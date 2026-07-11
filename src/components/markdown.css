@@ -1,0 +1,148 @@
+/* MarkdownRenderer prose + KaTeX styles.
+ *
+ * Only styles elements that do NOT already receive Tailwind classes from the
+ * custom react-markdown components (p, ul, ol, li, hr, strong, em, img, and
+ * KaTeX). Elements with custom components (h1-h6, code, pre, table, th, td,
+ * blockquote, a, citation) are styled via Tailwind classes in
+ * `markdown-components.tsx`, so we deliberately do not add `.prose-content`
+ * rules for them here (that would override the utilities).
+ */
+
+.prose-content {
+  color: #44403c; /* stone-700 */
+  font-size: 15px;
+  line-height: 1.75;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  /* Prevent content from expanding parent — critical for formula/table overflow */
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+/* Paragraphs */
+.prose-content p {
+  margin: 0.75rem 0;
+}
+
+.prose-content > :first-child {
+  margin-top: 0;
+}
+
+.prose-content > :last-child {
+  margin-bottom: 0;
+}
+
+/* Inline emphasis */
+.prose-content strong {
+  font-weight: 600;
+  color: #1c1917; /* stone-900 */
+}
+
+.prose-content em {
+  font-style: italic;
+}
+
+/* Lists — including nested */
+.prose-content ul,
+.prose-content ol {
+  margin: 0.75rem 0;
+  padding-left: 1.5rem;
+}
+
+.prose-content ul {
+  list-style: disc outside;
+}
+
+.prose-content ol {
+  list-style: decimal outside;
+}
+
+.prose-content li {
+  margin: 0.375rem 0;
+}
+
+.prose-content li::marker {
+  color: #78716c; /* stone-500 */
+}
+
+/* Nested list indentation */
+.prose-content li > ul,
+.prose-content li > ol {
+  margin: 0.375rem 0;
+}
+
+.prose-content li > ul {
+  list-style: disc outside;
+}
+
+.prose-content li > ol {
+  list-style: lower-alpha outside;
+}
+
+.prose-content li > ol > li > ol {
+  list-style: lower-roman outside;
+}
+
+/* Task list items (GFM) — no bullet */
+.prose-content li:has(> input[type='checkbox']) {
+  list-style: none;
+  margin-left: -1.25rem;
+}
+
+.prose-content li input[type='checkbox'] {
+  margin-right: 0.5rem;
+}
+
+/* Horizontal rule */
+.prose-content hr {
+  margin: 1.5rem 0;
+  border: 0;
+  border-top: 1px solid #e7e5e4; /* stone-200 */
+}
+
+/* Images */
+.prose-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+/* KaTeX — allow long formulas to scroll horizontally within their container */
+.prose-content .katex-display {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5rem 0;
+  margin: 1rem 0;
+}
+
+.prose-content .katex-display > .katex {
+  white-space: nowrap;
+}
+
+/* Inline math should not break layout */
+.prose-content .katex {
+  font-size: 1.05em;
+}
+
+/* Citation button base (component adds most styling) */
+.prose-content sup button {
+  font-family: inherit;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+/* Narrow panels (e.g. KnowledgeGraph right panel): keep things readable */
+@media (max-width: 480px) {
+  .prose-content {
+    font-size: 14px;
+  }
+
+  .prose-content ul,
+  .prose-content ol {
+    padding-left: 1.25rem;
+  }
+}
