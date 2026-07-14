@@ -16,6 +16,7 @@ const SNAPSHOTS = 'snapshots';
 const RETRIEVAL = 'retrieval-records';
 const QA_CONVERSATIONS = 'qa-conversations';
 const QA_MESSAGES = 'qa-messages';
+const LOCAL_STORAGE_UNAVAILABLE = 'Local course library storage is temporarily unavailable. Please retry.';
 
 interface SnapshotRecord {
   documentId: string;
@@ -63,13 +64,13 @@ async function openLibraryDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return null;
   if (dbPromise) return dbPromise;
   let settled = false;
-  const openingPromise = new Promise<IDBDatabase | null>(resolve => {
+  const openingPromise = new Promise<IDBDatabase | null>((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
     const settleUnavailable = () => {
       if (settled) return;
       settled = true;
       if (dbPromise === openingPromise) dbPromise = null;
-      resolve(null);
+      reject(new Error(LOCAL_STORAGE_UNAVAILABLE));
     };
     request.onupgradeneeded = () => {
       const db = request.result;
@@ -108,11 +109,13 @@ async function openLibraryDb(): Promise<IDBDatabase | null> {
       resolve(db);
     };
     request.onerror = () => {
+      if (settled) return;
       console.warn('Unable to open course library IndexedDB:', request.error);
       settleUnavailable();
     };
     request.onblocked = () => {
-      console.warn('Course library IndexedDB upgrade blocked; using memory fallback.');
+      if (settled) return;
+      console.warn('Course library IndexedDB upgrade blocked; local persistence is unavailable.');
       settleUnavailable();
     };
   });

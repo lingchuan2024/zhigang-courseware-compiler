@@ -334,18 +334,27 @@ describe('library repository', () => {
     expect(conversationCreatedAtKeyPath).toEqual(['conversationId', 'createdAt']);
   });
 
-  it('falls back when an upgrade is blocked and retries after the blocker closes', async () => {
+  it('rejects a blocked write and persists it after the blocker closes and the write is retried', async () => {
     const versionOneDb = await createVersionOneDatabase();
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const blockedList = listLibraryCourses();
+    const blockedWrite = saveChatConversation(conversation('after-block', 20));
     const outcome = await Promise.race([
-      blockedList.then(() => 'settled' as const),
-      new Promise<'pending'>(resolve => setTimeout(() => resolve('pending'), 25)),
+      blockedWrite.then(
+        () => ({ status: 'resolved' as const }),
+        error => ({ status: 'rejected' as const, error }),
+      ),
+      new Promise<{ status: 'pending' }>(resolve => {
+        setTimeout(() => resolve({ status: 'pending' }), 25);
+      }),
     ]);
 
     versionOneDb.close();
-    await blockedList;
     await new Promise(resolve => setTimeout(resolve, 0));
+    expect(outcome).toMatchObject({ status: 'rejected' });
+    if (outcome.status === 'rejected') {
+      expect(outcome.error).toEqual(new Error('Local course library storage is temporarily unavailable. Please retry.'));
+    }
+
     await saveChatConversation(conversation('after-block', 20));
     const db = await openDatabase();
     const storedConversation = await idbRequest(
@@ -353,10 +362,19 @@ describe('library repository', () => {
     );
     db.close();
 
-    expect(outcome).toBe('settled');
-    expect(warning).toHaveBeenCalledWith('Course library IndexedDB upgrade blocked; using memory fallback.');
+    expect(warning).toHaveBeenCalledWith('Course library IndexedDB upgrade blocked; local persistence is unavailable.');
     expect((await listChatConversations()).map(item => item.id)).toContain('after-block');
     expect(storedConversation).toMatchObject({ id: 'after-block' });
+  });
+
+  it('rejects a write when the IndexedDB open request errors', async () => {
+    const futureDb = await openDatabase(3);
+    futureDb.close();
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await expect(saveChatConversation(conversation('cannot-save', 20))).rejects.toThrow(
+      'Local course library storage is temporarily unavailable. Please retry.',
+    );
   });
 
   it('closes an open repository connection when another version is requested', async () => {
