@@ -904,6 +904,8 @@ export const useStore = create<AppState>((set, get) => ({
       sourceDocuments,
       knowledgeTopics,
       topicRelations,
+      teachingRelations,
+      narrativePaths,
       courseLearningPath,
       knowledgeCards,
       glossary,
@@ -980,6 +982,8 @@ export const useStore = create<AppState>((set, get) => ({
         terminology: generationMemory.terminology,
         symbols: generationMemory.symbols,
         structureVersion: knowledgeBaseVersions.topicStructure,
+        teachingRelations,
+        narrativePaths,
       }, {
         onTopicSynthesis: (synthesis, current, total) => {
           const existing = get().topicSyntheses.filter(item => item.topicId !== synthesis.topicId);

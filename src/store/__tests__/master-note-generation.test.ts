@@ -44,7 +44,7 @@ const card: KnowledgeCard = {
 };
 
 const synthesis: TopicSynthesis = {
-  id: 'synthesis-1', topicId: 'topic-1', framework: ['公式'], orderedCardIds: ['card-1'], parallelGroups: [], comparisons: [], formulaChains: [],
+  id: 'synthesis-1', topicId: 'topic-1', framework: ['公式'], orderedCardIds: ['card-1'], sections: [], parallelGroups: [], comparisons: [], formulaChains: [],
   markdown: 'GLM 综合', cardVersions: { 'card-1': 1 }, status: 'completed',
 };
 

@@ -1233,6 +1233,9 @@ export interface KnowledgeCard {
   confidence: number;
   reviewStatus: 'generated' | 'reviewed' | 'corrected';
 
+  /** 当前一级知识的二级叙事顺序，从 0 开始。 */
+  narrativeIndex?: number;
+
   /** 卡片及其来源的版本，用于精准标记下游过期状态。 */
   status?: GenerationStatus;
   sourceVersion?: number;
@@ -1289,12 +1292,21 @@ export interface FormulaChain {
   explanation: string;
 }
 
+export interface TopicSynthesisSection {
+  id: string;
+  title: string;
+  cardIds: string[];
+  relationReason: string;
+  markdown: string;
+}
+
 /** 一个一级知识对其全部二级知识卡片的综合结果。 */
 export interface TopicSynthesis {
   id: string;
   topicId: string;
   framework: string[];
   orderedCardIds: string[];
+  sections: TopicSynthesisSection[];
   parallelGroups: ParallelKnowledgeGroup[];
   comparisons: KnowledgeComparison[];
   formulaChains: FormulaChain[];

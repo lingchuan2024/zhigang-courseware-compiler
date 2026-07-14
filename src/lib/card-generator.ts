@@ -13,6 +13,7 @@ import {
   SourceRange,
   MarkdownBlock,
   TopicRelation,
+  TopicNarrativePath,
 } from '../types';
 import { generateId } from './utils';
 
@@ -196,14 +197,30 @@ export function generateCards(
   teachingBlocks: TeachingBlock[],
   allBlocks: MarkdownBlock[],
   topicRelations?: TopicRelation[],
+  narrativePaths?: Record<string, TopicNarrativePath>,
 ): KnowledgeCard[] {
   // 构建主题查找表
   const topicMap = new Map<string, KnowledgeTopic>(topics.map(t => [t.id, t]));
 
   const cards: KnowledgeCard[] = [];
+  const originalIndex = new Map(teachingBlocks.map((block, index) => [block.id, index]));
+  const orderedBlocks = topics.flatMap(topic => {
+    const topicBlocks = teachingBlocks.filter(block => block.topicId === topic.id);
+    const pathOrder = new Map(
+      (narrativePaths?.[topic.id]?.orderedTeachingBlockIds ?? []).map((id, index) => [id, index]),
+    );
+    return [...topicBlocks].sort((a, b) => {
+      const aOrder = pathOrder.get(a.id);
+      const bOrder = pathOrder.get(b.id);
+      if (aOrder !== undefined || bOrder !== undefined) {
+        return (aOrder ?? Number.MAX_SAFE_INTEGER) - (bOrder ?? Number.MAX_SAFE_INTEGER);
+      }
+      return (originalIndex.get(a.id) ?? 0) - (originalIndex.get(b.id) ?? 0);
+    });
+  });
 
-  for (let blockIndex = 0; blockIndex < teachingBlocks.length; blockIndex++) {
-    const block = teachingBlocks[blockIndex];
+  for (let blockIndex = 0; blockIndex < orderedBlocks.length; blockIndex++) {
+    const block = orderedBlocks[blockIndex];
     const topic = topicMap.get(block.topicId);
 
     // 找不到对应主题时跳过
@@ -245,7 +262,7 @@ export function generateCards(
         : undefined;
 
     const card: KnowledgeCard = {
-      id: `card_${topic.id}_${blockIndex}`,
+      id: `card_${topic.id}_${block.id}`,
       courseId: topic.courseId,
       topicId: topic.id,
       topicName: topic.name,
@@ -263,6 +280,7 @@ export function generateCards(
       misconceptions,
       confidence: block.confidence,
       reviewStatus: 'generated',
+      narrativeIndex: cards.filter(existing => existing.topicId === topic.id).length,
     };
 
     cards.push(card);

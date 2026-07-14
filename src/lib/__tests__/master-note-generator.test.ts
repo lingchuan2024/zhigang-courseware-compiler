@@ -154,4 +154,38 @@ describe('master note generator', () => {
     expect(result.masterNote.coverage.missingCardIds).toEqual(['card-b']);
     expect(onChapter).toHaveBeenCalledTimes(2);
   });
+
+  it('synthesizes cards in the second-layer narrative order', async () => {
+    const requests: MasterNoteGenerationRequest[] = [];
+    const completer: MasterNoteCompleter = async request => {
+      requests.push(request);
+      if (request.kind === 'topic-synthesis') {
+        return { framework: ['知识族', '公式'], sections: [], parallelGroups: [], comparisons: [], formulaChains: [], markdown: '按顺序综合' };
+      }
+      if (request.kind === 'chapter-plan') {
+        return { chapters: [{ id: 'chapter-1', title: 'GLM', objective: '理解', topicIds: ['topic-a'], framework: ['GLM'] }] };
+      }
+      return { markdown: '## GLM\n\n完整正文' };
+    };
+    const cardA = card('card-a', 'topic-a', '公式细节');
+    const cardB = card('card-b', 'topic-a', '知识族细节');
+
+    const result = await runMasterNoteGeneration(config, {
+      courseId: 'course-1', title: '测试课程', topics: [topic('topic-a', 'GLM')], topicRelations: [],
+      orderedTopicIds: ['topic-a'], knowledgeCards: [cardA, cardB], glossary: [], formulaIndex: [],
+      terminology: {}, symbols: {}, structureVersion: 1,
+      narrativePaths: {
+        'topic-a': {
+          topicId: 'topic-a',
+          orderedTeachingBlockIds: [cardB.teachingBlockId, cardA.teachingBlockId],
+          rationale: '先知识族后公式',
+        },
+      },
+      teachingRelations: [],
+    }, {}, completer);
+
+    const synthesisRequest = requests.find(request => request.kind === 'topic-synthesis')!;
+    expect(synthesisRequest.user.indexOf('card-b')).toBeLessThan(synthesisRequest.user.indexOf('card-a'));
+    expect(result.topicSyntheses[0].orderedCardIds).toEqual(['card-b', 'card-a']);
+  });
 });

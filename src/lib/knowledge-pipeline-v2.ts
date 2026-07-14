@@ -280,7 +280,7 @@ export async function runKnowledgePipeline(
   const formulaCards: FormulaCard[] = [];
 
   try {
-    knowledgeCards = generateCards(topics, teachingBlocks, allBlocks, topicRelations);
+    knowledgeCards = generateCards(topics, teachingBlocks, allBlocks, topicRelations, narrativePaths);
     versions.cards++;
     warnings.push(`生成了 ${knowledgeCards.length} 张知识卡片`);
   } catch (e) {
