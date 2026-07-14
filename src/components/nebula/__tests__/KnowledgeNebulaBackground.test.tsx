@@ -110,6 +110,60 @@ describe('KnowledgeNebulaBackground', () => {
     expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
   });
 
+  it('starts and stops data-canvas work as knowledge appears and disappears', () => {
+    const addWindowListener = vi.spyOn(window, 'addEventListener');
+    const removeWindowListener = vi.spyOn(window, 'removeEventListener');
+    const addDocumentListener = vi.spyOn(document, 'addEventListener');
+    const removeDocumentListener = vi.spyOn(document, 'removeEventListener');
+    const addCanvasListener = vi.spyOn(HTMLCanvasElement.prototype, 'addEventListener');
+    const removeCanvasListener = vi.spyOn(HTMLCanvasElement.prototype, 'removeEventListener');
+    const onCourseOpen = vi.fn();
+
+    act(() => root.render(createElement(KnowledgeNebulaBackground, {
+      summaries: [],
+      onCourseOpen,
+      reducedMotion: true,
+    })));
+
+    expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
+    expect(container.querySelector('[aria-label^="打开课程："]')).toBeNull();
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+    expect(addWindowListener).not.toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(addDocumentListener).not.toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+    expect(addCanvasListener).not.toHaveBeenCalledWith('wheel', expect.any(Function), expect.anything());
+
+    act(() => root.render(createElement(KnowledgeNebulaBackground, {
+      summaries: [summary],
+      onCourseOpen,
+      reducedMotion: true,
+    })));
+
+    expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).toBeNull();
+    expect(container.querySelector('[aria-label="放大星云"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="打开课程：机器学习"]')).not.toBeNull();
+    expect(requestAnimationFrame).toHaveBeenCalled();
+    expect(addWindowListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(addDocumentListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+    expect(addCanvasListener).toHaveBeenCalledWith('wheel', expect.any(Function), { passive: false });
+    const populatedAnimationCalls = vi.mocked(requestAnimationFrame).mock.calls.length;
+
+    act(() => root.render(createElement(KnowledgeNebulaBackground, {
+      summaries: [{ ...summary, knowledgeCount: 0, stars: [] }],
+      onCourseOpen,
+      reducedMotion: true,
+    })));
+
+    expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
+    expect(container.querySelector('[aria-label^="打开课程："]')).toBeNull();
+    expect(cancelAnimationFrame).toHaveBeenCalled();
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(populatedAnimationCalls);
+    expect(removeWindowListener).toHaveBeenCalledWith('resize', expect.any(Function));
+    expect(removeDocumentListener).toHaveBeenCalledWith('visibilitychange', expect.any(Function));
+    expect(removeCanvasListener).toHaveBeenCalledWith('wheel', expect.any(Function));
+  });
+
   it('removes global listeners and animation work on unmount', () => {
     const removeWindowListener = vi.spyOn(window, 'removeEventListener');
     const removeDocumentListener = vi.spyOn(document, 'removeEventListener');

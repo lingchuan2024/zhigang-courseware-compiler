@@ -61,6 +61,7 @@ export function HomeView({ onOpenSettings }: HomeViewProps) {
         </section>
       ) : (
         <div className="absolute inset-x-0 bottom-10 z-30 flex justify-center px-6 md:bottom-12">
+          <h1 className="sr-only">知纲</h1>
           <button
             type="button"
             onClick={() => navigate('library')}

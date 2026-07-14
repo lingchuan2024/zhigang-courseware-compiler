@@ -242,6 +242,7 @@ export function KnowledgeNebulaBackground({
   const hasKnowledge = summaries.some(summary => summary.knowledgeCount > 0);
 
   useEffect(() => {
+    if (!hasKnowledge) return undefined;
     const measure = () => {
       const bounds = containerRef.current?.getBoundingClientRect();
       setViewport({
@@ -252,24 +253,33 @@ export function KnowledgeNebulaBackground({
     measure();
     window.addEventListener('resize', measure);
     return () => window.removeEventListener('resize', measure);
-  }, []);
+  }, [hasKnowledge]);
 
   useEffect(() => {
+    if (!hasKnowledge) {
+      pausedRef.current = false;
+      return undefined;
+    }
     const handleVisibility = () => {
       pausedRef.current = document.visibilityState === 'hidden';
     };
     document.addEventListener('visibilitychange', handleVisibility);
     return () => document.removeEventListener('visibilitychange', handleVisibility);
-  }, []);
+  }, [hasKnowledge]);
 
   useEffect(() => {
+    if (!hasKnowledge) {
+      textureRef.current = null;
+      setCanvasFallback(canvasRef.current?.getContext('2d') == null);
+      return;
+    }
     const fitted = fitScene(scene.bounds, viewport, 96);
     cameraRef.current = fitted;
     targetCameraRef.current = fitted;
     setZoomLabel(fitted.zoom);
     textureRef.current = buildSceneTexture(scene);
     setCanvasFallback(textureRef.current === null || canvasRef.current?.getContext('2d') == null);
-  }, [scene, viewport]);
+  }, [hasKnowledge, scene, viewport]);
 
   const drawFrame = useCallback((time: number) => {
     const canvas = canvasRef.current;
@@ -321,6 +331,7 @@ export function KnowledgeNebulaBackground({
   }, [scene, shouldReduceMotion, viewport]);
 
   useEffect(() => {
+    if (!hasKnowledge) return undefined;
     let active = true;
     let lastReportedZoom = cameraRef.current.zoom;
     const animate = (time: number) => {
@@ -359,7 +370,7 @@ export function KnowledgeNebulaBackground({
       if (animationRef.current !== null) cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     };
-  }, [drawFrame, scene.bounds, shouldReduceMotion, viewport]);
+  }, [drawFrame, hasKnowledge, scene.bounds, shouldReduceMotion, viewport]);
 
   const applyCamera = useCallback((camera: NebulaCamera) => {
     targetCameraRef.current = camera;
@@ -381,6 +392,7 @@ export function KnowledgeNebulaBackground({
   const fitAll = useCallback(() => applyCamera(fitScene(scene.bounds, viewport, 96)), [applyCamera, scene.bounds, viewport]);
 
   useEffect(() => {
+    if (!hasKnowledge) return undefined;
     const canvas = canvasRef.current;
     if (!canvas) return undefined;
     const handleWheel = (event: WheelEvent) => {
@@ -398,7 +410,7 @@ export function KnowledgeNebulaBackground({
     };
     canvas.addEventListener('wheel', handleWheel, { passive: false });
     return () => canvas.removeEventListener('wheel', handleWheel);
-  }, [applyCamera, scene.bounds, viewport]);
+  }, [applyCamera, hasKnowledge, scene.bounds, viewport]);
 
   const localPointer = useCallback((event: ReactPointerEvent<HTMLCanvasElement>): PointerState => {
     const bounds = event.currentTarget.getBoundingClientRect();

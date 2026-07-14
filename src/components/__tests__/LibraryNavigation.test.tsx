@@ -81,6 +81,7 @@ describe('multi-course library navigation', () => {
   it('starts at home, creates a course, and opens its upload workspace', async () => {
     await act(async () => root!.render(createElement(App)));
     expect(container!.textContent).toContain('知纲');
+    expect(container!.querySelector('h1')?.textContent).toBe('知纲');
     expect(container!.textContent).not.toContain('还没有被点亮的知识星');
     expect(container!.textContent).not.toContain('知识被观测，星云才会发光。');
     expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
