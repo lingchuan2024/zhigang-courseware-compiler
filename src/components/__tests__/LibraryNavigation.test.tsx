@@ -7,8 +7,10 @@ import {
   listLibraryCourses,
   listLibraryDocuments,
   resetLibraryRepositoryForTests,
+  saveLibraryProjectSnapshot,
   upsertLibraryDocument,
 } from '../../lib/library-repository';
+import { useLibraryStore } from '../../store/useLibraryStore';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -48,6 +50,28 @@ afterEach(() => {
 });
 
 describe('multi-course library navigation', () => {
+  it('loads persisted course nebula summaries during initialization', async () => {
+    const course = await createLibraryCourse({ name: '机器学习' });
+    await upsertLibraryDocument({
+      id: 'nebula-doc', courseId: course.id, title: '星云讲义', fileName: 'nebula.pdf',
+      fileType: 'pdf', pageCount: 1, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await saveLibraryProjectSnapshot(course.id, 'nebula-doc', {
+      knowledgeTopics: [{
+        id: 'topic-1', courseId: course.id, name: 'Softmax', aliases: [], summary: '', learningObjective: '',
+        sourceRanges: [{ documentId: 'nebula-doc', startBlockId: 'a', endBlockId: 'b' }], childTopicIds: [],
+        importance: 'core', difficulty: 3, knowledgeGenre: 'concept', confidence: 0.9, status: 'generated',
+      }],
+      knowledgeCards: [],
+    });
+
+    await act(async () => root!.render(createElement(App)));
+
+    expect(useLibraryStore.getState().nebulaSummaries).toEqual([
+      expect.objectContaining({ courseId: course.id, knowledgeCount: 1 }),
+    ]);
+  });
+
   it('starts at home, creates a course, and opens its upload workspace', async () => {
     await act(async () => root!.render(createElement(App)));
     expect(container!.textContent).toContain('从课件到知识网络');

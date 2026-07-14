@@ -1,11 +1,12 @@
 import { create } from 'zustand';
-import type { LibraryCourse, LibraryDocument } from '../types';
+import type { CourseNebulaSummary, LibraryCourse, LibraryDocument } from '../types';
 import {
   createLibraryCourse,
   deleteLibraryCourseCascade,
   deleteLibraryDocumentCascade,
   listLibraryCourses,
   listLibraryDocuments,
+  listCourseNebulaSummaries,
   loadLibraryProjectSnapshot,
   migrateLegacyProjectToLibrary,
 } from '../lib/library-repository';
@@ -18,6 +19,7 @@ interface LibraryState {
   screen: LibraryScreen;
   courses: LibraryCourse[];
   documents: LibraryDocument[];
+  nebulaSummaries: CourseNebulaSummary[];
   activeCourseId: string | null;
   initialized: boolean;
   loading: boolean;
@@ -33,15 +35,24 @@ interface LibraryState {
   deleteCourse: (courseId: string) => Promise<void>;
 }
 
-async function loadLibraryData(): Promise<{ courses: LibraryCourse[]; documents: LibraryDocument[] }> {
-  const [courses, documents] = await Promise.all([listLibraryCourses(), listLibraryDocuments()]);
-  return { courses, documents };
+async function loadLibraryData(): Promise<{
+  courses: LibraryCourse[];
+  documents: LibraryDocument[];
+  nebulaSummaries: CourseNebulaSummary[];
+}> {
+  const [courses, documents, nebulaSummaries] = await Promise.all([
+    listLibraryCourses(),
+    listLibraryDocuments(),
+    listCourseNebulaSummaries(),
+  ]);
+  return { courses, documents, nebulaSummaries };
 }
 
 export const useLibraryStore = create<LibraryState>((set, get) => ({
   screen: 'home',
   courses: [],
   documents: [],
+  nebulaSummaries: [],
   activeCourseId: null,
   initialized: false,
   loading: false,
