@@ -60,8 +60,8 @@ export function MinerUParseView({ onOpenSettings }: MinerUParseViewProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-space-950">
-      <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900 px-6">
+    <div className="flex min-h-0 flex-1 flex-col bg-space-950/[0.76]">
+      <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.94] px-6 backdrop-blur-xl">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => navigateToStage('document')} className="text-space-muted hover:text-ink">←</button>
           <div className="min-w-0">
@@ -126,7 +126,7 @@ export function MinerUParseView({ onOpenSettings }: MinerUParseViewProps) {
         </main>
       ) : (
         <main className="flex-1 min-h-0 flex">
-          <aside className="w-64 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900 p-5">
+          <aside className="w-64 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900/[0.94] p-5 backdrop-blur-xl">
             <p className="mb-4 text-xs uppercase tracking-wider text-space-muted">解析摘要</p>
             <dl className="space-y-4 text-sm">
               <div><dt className="text-space-muted">状态</dt><dd className="mt-1 text-celadon-light">解析完成</dd></div>

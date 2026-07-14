@@ -237,14 +237,14 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     : 'loading';
 
   return (
-    <div className="relative h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-space-950">
+    <div className="relative h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-space-950/[0.68]">
     <div
       ref={backgroundRef}
       data-testid="qa-two-column-layout"
       aria-hidden={selectedCitation ? true : undefined}
-      className="grid h-[calc(100dvh-4rem)] min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-space-950 text-space-text md:grid-cols-[264px_minmax(0,1fr)] md:grid-rows-1"
+      className="grid h-[calc(100dvh-4rem)] min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-space-950/[0.72] text-space-text md:grid-cols-[264px_minmax(0,1fr)] md:grid-rows-1"
     >
-      <aside className="z-10 flex max-h-[220px] min-h-0 flex-col border-b border-space-border bg-space-900 md:max-h-none md:border-b-0 md:border-r">
+      <aside className="z-10 flex max-h-[220px] min-h-0 flex-col border-b border-space-border bg-space-900/[0.92] backdrop-blur-xl md:max-h-none md:border-b-0 md:border-r">
         <div className="border-b border-space-border p-4 md:p-5">
           <button
             type="button"
@@ -353,7 +353,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
         </div>
       </aside>
 
-      <main className="flex min-h-0 min-w-0 flex-col bg-[radial-gradient(circle_at_50%_0%,rgba(35,83,118,0.16),transparent_42%)]">
+      <main className="flex min-h-0 min-w-0 flex-col bg-space-950/[0.64] backdrop-blur-[2px]">
         <header className="flex items-center justify-between border-b border-space-border bg-space-900/90 px-5 py-4 backdrop-blur md:px-8">
           <div>
             <p className="font-mono text-[9px] tracking-[0.22em] text-cinnabar">KNOWLEDGE CARD CHAT</p>

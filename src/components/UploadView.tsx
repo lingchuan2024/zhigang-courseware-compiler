@@ -68,7 +68,7 @@ export function UploadView() {
   }, [handleCoursewareFile]);
 
   return (
-    <div className="flex-1 overflow-y-auto bg-space-950 p-8 flex items-center justify-center">
+    <div className="flex flex-1 items-center justify-center overflow-y-auto bg-space-950/[0.72] p-8 backdrop-blur-[2px]">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <h2 className="font-song text-3xl font-bold text-ink mb-3">上传课件</h2>

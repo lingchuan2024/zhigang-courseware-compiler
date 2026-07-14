@@ -163,7 +163,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
 
   if (courseNetwork.nodes.length === 0) {
     return (
-      <div className="grid flex-1 place-items-center bg-space-950">
+      <div className="grid flex-1 place-items-center bg-space-950/[0.74]">
         <div className="text-center">
           <p className="mb-4 text-space-muted">暂无知识结构数据</p>
           <button className="btn-primary" onClick={() => navigateToStage('mineru')}>返回 MinerU 解析</button>
@@ -173,8 +173,8 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   }
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950">
-      <header className="flex h-[72px] flex-shrink-0 items-center justify-between gap-4 border-b border-space-border bg-space-900 px-5">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950/[0.72]">
+      <header className="flex h-[72px] flex-shrink-0 items-center justify-between gap-4 border-b border-space-border bg-space-900/[0.94] px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigateToStage('mineru')} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-white" aria-label="返回 MinerU 解析">←</button>
           <div className="min-w-0">

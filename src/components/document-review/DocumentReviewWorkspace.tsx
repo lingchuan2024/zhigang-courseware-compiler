@@ -104,8 +104,8 @@ export function DocumentReviewWorkspace() {
   // Markdown 预览模式
   if (isMarkdown || hasSourceDocs) {
     return (
-      <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950">
-        <div className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900 px-6 py-3">
+      <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.78]">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.94] px-6 py-3 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <button
               className="text-sm text-charcoal/60 hover:text-ink"
@@ -158,7 +158,7 @@ export function DocumentReviewWorkspace() {
   }
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.78]">
       <ReviewToolbar
         fileName={document.fileName || document.title}
         totalPages={totalPages}
@@ -191,7 +191,7 @@ export function DocumentReviewWorkspace() {
 
       <div className="flex-1 flex overflow-hidden">
         {!isPptx && (
-          <aside className="hidden w-[148px] flex-shrink-0 overflow-hidden border-r border-space-border bg-space-900 lg:block xl:w-[168px]">
+          <aside className="hidden w-[148px] flex-shrink-0 overflow-hidden border-r border-space-border bg-space-900/[0.94] backdrop-blur-xl lg:block xl:w-[168px]">
             <PageNavigator
             pages={displayPages}
               currentPage={currentPage}

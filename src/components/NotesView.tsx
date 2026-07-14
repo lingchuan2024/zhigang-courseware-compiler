@@ -330,9 +330,9 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
   const citations = activeKp?.note?.citations || [];
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950 text-space-text">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.82] text-space-text">
       {/* 顶部栏 */}
-      <header className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-6 py-3 backdrop-blur-xl">
+      <header className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.97] px-6 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigateToStage('structure')}
@@ -478,7 +478,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧目录 */}
         {sidebarOpen && (
-          <aside className="w-64 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900">
+          <aside className="w-64 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900/[0.96] backdrop-blur-xl">
             <div className="p-3">
               <div className="mb-3 flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider text-space-faint">
                 <span>目录</span>
