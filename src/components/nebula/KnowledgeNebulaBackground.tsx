@@ -22,6 +22,7 @@ import {
   type Point,
   type Size,
 } from '../../lib/nebula/nebula-layout';
+import { AstronomyBackdrop } from '../backgrounds/AstronomyBackdrop';
 import { NebulaViewportControls } from './NebulaViewportControls';
 
 interface KnowledgeNebulaBackgroundProps {
@@ -468,11 +469,12 @@ export function KnowledgeNebulaBackground({
       className="absolute inset-0 overflow-hidden bg-[#010207]"
       data-canvas-fallback={canvasFallback ? 'true' : undefined}
     >
+      {!hasKnowledge ? <AstronomyBackdrop variant="dormant" /> : null}
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_20%,rgba(24,66,91,.16),transparent_34%),radial-gradient(circle_at_18%_76%,rgba(102,22,48,.13),transparent_38%),linear-gradient(145deg,#010207_0%,#030713_55%,#010207_100%)]" />
       <canvas
         ref={canvasRef}
         data-nebula-canvas="true"
-        className="absolute inset-0 h-full w-full cursor-grab touch-none active:cursor-grabbing"
+        className={`absolute inset-0 h-full w-full cursor-grab touch-none active:cursor-grabbing ${!hasKnowledge ? 'hidden' : ''}`}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerEnd}
@@ -487,42 +489,37 @@ export function KnowledgeNebulaBackground({
         aria-hidden="true"
       />
 
-      <div className="pointer-events-none absolute inset-0 z-20" aria-label="课程星云">
-        {scene.courses.map(course => (
-          <button
-            key={course.courseId}
-            ref={element => {
-              if (element) hotspotRefs.current.set(course.courseId, element);
-              else hotspotRefs.current.delete(course.courseId);
-            }}
-            type="button"
-            aria-label={`打开课程：${course.courseName}`}
-            onClick={() => onCourseOpen(course.courseId)}
-            className="pointer-events-auto absolute left-0 top-0 min-w-36 rounded-2xl border border-white/10 bg-[#040914]/55 px-4 py-3 text-left text-[#edf7fc] opacity-0 shadow-[0_16px_50px_rgba(0,0,0,.38)] backdrop-blur-md transition-[border-color,background-color,opacity] hover:border-[#77dbea]/45 hover:bg-[#07111d]/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#72d9e8]"
-          >
-            <span className="block font-song text-base font-bold tracking-wide">{course.courseName}</span>
-            <span className="mt-1 block font-mono text-[9px] tracking-[0.14em] text-[#71879a]">
-              {course.documentCount} 份课件 · {course.knowledgeCount} 个知识点
-            </span>
-          </button>
-        ))}
-      </div>
-
-      {!hasKnowledge ? (
-        <div className="pointer-events-none absolute inset-0 z-20 grid place-items-center px-6 text-center">
-          <div className="rounded-3xl border border-white/[0.07] bg-[#030812]/45 px-8 py-7 backdrop-blur-sm">
-            <p className="font-song text-xl text-[#dceaf0]">还没有被点亮的知识星</p>
-            <p className="mt-2 text-xs tracking-wider text-[#60778a]">导入并解析课件后，真实知识点会在这里聚成星云</p>
-          </div>
+      {hasKnowledge ? (
+        <div className="pointer-events-none absolute inset-0 z-20" aria-label="课程星云">
+          {scene.courses.map(course => (
+            <button
+              key={course.courseId}
+              ref={element => {
+                if (element) hotspotRefs.current.set(course.courseId, element);
+                else hotspotRefs.current.delete(course.courseId);
+              }}
+              type="button"
+              aria-label={`打开课程：${course.courseName}`}
+              onClick={() => onCourseOpen(course.courseId)}
+              className="pointer-events-auto absolute left-0 top-0 min-w-36 rounded-2xl border border-white/10 bg-[#040914]/55 px-4 py-3 text-left text-[#edf7fc] opacity-0 shadow-[0_16px_50px_rgba(0,0,0,.38)] backdrop-blur-md transition-[border-color,background-color,opacity] hover:border-[#77dbea]/45 hover:bg-[#07111d]/85 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#72d9e8]"
+            >
+              <span className="block font-song text-base font-bold tracking-wide">{course.courseName}</span>
+              <span className="mt-1 block font-mono text-[9px] tracking-[0.14em] text-[#71879a]">
+                {course.documentCount} 份课件 · {course.knowledgeCount} 个知识点
+              </span>
+            </button>
+          ))}
         </div>
       ) : null}
 
-      <NebulaViewportControls
-        zoom={zoomLabel}
-        onZoomIn={() => zoomBy(1.22)}
-        onZoomOut={() => zoomBy(1 / 1.22)}
-        onFit={fitAll}
-      />
+      {hasKnowledge ? (
+        <NebulaViewportControls
+          zoom={zoomLabel}
+          onZoomIn={() => zoomBy(1.22)}
+          onZoomOut={() => zoomBy(1 / 1.22)}
+          onFit={fitAll}
+        />
+      ) : null}
     </div>
   );
 }

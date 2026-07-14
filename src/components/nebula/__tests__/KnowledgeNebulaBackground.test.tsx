@@ -79,7 +79,7 @@ describe('KnowledgeNebulaBackground', () => {
     expect(onCourseOpen).toHaveBeenCalledWith('course-1');
   });
 
-  it('keeps the empty state and controls usable when Canvas 2D is unavailable', () => {
+  it('renders a dormant universe without data controls when Canvas 2D is unavailable', () => {
     vi.mocked(HTMLCanvasElement.prototype.getContext).mockReturnValue(null);
     act(() => root.render(createElement(KnowledgeNebulaBackground, {
       summaries: [],
@@ -87,9 +87,24 @@ describe('KnowledgeNebulaBackground', () => {
       reducedMotion: true,
     })));
 
-    expect(container.textContent).toContain('还没有被点亮的知识星');
-    expect(container.querySelector<HTMLButtonElement>('[aria-label="放大星云"]')).not.toBeNull();
+    expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.textContent).not.toContain('还没有被点亮的知识星');
+    expect(container.textContent).not.toContain('导入并解析课件后');
+    expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
+    expect(container.querySelector('[aria-label^="打开课程："]')).toBeNull();
     expect(container.querySelector('[data-canvas-fallback="true"]')).not.toBeNull();
+  });
+
+  it('uses dormant mode when courses exist without knowledge', () => {
+    act(() => root.render(createElement(KnowledgeNebulaBackground, {
+      summaries: [{ ...summary, knowledgeCount: 0, stars: [] }],
+      onCourseOpen: vi.fn(),
+      reducedMotion: true,
+    })));
+
+    expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label^="打开课程："]')).toBeNull();
+    expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
   });
 
   it('removes global listeners and animation work on unmount', () => {
