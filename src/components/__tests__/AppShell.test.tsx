@@ -30,8 +30,12 @@ describe('AppShell', () => {
       },
     )));
 
+    const content = container.querySelector<HTMLElement>('[data-app-shell-content]');
+
     expect(container.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
-    expect(container.querySelector('[data-app-shell-content]')?.textContent).toContain('课程空间');
+    expect(content?.textContent).toContain('课程空间');
+    expect(content?.classList.contains('relative')).toBe(true);
+    expect(content?.classList.contains('z-10')).toBe(true);
   });
 
   it('keeps the brand home action when no backdrop is supplied', () => {
