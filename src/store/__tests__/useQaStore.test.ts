@@ -249,23 +249,92 @@ describe('QA conversation store', () => {
     });
     expect(useQaStore.getState().activeRequestConversationIds).not.toContain(conversationId);
 
-    const replacement = deferred<RagAnswer>();
-    const replacementAnswerer = vi.fn<QaAnswerer>(() => replacement.promise);
-    const replacementSend = useQaStore.getState().sendQuestion({
+    await expect(useQaStore.getState().sendQuestion({
       config,
       question: '删除失败后的新问题',
-      answerer: replacementAnswerer,
-    });
-    await waitFor(() => expect(replacementAnswerer).toHaveBeenCalledOnce());
-    expect(useQaStore.getState().activeRequestConversationIds).toEqual([conversationId]);
+      answerer: async () => completedAnswer('不应提前调用'),
+    })).rejects.toThrow('聊天已被删除');
 
     slow.resolve(completedAnswer('迟到回答'));
     await send;
-    expect(useQaStore.getState().activeRequestConversationIds).toEqual([conversationId]);
     expect((await listChatMessages(conversationId)).find(item => item.id === interrupted.id)?.status).toBe('interrupted');
-    replacement.resolve(completedAnswer('新回答'));
+    const replacementSend = useQaStore.getState().sendQuestion({
+      config,
+      question: '删除失败后的新问题',
+      answerer: async () => completedAnswer('新回答'),
+    });
     await replacementSend;
     expect(useQaStore.getState().activeRequestConversationIds).toEqual([]);
+  });
+
+  it('settles its own placeholder when pending persistence finishes after failed-delete scanning', async () => {
+    const pendingSaveStarted = deferred<void>();
+    const pendingSaveGate = deferred<void>();
+    const realSaveMessage = repository.saveChatMessage;
+    vi.spyOn(repository, 'saveChatMessage').mockImplementation(async item => {
+      if (item.role === 'assistant' && item.status === 'pending') {
+        pendingSaveStarted.resolve();
+        await pendingSaveGate.promise;
+      }
+      return realSaveMessage(item);
+    });
+    const answerer = vi.fn<QaAnswerer>().mockResolvedValue(completedAnswer('不应调用'));
+    const send = useQaStore.getState().sendQuestion({ config, question: '占位符竞争', answerer });
+    await pendingSaveStarted.promise;
+    const conversationId = useQaStore.getState().activeConversationId!;
+    vi.spyOn(repository, 'deleteChatConversation').mockRejectedValueOnce(new Error('删除事务失败'));
+
+    await expect(useQaStore.getState().deleteConversation(conversationId)).rejects.toThrow('删除事务失败');
+    await expect(useQaStore.getState().sendQuestion({
+      config,
+      question: '清理未完成时的问题',
+      answerer,
+    })).rejects.toThrow('聊天已被删除');
+
+    pendingSaveGate.resolve();
+    await send;
+
+    const stored = await listChatMessages(conversationId);
+    expect(stored.filter(item => item.status === 'pending')).toEqual([]);
+    expect(stored.find(item => item.role === 'assistant')).toMatchObject({
+      status: 'interrupted',
+      error: '删除聊天失败，回答生成已中断',
+    });
+    expect(useQaStore.getState().activeRequestConversationIds).toEqual([]);
+    expect(answerer).not.toHaveBeenCalled();
+
+    await useQaStore.getState().sendQuestion({
+      config,
+      question: '清理完成后的问题',
+      answerer: async () => completedAnswer('正常回答'),
+    });
+    expect((await listChatMessages(conversationId)).filter(item => item.status === 'pending')).toEqual([]);
+  });
+
+  it('reapplies a successful cascade when its pending placeholder write finishes late', async () => {
+    const pendingSaveStarted = deferred<void>();
+    const pendingSaveGate = deferred<void>();
+    const realSaveMessage = repository.saveChatMessage;
+    vi.spyOn(repository, 'saveChatMessage').mockImplementation(async item => {
+      if (item.role === 'assistant' && item.status === 'pending') {
+        pendingSaveStarted.resolve();
+        await pendingSaveGate.promise;
+      }
+      return realSaveMessage(item);
+    });
+    const answerer = vi.fn<QaAnswerer>().mockResolvedValue(completedAnswer('不应调用'));
+    const send = useQaStore.getState().sendQuestion({ config, question: '成功删除占位符竞争', answerer });
+    await pendingSaveStarted.promise;
+    const conversationId = useQaStore.getState().activeConversationId!;
+
+    await useQaStore.getState().deleteConversation(conversationId);
+    pendingSaveGate.resolve();
+    await send;
+
+    expect(await listChatMessages(conversationId)).toEqual([]);
+    expect((await listChatConversations()).some(item => item.id === conversationId)).toBe(false);
+    expect(useQaStore.getState().activeRequestConversationIds).toEqual([]);
+    expect(answerer).not.toHaveBeenCalled();
   });
 
   it('keeps a successful cascade deleted when the following conversation refresh fails', async () => {

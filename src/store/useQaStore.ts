@@ -22,6 +22,7 @@ import {
 const ACTIVE_CONVERSATION_KEY = 'zhigang_qa_active_conversation';
 const activeGenerations = new Map<string, symbol>();
 const invalidatedGenerations = new Map<string, symbol>();
+const settledCancelledGenerations = new Set<symbol>();
 const deletedConversationIds = new Set<string>();
 const deletionStates = new Map<string, 'pending' | 'succeeded' | 'failed'>();
 let provisionalConversationReservation: symbol | null = null;
@@ -152,7 +153,15 @@ function releaseGeneration(conversationId: string, token: symbol): void {
   if (activeGenerations.get(conversationId) === token) {
     activeGenerations.delete(conversationId);
   } else if (invalidatedGenerations.get(conversationId) === token) {
+    const deletionState = deletionStates.get(conversationId);
+    if (
+      (deletionState === 'failed' || deletionState === 'succeeded') &&
+      !settledCancelledGenerations.has(token)
+    ) {
+      return;
+    }
     invalidatedGenerations.delete(conversationId);
+    settledCancelledGenerations.delete(token);
     cleanupDeletionGuard(conversationId);
   } else {
     return;
@@ -187,6 +196,7 @@ function invalidateConversation(conversationId: string): void {
 export function resetQaStoreRuntimeForTests(): void {
   activeGenerations.clear();
   invalidatedGenerations.clear();
+  settledCancelledGenerations.clear();
   deletedConversationIds.clear();
   deletionStates.clear();
   provisionalConversationReservation = null;
@@ -226,6 +236,38 @@ async function refreshOwningConversation(conversationId: string, token: symbol):
           ? { ...item, updatedAt: Math.max(item.updatedAt, updated.updatedAt) }
           : item
       ))),
+    };
+  });
+}
+
+async function settleCancelledPlaceholder(
+  conversationId: string,
+  token: symbol,
+  placeholder: ChatMessage,
+): Promise<void> {
+  if (invalidatedGenerations.get(conversationId) !== token) return;
+  const deletionState = deletionStates.get(conversationId);
+  if (deletionState === 'succeeded') {
+    await repository.deleteChatConversation(conversationId);
+    settledCancelledGenerations.add(token);
+    return;
+  }
+  if (deletionState !== 'failed') return;
+  const interrupted: ChatMessage = {
+    ...placeholder,
+    status: 'interrupted',
+    error: '删除聊天失败，回答生成已中断',
+    updatedAt: nextTimestamp(),
+  };
+  await repository.saveChatMessage(interrupted);
+  settledCancelledGenerations.add(token);
+  useQaStore.setState(state => {
+    if (state.activeConversationId !== conversationId) return {};
+    const exists = state.messages.some(item => item.id === interrupted.id);
+    return {
+      messages: exists
+        ? state.messages.map(item => item.id === interrupted.id ? interrupted : item)
+        : [...state.messages, interrupted],
     };
   });
 }
@@ -298,7 +340,21 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
         : {}
     ));
   } catch (error) {
-    if (error instanceof GenerationCancelledError) return;
+    if (
+      error instanceof GenerationCancelledError ||
+      invalidatedGenerations.get(conversationId) === token
+    ) {
+      try {
+        await settleCancelledPlaceholder(conversationId, token, placeholder);
+      } catch (settleError) {
+        useQaStore.setState(state => (
+          state.activeConversationId === conversationId
+            ? { error: `中断回答失败：${errorMessage(settleError)}` }
+            : {}
+        ));
+      }
+      return;
+    }
     const failed: ChatMessage = {
       ...placeholder,
       status: 'failed',
@@ -541,7 +597,6 @@ export const useQaStore = create<QaState>((set, get) => ({
       }
 
       deletionStates.set(id, 'failed');
-      deletedConversationIds.delete(id);
       let interruptionError: string | null = null;
       try {
         await interruptPendingGenerationAfterDeleteFailure(id);
