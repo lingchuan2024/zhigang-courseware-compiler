@@ -213,12 +213,58 @@ export interface MinerUParseResult {
 // 课件文档
 export interface CourseDocument {
   id: string;
+  /** 所属课程空间；旧版单课件数据允许为空并在迁移时补齐。 */
+  courseId?: string;
   title: string;
   fileName: string;
   fileType?: 'pdf' | 'pptx' | 'markdown';
   sourceKey?: string;
   pages: CoursePage[];
   uploadedAt: number;
+}
+
+export type LibraryDocumentStatus = 'new' | 'processing' | 'ready' | 'failed' | 'stale';
+
+/** 本地课件库中的课程空间。 */
+export interface LibraryCourse {
+  id: string;
+  name: string;
+  description?: string;
+  documentIds: string[];
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** 本地课件库中的课件元数据；具体处理产物保存在独立快照中。 */
+export interface LibraryDocument {
+  id: string;
+  courseId: string;
+  title: string;
+  fileName: string;
+  fileType: 'pdf' | 'pptx' | 'markdown';
+  pageCount: number;
+  stage: ProductStage;
+  status: LibraryDocumentStatus;
+  uploadedAt: number;
+  updatedAt: number;
+  cardCount?: number;
+  error?: string;
+}
+
+/** 面向全库问答的知识卡片检索记录。 */
+export interface RetrievalRecord {
+  id: string;
+  cardId: string;
+  courseId: string;
+  documentId: string;
+  topicId: string;
+  teachingBlockId: string;
+  title: string;
+  content: string;
+  keywords: string[];
+  aliases: string[];
+  sourceRanges: SourceRange[];
+  version: number;
 }
 
 // 视图投影视图配置

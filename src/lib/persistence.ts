@@ -10,6 +10,7 @@ import {
 } from '../types';
 import { convertV1ToV2 } from './notes-v2';
 import { computeContentHash } from './evidence';
+import { saveLibraryProjectSnapshot, upsertLibraryDocument } from './library-repository';
 
 const STORAGE_KEY = 'zhigang_project_state';
 
@@ -66,6 +67,37 @@ export function saveState(state: Partial<ProjectState>): void {
     if (toSave.jobStatus === 'running') {
       toSave.job = null;
       toSave.jobStatus = 'idle';
+    }
+
+    const activeDocument = state.document;
+    if (activeDocument?.courseId) {
+      const updatedAt = Date.now();
+      void Promise.all([
+        upsertLibraryDocument({
+          id: activeDocument.id,
+          courseId: activeDocument.courseId,
+          title: activeDocument.title,
+          fileName: activeDocument.fileName,
+          fileType: activeDocument.fileType ?? 'markdown',
+          pageCount: activeDocument.pages.length,
+          stage: state.stage ?? 'upload',
+          status: state.jobStatus === 'failed'
+            ? 'failed'
+            : state.jobStatus === 'running'
+              ? 'processing'
+              : state.stage === 'cards' || state.stage === 'notes'
+                ? 'ready'
+                : 'new',
+          uploadedAt: activeDocument.uploadedAt,
+          updatedAt,
+          cardCount: state.knowledgeCards?.length ?? 0,
+        }),
+        saveLibraryProjectSnapshot(
+          activeDocument.courseId,
+          activeDocument.id,
+          toSave as Partial<ProjectState>,
+        ),
+      ]).catch(error => console.warn('Unable to mirror project into course library:', error));
     }
 
     const serialized = JSON.stringify(toSave);
