@@ -470,7 +470,12 @@ export function KnowledgeNebulaBackground({
       data-canvas-fallback={canvasFallback ? 'true' : undefined}
     >
       {!hasKnowledge ? <AstronomyBackdrop variant="dormant" /> : null}
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_20%,rgba(24,66,91,.16),transparent_34%),radial-gradient(circle_at_18%_76%,rgba(102,22,48,.13),transparent_38%),linear-gradient(145deg,#010207_0%,#030713_55%,#010207_100%)]" />
+      {hasKnowledge ? (
+        <div
+          className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_74%_20%,rgba(24,66,91,.16),transparent_34%),radial-gradient(circle_at_18%_76%,rgba(102,22,48,.13),transparent_38%),linear-gradient(145deg,#010207_0%,#030713_55%,#010207_100%)]"
+          data-nebula-scene-wash="true"
+        />
+      ) : null}
       <canvas
         ref={canvasRef}
         data-nebula-canvas="true"

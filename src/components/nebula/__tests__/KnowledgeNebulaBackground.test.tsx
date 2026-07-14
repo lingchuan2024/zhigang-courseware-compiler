@@ -70,6 +70,7 @@ describe('KnowledgeNebulaBackground', () => {
     })));
 
     expect(container.querySelectorAll('canvas[data-nebula-canvas="true"]')).toHaveLength(1);
+    expect(container.querySelector('[data-nebula-scene-wash="true"]')).not.toBeNull();
     expect(container.textContent).toContain('放大');
     expect(container.textContent).toContain('缩小');
     expect(container.textContent).toContain('适应全部星云');
@@ -88,6 +89,7 @@ describe('KnowledgeNebulaBackground', () => {
     })));
 
     expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.querySelector('[data-nebula-scene-wash="true"]')).toBeNull();
     expect(container.textContent).not.toContain('还没有被点亮的知识星');
     expect(container.textContent).not.toContain('导入并解析课件后');
     expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
@@ -103,6 +105,7 @@ describe('KnowledgeNebulaBackground', () => {
     })));
 
     expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.querySelector('[data-nebula-scene-wash="true"]')).toBeNull();
     expect(container.querySelector('[aria-label^="打开课程："]')).toBeNull();
     expect(container.querySelector('[aria-label="放大星云"]')).toBeNull();
   });
