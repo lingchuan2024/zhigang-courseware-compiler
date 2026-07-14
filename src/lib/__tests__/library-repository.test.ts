@@ -1,7 +1,11 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import type { ProjectState, RetrievalRecord } from '../../types';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ChatConversation, ChatMessage, ProjectState, RetrievalRecord } from '../../types';
 import {
   createLibraryCourse,
+  deleteChatConversation,
+  interruptPendingChatMessages,
+  listChatConversations,
+  listChatMessages,
   listLibraryCourses,
   listLibraryDocuments,
   listRetrievalRecords,
@@ -9,6 +13,8 @@ import {
   migrateLegacyProjectToLibrary,
   replaceDocumentRetrievalRecords,
   resetLibraryRepositoryForTests,
+  saveChatConversation,
+  saveChatMessage,
   saveLibraryProjectSnapshot,
   upsertLibraryDocument,
 } from '../library-repository';
@@ -55,6 +61,35 @@ function record(cardId: string, courseId: string, documentId: string): Retrieval
     aliases: [],
     sourceRanges: [],
     version: 1,
+  };
+}
+
+function conversation(id: string, updatedAt: number): ChatConversation {
+  return {
+    id,
+    title: id,
+    courseIds: [],
+    createdAt: 1,
+    updatedAt,
+    lastOpenedAt: updatedAt,
+  };
+}
+
+function message(
+  id: string,
+  conversationId: string,
+  role: ChatMessage['role'],
+  status: ChatMessage['status'],
+  createdAt: number,
+): ChatMessage {
+  return {
+    id,
+    conversationId,
+    role,
+    content: id,
+    status,
+    createdAt,
+    updatedAt: createdAt,
   };
 }
 
@@ -131,5 +166,72 @@ describe('library repository', () => {
     expect(restored?.document?.courseId).toBe(course.id);
     expect(restored?.knowledgeCards?.[0].courseId).toBe(course.id);
     expect((await listRetrievalRecords())[0].courseId).toBe(course.id);
+  });
+
+  it('lists conversations by most recent update with an id tie-break', async () => {
+    await saveChatConversation(conversation('conversation-b', 20));
+    await saveChatConversation(conversation('conversation-old', 10));
+    await saveChatConversation(conversation('conversation-a', 20));
+
+    expect((await listChatConversations()).map(item => item.id)).toEqual([
+      'conversation-a',
+      'conversation-b',
+      'conversation-old',
+    ]);
+  });
+
+  it('lists messages chronologically with a stable id tie-break', async () => {
+    await saveChatMessage(message('message-b', 'conversation-1', 'assistant', 'completed', 20));
+    await saveChatMessage(message('message-other', 'conversation-2', 'user', 'completed', 5));
+    await saveChatMessage(message('message-late', 'conversation-1', 'assistant', 'completed', 30));
+    await saveChatMessage(message('message-a', 'conversation-1', 'user', 'completed', 20));
+
+    expect((await listChatMessages('conversation-1')).map(item => item.id)).toEqual([
+      'message-a',
+      'message-b',
+      'message-late',
+    ]);
+  });
+
+  it('deletes a conversation and only its messages', async () => {
+    await saveChatConversation(conversation('conversation-1', 10));
+    await saveChatConversation(conversation('conversation-2', 20));
+    await saveChatMessage(message('message-1', 'conversation-1', 'user', 'completed', 1));
+    await saveChatMessage(message('message-2', 'conversation-1', 'assistant', 'completed', 2));
+    await saveChatMessage(message('message-other', 'conversation-2', 'user', 'completed', 3));
+
+    await deleteChatConversation('conversation-1');
+
+    expect((await listChatConversations()).map(item => item.id)).toEqual(['conversation-2']);
+    expect(await listChatMessages('conversation-1')).toEqual([]);
+    expect((await listChatMessages('conversation-2')).map(item => item.id)).toEqual(['message-other']);
+  });
+
+  it('interrupts only pending assistant messages', async () => {
+    const pendingAssistant = message('assistant-pending', 'conversation-1', 'assistant', 'pending', 1);
+    const pendingUser = message('user-pending', 'conversation-1', 'user', 'pending', 2);
+    const completedAssistant = message('assistant-completed', 'conversation-1', 'assistant', 'completed', 3);
+    const failedAssistant = message('assistant-failed', 'conversation-1', 'assistant', 'failed', 4);
+    await Promise.all([
+      saveChatMessage(pendingAssistant),
+      saveChatMessage(pendingUser),
+      saveChatMessage(completedAssistant),
+      saveChatMessage(failedAssistant),
+    ]);
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100);
+
+    await interruptPendingChatMessages();
+
+    const messages = await listChatMessages('conversation-1');
+    expect(messages.find(item => item.id === pendingAssistant.id)).toEqual({
+      ...pendingAssistant,
+      status: 'interrupted',
+      error: '上次回答因页面关闭而中断',
+      updatedAt: 100,
+    });
+    expect(messages.find(item => item.id === pendingUser.id)).toEqual(pendingUser);
+    expect(messages.find(item => item.id === completedAssistant.id)).toEqual(completedAssistant);
+    expect(messages.find(item => item.id === failedAssistant.id)).toEqual(failedAssistant);
+    now.mockRestore();
   });
 });

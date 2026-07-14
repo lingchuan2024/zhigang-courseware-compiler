@@ -272,6 +272,61 @@ export interface RetrievalRecord {
   version: number;
 }
 
+export interface RagAnswerSection {
+  source: 'cards' | 'general';
+  content: string;
+  cardIds: string[];
+}
+
+export interface RagAnswer {
+  mode: 'cards' | 'mixed' | 'general';
+  sections: RagAnswerSection[];
+}
+
+export interface ChatConversation {
+  id: string;
+  title: string;
+  /** 空数组表示使用全部课程。 */
+  courseIds: string[];
+  createdAt: number;
+  updatedAt: number;
+  lastOpenedAt: number;
+}
+
+export type ChatMessageRole = 'user' | 'assistant';
+
+export type ChatMessageStatus = 'pending' | 'completed' | 'failed' | 'interrupted';
+
+export interface ChatCitationSnapshot {
+  cardId: string;
+  courseId: string;
+  documentId: string;
+  courseName: string;
+  documentTitle: string;
+  title: string;
+  content: string;
+  sourceExcerpt?: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  conversationId: string;
+  role: ChatMessageRole;
+  content: string;
+  status: ChatMessageStatus;
+  answer?: RagAnswer;
+  citations?: ChatCitationSnapshot[];
+  error?: string;
+  retryOfMessageId?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface ChatHistoryTurn {
+  role: ChatMessageRole;
+  content: string;
+}
+
 // 视图投影视图配置
 export interface ViewConfig {
   showSummary: boolean;

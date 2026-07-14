@@ -1,4 +1,6 @@
 import type {
+  ChatConversation,
+  ChatMessage,
   LibraryCourse,
   LibraryDocument,
   ProjectState,
@@ -7,11 +9,13 @@ import type {
 import { buildRetrievalRecords } from './card-retrieval';
 
 const DB_NAME = 'zhigang-library';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const COURSES = 'courses';
 const DOCUMENTS = 'documents';
 const SNAPSHOTS = 'snapshots';
 const RETRIEVAL = 'retrieval-records';
+const QA_CONVERSATIONS = 'qa-conversations';
+const QA_MESSAGES = 'qa-messages';
 
 interface SnapshotRecord {
   documentId: string;
@@ -24,6 +28,8 @@ const memory = {
   documents: new Map<string, LibraryDocument>(),
   snapshots: new Map<string, SnapshotRecord>(),
   retrieval: new Map<string, RetrievalRecord>(),
+  conversations: new Map<string, ChatConversation>(),
+  messages: new Map<string, ChatMessage>(),
 };
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -70,6 +76,15 @@ async function openLibraryDb(): Promise<IDBDatabase | null> {
         const store = db.createObjectStore(RETRIEVAL, { keyPath: 'id' });
         store.createIndex('documentId', 'documentId', { unique: false });
         store.createIndex('courseId', 'courseId', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(QA_CONVERSATIONS)) {
+        const store = db.createObjectStore(QA_CONVERSATIONS, { keyPath: 'id' });
+        store.createIndex('updatedAt', 'updatedAt', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(QA_MESSAGES)) {
+        const store = db.createObjectStore(QA_MESSAGES, { keyPath: 'id' });
+        store.createIndex('conversationId', 'conversationId', { unique: false });
+        store.createIndex('conversationCreatedAt', ['conversationId', 'createdAt'], { unique: false });
       }
     };
     request.onsuccess = () => resolve(request.result);
@@ -255,11 +270,107 @@ export async function listRetrievalRecords(filter?: { courseIds?: string[]; docu
   );
 }
 
+export async function saveChatConversation(conversation: ChatConversation): Promise<void> {
+  const normalized = clone(conversation);
+  const db = await openLibraryDb();
+  if (!db) {
+    memory.conversations.set(normalized.id, normalized);
+    return;
+  }
+  const tx = db.transaction(QA_CONVERSATIONS, 'readwrite');
+  tx.objectStore(QA_CONVERSATIONS).put(normalized);
+  await transactionDone(tx);
+}
+
+export async function listChatConversations(): Promise<ChatConversation[]> {
+  const db = await openLibraryDb();
+  const conversations = db
+    ? await requestValue(db.transaction(QA_CONVERSATIONS, 'readonly').objectStore(QA_CONVERSATIONS).getAll()) as ChatConversation[]
+    : Array.from(memory.conversations.values()).map(clone);
+  return conversations.sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
+}
+
+export async function deleteChatConversation(conversationId: string): Promise<void> {
+  const db = await openLibraryDb();
+  if (!db) {
+    memory.conversations.delete(conversationId);
+    for (const [id, message] of memory.messages) {
+      if (message.conversationId === conversationId) memory.messages.delete(id);
+    }
+    return;
+  }
+  const tx = db.transaction([QA_CONVERSATIONS, QA_MESSAGES], 'readwrite');
+  tx.objectStore(QA_CONVERSATIONS).delete(conversationId);
+  const messageStore = tx.objectStore(QA_MESSAGES);
+  const messages = await requestValue(messageStore.index('conversationId').getAll(conversationId)) as ChatMessage[];
+  messages.forEach(message => messageStore.delete(message.id));
+  await transactionDone(tx);
+}
+
+export async function saveChatMessage(message: ChatMessage): Promise<void> {
+  const normalized = clone(message);
+  const db = await openLibraryDb();
+  if (!db) {
+    memory.messages.set(normalized.id, normalized);
+    return;
+  }
+  const tx = db.transaction(QA_MESSAGES, 'readwrite');
+  tx.objectStore(QA_MESSAGES).put(normalized);
+  await transactionDone(tx);
+}
+
+export async function listChatMessages(conversationId: string): Promise<ChatMessage[]> {
+  const db = await openLibraryDb();
+  let messages: ChatMessage[];
+  if (!db) {
+    messages = Array.from(memory.messages.values()).map(clone);
+  } else {
+    const tx = db.transaction(QA_MESSAGES, 'readonly');
+    messages = await requestValue(
+      tx.objectStore(QA_MESSAGES).index('conversationId').getAll(conversationId),
+    ) as ChatMessage[];
+  }
+  return messages
+    .filter(message => message.conversationId === conversationId)
+    .sort((a, b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id));
+}
+
+export async function interruptPendingChatMessages(): Promise<void> {
+  const now = Date.now();
+  const db = await openLibraryDb();
+  if (!db) {
+    for (const [id, message] of memory.messages) {
+      if (message.role !== 'assistant' || message.status !== 'pending') continue;
+      memory.messages.set(id, clone({
+        ...message,
+        status: 'interrupted',
+        error: '上次回答因页面关闭而中断',
+        updatedAt: now,
+      }));
+    }
+    return;
+  }
+  const tx = db.transaction(QA_MESSAGES, 'readwrite');
+  const store = tx.objectStore(QA_MESSAGES);
+  const messages = await requestValue(store.getAll()) as ChatMessage[];
+  messages
+    .filter(message => message.role === 'assistant' && message.status === 'pending')
+    .forEach(message => store.put({
+      ...message,
+      status: 'interrupted',
+      error: '上次回答因页面关闭而中断',
+      updatedAt: now,
+    }));
+  await transactionDone(tx);
+}
+
 export async function resetLibraryRepositoryForTests(): Promise<void> {
   memory.courses.clear();
   memory.documents.clear();
   memory.snapshots.clear();
   memory.retrieval.clear();
+  memory.conversations.clear();
+  memory.messages.clear();
   if (typeof indexedDB === 'undefined') return;
   const db = await dbPromise;
   db?.close();
