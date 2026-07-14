@@ -941,10 +941,14 @@ export const useStore = create<AppState>((set, get) => ({
       const allFailed = result.cards.length > 0 && result.failedCardIds.length === result.cards.length;
       set({
         knowledgeCards: result.cards,
-        topicSyntheses: [],
-        chapterPlan: [],
-        chapterNotes: [],
-        courseMasterNote: null,
+        // 保留旧笔记供用户查看，只把母笔记标为需要根据新卡片重新生成。
+        courseMasterNote: state.courseMasterNote
+          ? {
+              ...state.courseMasterNote,
+              status: 'partial',
+              error: '知识卡片已更新；当前完整笔记仍保留，但建议重新生成。',
+            }
+          : null,
         knowledgeBaseVersions: {
           ...get().knowledgeBaseVersions,
           cards: get().knowledgeBaseVersions.cards + 1,

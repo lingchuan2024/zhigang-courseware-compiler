@@ -23,11 +23,16 @@ import type {
 const mocks = vi.hoisted(() => ({
   runMasterNoteGeneration: vi.fn(),
   regenerateChapterNote: vi.fn(),
+  enrichKnowledgeCards: vi.fn(),
 }));
 
 vi.mock('../../lib/master-note-generator', () => ({
   runMasterNoteGeneration: mocks.runMasterNoteGeneration,
   regenerateChapterNote: mocks.regenerateChapterNote,
+}));
+
+vi.mock('../../lib/card-enrichment', () => ({
+  enrichKnowledgeCards: mocks.enrichKnowledgeCards,
 }));
 
 import { useStore } from '../useStore';
@@ -89,6 +94,7 @@ describe('master note store generation', () => {
     localStorage.clear();
     mocks.runMasterNoteGeneration.mockReset();
     mocks.regenerateChapterNote.mockReset();
+    mocks.enrichKnowledgeCards.mockReset();
   });
 
   it('blocks complete-note generation when the knowledge model is missing', async () => {
@@ -147,5 +153,27 @@ describe('master note store generation', () => {
     expect(useStore.getState().chapterNotes).toEqual([chapter, repaired]);
     expect(useStore.getState().courseMasterNote?.markdown).toContain('修复后的正文');
     expect(useStore.getState().chapterNotes[0]).toBe(chapter);
+  });
+
+  it('keeps the existing complete note when cards are enriched and marks it partial', async () => {
+    seed(true);
+    useStore.setState({
+      topicSyntheses: [synthesis],
+      chapterPlan: [plan],
+      chapterNotes: [chapter],
+      courseMasterNote: masterNote,
+    });
+    mocks.enrichKnowledgeCards.mockResolvedValue({
+      cards: [{ ...card, detailedNote: '更新后的卡片', cardVersion: 2 }],
+      failedCardIds: [],
+    });
+
+    await act(async () => useStore.getState().regenerateKnowledgeCards());
+
+    const state = useStore.getState();
+    expect(state.courseMasterNote?.markdown).toBe(masterNote.markdown);
+    expect(state.courseMasterNote?.status).toBe('partial');
+    expect(state.topicSyntheses).toEqual([synthesis]);
+    expect(state.chapterNotes).toEqual([chapter]);
   });
 });
