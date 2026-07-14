@@ -4,6 +4,7 @@ import type {
   ProjectState,
   RetrievalRecord,
 } from '../types';
+import { buildRetrievalRecords } from './card-retrieval';
 
 const DB_NAME = 'zhigang-library';
 const DB_VERSION = 1;
@@ -152,6 +153,49 @@ export async function listLibraryDocuments(courseId?: string): Promise<LibraryDo
   return documents
     .filter(document => !courseId || document.courseId === courseId)
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+/** 将旧版单项目快照一次性归入本地课程空间。 */
+export async function migrateLegacyProjectToLibrary(
+  legacy: Partial<ProjectState> | null | undefined,
+): Promise<LibraryCourse | null> {
+  const document = legacy?.document;
+  if (!document) return null;
+  const existingDocument = (await listLibraryDocuments()).find(item => item.id === document.id);
+  if (existingDocument) {
+    return (await listLibraryCourses()).find(course => course.id === existingDocument.courseId) ?? null;
+  }
+
+  const course = await createLibraryCourse({ name: document.title || '迁移课程' });
+  const normalizedDocument = { ...document, courseId: course.id };
+  const normalizedSnapshot: Partial<ProjectState> = {
+    ...legacy,
+    document: normalizedDocument,
+    sourceDocuments: legacy.sourceDocuments?.map(source => ({ ...source, courseId: course.id })) ?? [],
+    knowledgeTopics: legacy.knowledgeTopics?.map(topic => ({ ...topic, courseId: course.id })) ?? [],
+    knowledgeCards: legacy.knowledgeCards?.map(card => ({ ...card, courseId: course.id })) ?? [],
+  };
+  await upsertLibraryDocument({
+    id: document.id,
+    courseId: course.id,
+    title: document.title,
+    fileName: document.fileName,
+    fileType: document.fileType ?? 'markdown',
+    pageCount: document.pages.length,
+    stage: legacy.stage ?? 'upload',
+    status: legacy.jobStatus === 'failed'
+      ? 'failed'
+      : legacy.stage === 'cards' || legacy.stage === 'notes' ? 'ready' : 'new',
+    uploadedAt: document.uploadedAt,
+    updatedAt: Date.now(),
+    cardCount: normalizedSnapshot.knowledgeCards?.length ?? 0,
+  });
+  await saveLibraryProjectSnapshot(course.id, document.id, normalizedSnapshot);
+  await replaceDocumentRetrievalRecords(
+    document.id,
+    buildRetrievalRecords(normalizedSnapshot.knowledgeCards ?? [], document.id, course.id),
+  );
+  return course;
 }
 
 export async function saveLibraryProjectSnapshot(

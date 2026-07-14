@@ -5,8 +5,10 @@ import {
   listLibraryCourses,
   listLibraryDocuments,
   loadLibraryProjectSnapshot,
+  migrateLegacyProjectToLibrary,
 } from '../lib/library-repository';
 import { useStore } from './useStore';
+import { loadState } from '../lib/persistence';
 
 export type LibraryScreen = 'home' | 'library' | 'workspace' | 'qa';
 
@@ -44,6 +46,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   initialize: async () => {
     set({ loading: true, error: null, screen: 'home' });
     try {
+      await migrateLegacyProjectToLibrary(loadState());
       const data = await loadLibraryData();
       const activeCourseId = data.courses.some(course => course.id === get().activeCourseId)
         ? get().activeCourseId
