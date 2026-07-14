@@ -7,6 +7,7 @@ import type {
   RetrievalRecord,
 } from '../types';
 import { buildRetrievalRecords } from './card-retrieval';
+import { deleteDocumentSource } from './document-source';
 
 const DB_NAME = 'zhigang-library';
 const DB_VERSION = 2;
@@ -195,6 +196,99 @@ export async function listLibraryDocuments(courseId?: string): Promise<LibraryDo
   return documents
     .filter(document => !courseId || document.courseId === courseId)
     .sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export async function deleteLibraryDocumentCascade(documentId: string): Promise<void> {
+  const db = await openLibraryDb();
+  if (!db) {
+    const document = memory.documents.get(documentId);
+    const snapshot = memory.snapshots.get(documentId);
+    memory.documents.delete(documentId);
+    memory.snapshots.delete(documentId);
+    for (const [id, retrieval] of memory.retrieval) {
+      if (retrieval.documentId === documentId) memory.retrieval.delete(id);
+    }
+    if (document) {
+      const course = memory.courses.get(document.courseId);
+      if (course) {
+        memory.courses.set(course.id, {
+          ...course,
+          documentIds: course.documentIds.filter(id => id !== documentId),
+          updatedAt: Date.now(),
+        });
+      }
+    }
+    await deleteDocumentSource(snapshot?.snapshot.document?.sourceKey ?? documentId);
+    return;
+  }
+
+  const tx = db.transaction([COURSES, DOCUMENTS, SNAPSHOTS, RETRIEVAL], 'readwrite');
+  const courseStore = tx.objectStore(COURSES);
+  const documentStore = tx.objectStore(DOCUMENTS);
+  const snapshotStore = tx.objectStore(SNAPSHOTS);
+  const retrievalStore = tx.objectStore(RETRIEVAL);
+  const document = await requestValue(documentStore.get(documentId)) as LibraryDocument | undefined;
+  const snapshot = await requestValue(snapshotStore.get(documentId)) as SnapshotRecord | undefined;
+  const retrieval = await requestValue(retrievalStore.index('documentId').getAll(documentId)) as RetrievalRecord[];
+
+  documentStore.delete(documentId);
+  snapshotStore.delete(documentId);
+  retrieval.forEach(record => retrievalStore.delete(record.id));
+  if (document) {
+    const course = await requestValue(courseStore.get(document.courseId)) as LibraryCourse | undefined;
+    if (course) {
+      courseStore.put({
+        ...course,
+        documentIds: course.documentIds.filter(id => id !== documentId),
+        updatedAt: Date.now(),
+      });
+    }
+  }
+  await transactionDone(tx);
+  await deleteDocumentSource(snapshot?.snapshot.document?.sourceKey ?? documentId);
+}
+
+export async function deleteLibraryCourseCascade(courseId: string): Promise<void> {
+  const db = await openLibraryDb();
+  if (!db) {
+    const documentIds = new Set<string>();
+    const sourceKeys: string[] = [];
+    for (const document of memory.documents.values()) {
+      if (document.courseId === courseId) documentIds.add(document.id);
+    }
+    memory.courses.get(courseId)?.documentIds.forEach(id => documentIds.add(id));
+    for (const documentId of documentIds) {
+      sourceKeys.push(memory.snapshots.get(documentId)?.snapshot.document?.sourceKey ?? documentId);
+      memory.documents.delete(documentId);
+      memory.snapshots.delete(documentId);
+    }
+    for (const [id, retrieval] of memory.retrieval) {
+      if (retrieval.courseId === courseId || documentIds.has(retrieval.documentId)) memory.retrieval.delete(id);
+    }
+    memory.courses.delete(courseId);
+    await Promise.all(sourceKeys.map(sourceKey => deleteDocumentSource(sourceKey)));
+    return;
+  }
+
+  const tx = db.transaction([COURSES, DOCUMENTS, SNAPSHOTS, RETRIEVAL], 'readwrite');
+  const courseStore = tx.objectStore(COURSES);
+  const documentStore = tx.objectStore(DOCUMENTS);
+  const snapshotStore = tx.objectStore(SNAPSHOTS);
+  const retrievalStore = tx.objectStore(RETRIEVAL);
+  const documents = await requestValue(documentStore.index('courseId').getAll(courseId)) as LibraryDocument[];
+  const documentIds = documents.map(document => document.id);
+  const snapshots = await Promise.all(
+    documentIds.map(documentId => requestValue(snapshotStore.get(documentId)) as Promise<SnapshotRecord | undefined>),
+  );
+  const retrieval = await requestValue(retrievalStore.index('courseId').getAll(courseId)) as RetrievalRecord[];
+
+  documents.forEach(document => documentStore.delete(document.id));
+  documentIds.forEach(documentId => snapshotStore.delete(documentId));
+  retrieval.forEach(record => retrievalStore.delete(record.id));
+  courseStore.delete(courseId);
+  await transactionDone(tx);
+  await Promise.all(snapshots.map((snapshot, index) =>
+    deleteDocumentSource(snapshot?.snapshot.document?.sourceKey ?? documentIds[index])));
 }
 
 /** 将旧版单项目快照一次性归入本地课程空间。 */

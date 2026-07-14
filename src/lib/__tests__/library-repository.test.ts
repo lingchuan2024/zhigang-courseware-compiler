@@ -4,6 +4,8 @@ import type { ChatConversation, ChatMessage, ProjectState, RetrievalRecord } fro
 import {
   createLibraryCourse,
   deleteChatConversation,
+  deleteLibraryCourseCascade,
+  deleteLibraryDocumentCascade,
   interruptPendingChatMessages,
   listChatConversations,
   listChatMessages,
@@ -174,6 +176,58 @@ describe('library repository', () => {
 
     expect((await listRetrievalRecords()).map(item => item.cardId).sort()).toEqual(['card-b', 'card-c']);
     expect((await listRetrievalRecords({ courseIds: ['course-1'] })).length).toBe(2);
+  });
+
+  it('deletes one document with its snapshot and retrieval records only', async () => {
+    const course = await createLibraryCourse({ name: '机器学习' });
+    await upsertLibraryDocument({
+      id: 'doc-1', courseId: course.id, title: '第一讲', fileName: 'lecture1.pdf',
+      fileType: 'pdf', pageCount: 10, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await upsertLibraryDocument({
+      id: 'doc-2', courseId: course.id, title: '第二讲', fileName: 'lecture2.pdf',
+      fileType: 'pdf', pageCount: 12, stage: 'cards', status: 'ready', uploadedAt: 3, updatedAt: 4,
+    });
+    await saveLibraryProjectSnapshot(course.id, 'doc-1', snapshot('doc-1', course.id, '第一讲'));
+    await saveLibraryProjectSnapshot(course.id, 'doc-2', snapshot('doc-2', course.id, '第二讲'));
+    await replaceDocumentRetrievalRecords('doc-1', [record('card-a', course.id, 'doc-1')]);
+    await replaceDocumentRetrievalRecords('doc-2', [record('card-b', course.id, 'doc-2')]);
+
+    await deleteLibraryDocumentCascade('doc-1');
+
+    expect((await listLibraryDocuments(course.id)).map(item => item.id)).toEqual(['doc-2']);
+    expect((await listLibraryCourses())[0].documentIds).toEqual(['doc-2']);
+    expect(await loadLibraryProjectSnapshot('doc-1')).toBeNull();
+    expect((await loadLibraryProjectSnapshot('doc-2'))?.document?.title).toBe('第二讲');
+    expect((await listRetrievalRecords()).map(item => item.documentId)).toEqual(['doc-2']);
+  });
+
+  it('deletes a course and all derived courseware while retaining other courses and chat history', async () => {
+    const deletedCourse = await createLibraryCourse({ name: '待删除课程' });
+    const keptCourse = await createLibraryCourse({ name: '保留课程' });
+    await upsertLibraryDocument({
+      id: 'deleted-doc', courseId: deletedCourse.id, title: '删除讲义', fileName: 'delete.pdf',
+      fileType: 'pdf', pageCount: 10, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await upsertLibraryDocument({
+      id: 'kept-doc', courseId: keptCourse.id, title: '保留讲义', fileName: 'keep.pdf',
+      fileType: 'pdf', pageCount: 10, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await saveLibraryProjectSnapshot(deletedCourse.id, 'deleted-doc', snapshot('deleted-doc', deletedCourse.id, '删除讲义'));
+    await saveLibraryProjectSnapshot(keptCourse.id, 'kept-doc', snapshot('kept-doc', keptCourse.id, '保留讲义'));
+    await replaceDocumentRetrievalRecords('deleted-doc', [record('deleted-card', deletedCourse.id, 'deleted-doc')]);
+    await replaceDocumentRetrievalRecords('kept-doc', [record('kept-card', keptCourse.id, 'kept-doc')]);
+    await saveChatConversation(conversation('history', 20));
+    await saveChatMessage(message('history-message', 'history', 'assistant', 'completed', 21));
+
+    await deleteLibraryCourseCascade(deletedCourse.id);
+
+    expect((await listLibraryCourses()).map(item => item.id)).toEqual([keptCourse.id]);
+    expect((await listLibraryDocuments()).map(item => item.id)).toEqual(['kept-doc']);
+    expect(await loadLibraryProjectSnapshot('deleted-doc')).toBeNull();
+    expect((await listRetrievalRecords()).map(item => item.cardId)).toEqual(['kept-card']);
+    expect((await listChatConversations()).map(item => item.id)).toEqual(['history']);
+    expect((await listChatMessages('history')).map(item => item.id)).toEqual(['history-message']);
   });
 
   it('mirrors an active course document when the legacy persistence path saves', async () => {

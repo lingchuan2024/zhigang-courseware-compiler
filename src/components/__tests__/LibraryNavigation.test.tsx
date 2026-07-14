@@ -2,7 +2,13 @@ import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import App from '../../App';
-import { resetLibraryRepositoryForTests } from '../../lib/library-repository';
+import {
+  createLibraryCourse,
+  listLibraryCourses,
+  listLibraryDocuments,
+  resetLibraryRepositoryForTests,
+  upsertLibraryDocument,
+} from '../../lib/library-repository';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -67,5 +73,38 @@ describe('multi-course library navigation', () => {
     await act(async () => button('进入课件库').click());
     await act(async () => button('返回首页').click());
     expect(container!.textContent).toContain('从课件到知识网络');
+  });
+
+  it('confirms and deletes one courseware with all derived content', async () => {
+    const course = await createLibraryCourse({ name: '机器学习' });
+    await upsertLibraryDocument({
+      id: 'doc-1', courseId: course.id, title: '第一讲', fileName: 'lecture1.pdf',
+      fileType: 'pdf', pageCount: 10, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await act(async () => root!.render(createElement(App)));
+    await act(async () => button('进入课件库').click());
+
+    expect(container!.textContent).toContain('lecture1.pdf');
+    await act(async () => button('删除课件').click());
+    expect(container!.textContent).toContain('同时删除 MinerU 解析、知识结构、知识卡片、完整笔记和检索索引');
+    await act(async () => button('确认删除课件').click());
+
+    expect(container!.textContent).not.toContain('lecture1.pdf');
+    expect(await listLibraryDocuments(course.id)).toEqual([]);
+  });
+
+  it('confirms and deletes a course space while keeping another course', async () => {
+    const kept = await createLibraryCourse({ name: '保留课程' });
+    const removed = await createLibraryCourse({ name: '待移除空间' });
+    await act(async () => root!.render(createElement(App)));
+    await act(async () => button('进入课件库').click());
+    await act(async () => button('待移除空间').click());
+    await act(async () => button('删除课程').click());
+
+    expect(container!.textContent).toContain('删除整个课程空间');
+    await act(async () => button('确认删除课程').click());
+
+    expect((await listLibraryCourses()).map(course => course.id)).toEqual([kept.id]);
+    expect((await listLibraryCourses()).some(course => course.id === removed.id)).toBe(false);
   });
 });

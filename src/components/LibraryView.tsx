@@ -10,9 +10,17 @@ export function LibraryView() {
   const openCourse = useLibraryStore(state => state.openCourse);
   const openDocument = useLibraryStore(state => state.openDocument);
   const startNewDocument = useLibraryStore(state => state.startNewDocument);
+  const deleteDocument = useLibraryStore(state => state.deleteDocument);
+  const deleteCourse = useLibraryStore(state => state.deleteCourse);
   const navigate = useLibraryStore(state => state.navigate);
   const error = useLibraryStore(state => state.error);
   const [name, setName] = useState('');
+  const [deleting, setDeleting] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<
+    | { kind: 'document'; id: string; title: string }
+    | { kind: 'course'; id: string; title: string; documentCount: number }
+    | null
+  >(null);
   const activeCourse = courses.find(course => course.id === activeCourseId) ?? null;
   const courseDocuments = documents.filter(document => document.courseId === activeCourseId);
 
@@ -21,6 +29,18 @@ export function LibraryView() {
     if (!name.trim()) return;
     await createCourse(name);
     setName('');
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    try {
+      if (deleteTarget.kind === 'document') await deleteDocument(deleteTarget.id);
+      else await deleteCourse(deleteTarget.id);
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
   };
 
   return (
@@ -65,14 +85,25 @@ export function LibraryView() {
               <h2 className="mt-2 font-song text-3xl font-bold text-ink">课程与课件</h2>
               <p className="mt-2 text-sm text-stone-500">{activeCourse ? `${activeCourse.name} · 独立保存每份课件的解析与知识产物` : '先创建一个课程空间'}</p>
             </div>
-            <button
-              type="button"
-              disabled={!activeCourseId}
-              onClick={() => startNewDocument()}
-              className="rounded-xl bg-celadon px-5 py-3 text-sm font-medium text-white hover:bg-celadon-light disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              ＋ 添加课件
-            </button>
+            <div className="flex items-center gap-2">
+              {activeCourse && (
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget({ kind: 'course', id: activeCourse.id, title: activeCourse.name, documentCount: courseDocuments.length })}
+                  className="rounded-xl border border-cinnabar/30 bg-white px-4 py-3 text-sm text-cinnabar hover:bg-cinnabar/5"
+                >
+                  删除课程
+                </button>
+              )}
+              <button
+                type="button"
+                disabled={!activeCourseId}
+                onClick={() => startNewDocument()}
+                className="rounded-xl bg-celadon px-5 py-3 text-sm font-medium text-white hover:bg-celadon-light disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ＋ 添加课件
+              </button>
+            </div>
           </div>
 
           {error && <div className="mt-5 rounded-xl border border-cinnabar/20 bg-cinnabar/5 p-4 text-sm text-cinnabar">{error}</div>}
@@ -87,31 +118,57 @@ export function LibraryView() {
           ) : (
             <div className="mt-7 grid gap-4 lg:grid-cols-2">
               {courseDocuments.map(document => (
-                <button
-                  type="button"
-                  key={document.id}
-                  onClick={() => void openDocument(document.id)}
-                  className="group rounded-2xl border border-[#ded5c7] bg-[#faf8f3] p-5 text-left transition hover:-translate-y-0.5 hover:border-celadon/50 hover:shadow-[0_12px_30px_rgba(23,63,53,.09)]"
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className="rounded-md bg-[#ebe5da] px-2 py-1 font-mono text-[10px] uppercase text-stone-500">{document.fileType}</span>
-                      <h3 className="mt-4 font-song text-xl font-bold text-ink group-hover:text-ink-light">{document.title}</h3>
-                      <p className="mt-1 text-xs text-stone-400">{document.fileName}</p>
+                <article key={document.id} className="group relative rounded-2xl border border-[#ded5c7] bg-[#faf8f3] transition hover:-translate-y-0.5 hover:border-celadon/50 hover:shadow-[0_12px_30px_rgba(23,63,53,.09)]">
+                  <button type="button" onClick={() => void openDocument(document.id)} className="w-full p-5 text-left">
+                    <div className="flex items-start justify-between gap-4 pr-16">
+                      <div>
+                        <span className="rounded-md bg-[#ebe5da] px-2 py-1 font-mono text-[10px] uppercase text-stone-500">{document.fileType}</span>
+                        <h3 className="mt-4 font-song text-xl font-bold text-ink group-hover:text-ink-light">{document.title}</h3>
+                        <p className="mt-1 text-xs text-stone-400">{document.fileName}</p>
+                      </div>
+                      <span className={`h-2.5 w-2.5 rounded-full ${document.status === 'ready' ? 'bg-celadon' : document.status === 'failed' ? 'bg-cinnabar' : 'bg-amber-400'}`} />
                     </div>
-                    <span className={`h-2.5 w-2.5 rounded-full ${document.status === 'ready' ? 'bg-celadon' : document.status === 'failed' ? 'bg-cinnabar' : 'bg-amber-400'}`} />
-                  </div>
-                  <div className="mt-6 flex items-center gap-4 border-t border-[#e5ddd1] pt-4 text-xs text-stone-500">
-                    <span>{document.pageCount} 页</span>
-                    <span>{document.cardCount ?? 0} 张卡片</span>
-                    <span className="ml-auto">{document.stage}</span>
-                  </div>
-                </button>
+                    <div className="mt-6 flex items-center gap-4 border-t border-[#e5ddd1] pt-4 text-xs text-stone-500">
+                      <span>{document.pageCount} 页</span>
+                      <span>{document.cardCount ?? 0} 张卡片</span>
+                      <span className="ml-auto">{document.stage}</span>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget({ kind: 'document', id: document.id, title: document.title })}
+                    className="absolute right-4 top-4 rounded-lg border border-transparent px-2.5 py-1.5 text-xs text-stone-400 hover:border-cinnabar/20 hover:bg-cinnabar/5 hover:text-cinnabar"
+                  >
+                    删除课件
+                  </button>
+                </article>
               ))}
             </div>
           )}
         </section>
       </main>
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-[#173f35]/35 p-5" role="dialog" aria-modal="true">
+          <section className="w-full max-w-lg rounded-2xl border border-[#ded5c7] bg-[#fffdfa] p-6 shadow-2xl">
+            <p className="font-mono text-[11px] tracking-[0.18em] text-cinnabar">DESTRUCTIVE ACTION</p>
+            <h2 className="mt-3 font-song text-2xl font-bold text-ink">
+              {deleteTarget.kind === 'document' ? `删除课件“${deleteTarget.title}”？` : `删除整个课程空间“${deleteTarget.title}”？`}
+            </h2>
+            {deleteTarget.kind === 'document' ? (
+              <p className="mt-4 text-sm leading-7 text-stone-600">此操作会同时删除 MinerU 解析、知识结构、知识卡片、完整笔记和检索索引，且无法撤销。</p>
+            ) : (
+              <p className="mt-4 text-sm leading-7 text-stone-600">该课程包含 {deleteTarget.documentCount} 份课件。删除后，全部课件及其 MinerU 解析、知识网络、卡片、笔记和索引都会被清理；聊天历史仍会保留。</p>
+            )}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="rounded-xl border border-stone-300 px-4 py-2.5 text-sm text-stone-600 hover:bg-stone-50 disabled:opacity-50">取消</button>
+              <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="rounded-xl bg-cinnabar px-4 py-2.5 text-sm font-medium text-white hover:bg-[#ae3f2a] disabled:opacity-50">
+                {deleting ? '正在删除…' : deleteTarget.kind === 'document' ? '确认删除课件' : '确认删除课程'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
     </AppShell>
   );
 }

@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import type { LibraryCourse, LibraryDocument } from '../types';
 import {
   createLibraryCourse,
+  deleteLibraryCourseCascade,
+  deleteLibraryDocumentCascade,
   listLibraryCourses,
   listLibraryDocuments,
   loadLibraryProjectSnapshot,
@@ -27,6 +29,8 @@ interface LibraryState {
   openCourse: (courseId: string) => Promise<void>;
   startNewDocument: (courseId?: string) => void;
   openDocument: (documentId: string) => Promise<void>;
+  deleteDocument: (documentId: string) => Promise<void>;
+  deleteCourse: (courseId: string) => Promise<void>;
 }
 
 async function loadLibraryData(): Promise<{ courses: LibraryCourse[]; documents: LibraryDocument[] }> {
@@ -109,6 +113,44 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       });
     } catch (error) {
       set({ loading: false, error: error instanceof Error ? error.message : String(error) });
+    }
+  },
+
+  deleteDocument: async documentId => {
+    set({ loading: true, error: null });
+    try {
+      await deleteLibraryDocumentCascade(documentId);
+      if (useStore.getState().document?.id === documentId) {
+        useStore.setState({ stage: 'upload', document: null, job: null, jobStatus: 'idle' });
+      }
+      const data = await loadLibraryData();
+      const activeCourseId = data.courses.some(course => course.id === get().activeCourseId)
+        ? get().activeCourseId
+        : data.courses[0]?.id ?? null;
+      set({ ...data, activeCourseId, loading: false });
+    } catch (error) {
+      set({ loading: false, error: error instanceof Error ? error.message : String(error) });
+      throw error;
+    }
+  },
+
+  deleteCourse: async courseId => {
+    set({ loading: true, error: null });
+    try {
+      const deletedDocumentIds = new Set(get().documents.filter(document => document.courseId === courseId).map(document => document.id));
+      await deleteLibraryCourseCascade(courseId);
+      if (useStore.getState().document && deletedDocumentIds.has(useStore.getState().document!.id)) {
+        useStore.setState({ stage: 'upload', document: null, job: null, jobStatus: 'idle' });
+      }
+      const data = await loadLibraryData();
+      const previousActive = get().activeCourseId;
+      const activeCourseId = previousActive !== courseId && data.courses.some(course => course.id === previousActive)
+        ? previousActive
+        : data.courses[0]?.id ?? null;
+      set({ ...data, activeCourseId, loading: false });
+    } catch (error) {
+      set({ loading: false, error: error instanceof Error ? error.message : String(error) });
+      throw error;
     }
   },
 }));
