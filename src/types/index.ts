@@ -252,6 +252,32 @@ export interface LibraryDocument {
   error?: string;
 }
 
+export type NebulaCardStatus = 'none' | 'partial' | 'complete' | 'failed';
+
+/** 首页星云中的轻量知识星摘要，不包含原文或完整卡片。 */
+export interface KnowledgeStarSummary {
+  key: string;
+  name: string;
+  sourceDocumentCount: number;
+  evidenceCount: number;
+  importance: 'core' | 'important' | 'supplementary';
+  cardStatus: NebulaCardStatus;
+}
+
+/** 每门课程一条的持久化星云摘要。 */
+export interface CourseNebulaSummary {
+  version: 1;
+  courseId: string;
+  courseName: string;
+  documentCount: number;
+  knowledgeCount: number;
+  completedCardCount: number;
+  updatedAt: number;
+  paletteId: string;
+  seed: number;
+  stars: KnowledgeStarSummary[];
+}
+
 /** 面向全库问答的知识卡片检索记录。 */
 export interface RetrievalRecord {
   id: string;
