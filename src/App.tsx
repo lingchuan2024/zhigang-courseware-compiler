@@ -12,6 +12,7 @@ import { HomeView } from './components/HomeView';
 import { LibraryView } from './components/LibraryView';
 import { AppShell } from './components/AppShell';
 import { useLibraryStore } from './store/useLibraryStore';
+import { KnowledgeQaView } from './components/KnowledgeQaView';
 
 function App() {
   const stage = useStore(s => s.stage);
@@ -49,11 +50,12 @@ function App() {
 
   if (screen === 'qa') {
     return (
-      <AppShell onHome={() => navigateLibrary('home')} action={<button type="button" onClick={() => navigateLibrary('library')} className="text-sm text-ink/70">课件库</button>}>
-        <div className="grid min-h-[calc(100vh-4rem)] place-items-center px-6 text-center">
-          <div><p className="font-song text-3xl font-bold text-ink">全库知识问答</p><p className="mt-3 text-stone-500">正在建立知识卡片索引。</p></div>
-        </div>
-      </AppShell>
+      <>
+        <AppShell onHome={() => navigateLibrary('home')} action={<button type="button" onClick={() => navigateLibrary('library')} className="text-sm text-ink/70">课件库</button>}>
+          <KnowledgeQaView onOpenSettings={() => setSettingsOpen(true)} />
+        </AppShell>
+        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      </>
     );
   }
 

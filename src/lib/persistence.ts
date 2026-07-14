@@ -10,7 +10,8 @@ import {
 } from '../types';
 import { convertV1ToV2 } from './notes-v2';
 import { computeContentHash } from './evidence';
-import { saveLibraryProjectSnapshot, upsertLibraryDocument } from './library-repository';
+import { replaceDocumentRetrievalRecords, saveLibraryProjectSnapshot, upsertLibraryDocument } from './library-repository';
+import { buildRetrievalRecords } from './card-retrieval';
 
 const STORAGE_KEY = 'zhigang_project_state';
 
@@ -96,6 +97,10 @@ export function saveState(state: Partial<ProjectState>): void {
           activeDocument.courseId,
           activeDocument.id,
           toSave as Partial<ProjectState>,
+        ),
+        replaceDocumentRetrievalRecords(
+          activeDocument.id,
+          buildRetrievalRecords(state.knowledgeCards ?? [], activeDocument.id, activeDocument.courseId),
         ),
       ]).catch(error => console.warn('Unable to mirror project into course library:', error));
     }

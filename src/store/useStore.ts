@@ -680,7 +680,7 @@ export const useStore = create<AppState>((set, get) => ({
   loadMarkdownDocument: (markdown, title) => {
     // 从 Markdown 文本创建 SourceDocument
     Promise.resolve().then(() => {
-      const courseId = get().document?.id ?? `course_${Date.now()}`;
+      const courseId = get().document?.courseId ?? get().document?.id ?? `course_${Date.now()}`;
       const doc = createSourceDocument(markdown, courseId, title);
       const docs = [...get().sourceDocuments, doc];
       set({
@@ -746,7 +746,7 @@ export const useStore = create<AppState>((set, get) => ({
           mineruParseResult: { ...get().mineruParseResult!, status, progress },
         }),
       });
-      const parsed = createSourceDocument(output.markdown, document.id, document.title);
+      const parsed = createSourceDocument(output.markdown, document.courseId ?? document.id, document.title);
       set({
         sourceDocuments: [parsed],
         mineruParseResult: {

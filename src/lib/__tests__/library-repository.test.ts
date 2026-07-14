@@ -92,10 +92,18 @@ describe('library repository', () => {
   });
 
   it('mirrors an active course document when the legacy persistence path saves', async () => {
-    const state = snapshot('doc-mirror', 'course-mirror', '镜像课件');
+    const state = {
+      ...snapshot('doc-mirror', 'course-mirror', '镜像课件'),
+      knowledgeCards: [{
+        id: 'card-mirror', courseId: 'course-mirror', topicId: 'topic-1', topicName: 'GLM', teachingBlockId: 'block-1', teachingType: 'formula',
+        title: 'GLM 公式', conciseSummary: '公式摘要', detailedNote: '公式正文', sourceRanges: [], keywords: ['GLM'], aliases: [],
+        prerequisiteTopicIds: [], relatedTopicIds: [], confidence: 0.9, reviewStatus: 'generated' as const,
+      }],
+    };
     saveState(state);
     await new Promise(resolve => setTimeout(resolve, 0));
 
     expect((await loadLibraryProjectSnapshot('doc-mirror'))?.document?.courseId).toBe('course-mirror');
+    expect((await listRetrievalRecords()).map(item => item.cardId)).toEqual(['card-mirror']);
   });
 });
