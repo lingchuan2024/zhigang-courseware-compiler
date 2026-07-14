@@ -237,12 +237,12 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     : 'loading';
 
   return (
-    <div className="relative h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-space-950/[0.68]">
+    <div className="relative h-[calc(100dvh-4rem)] min-h-0 overflow-hidden">
     <div
       ref={backgroundRef}
       data-testid="qa-two-column-layout"
       aria-hidden={selectedCitation ? true : undefined}
-      className="grid h-[calc(100dvh-4rem)] min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-space-950/[0.72] text-space-text md:grid-cols-[264px_minmax(0,1fr)] md:grid-rows-1"
+      className="grid h-[calc(100dvh-4rem)] min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden text-space-text md:grid-cols-[264px_minmax(0,1fr)] md:grid-rows-1"
     >
       <aside className="z-10 flex max-h-[220px] min-h-0 flex-col border-b border-space-border bg-space-900/[0.92] backdrop-blur-xl md:max-h-none md:border-b-0 md:border-r">
         <div className="border-b border-space-border p-4 md:p-5">

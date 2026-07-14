@@ -109,8 +109,8 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
   };
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950 text-space-text">
-      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-5 backdrop-blur-xl">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950/[0.82] text-space-text">
+      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.97] px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigateToStage('cards')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识卡片">←</button>
           <button type="button" onClick={() => setDirectoryOpen(value => !value)} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="切换章节目录">☰</button>
@@ -151,7 +151,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
 
       <div className="relative flex min-h-0 flex-1">
         {directoryOpen && (
-          <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900 p-3">
+          <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900/[0.96] p-3 backdrop-blur-xl">
             <p className="px-3 pb-2 pt-1 text-[11px] font-semibold tracking-[0.16em] text-space-faint">课程框架</p>
             <nav className="space-y-1">
               {plan.map((chapter, index) => {

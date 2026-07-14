@@ -453,6 +453,16 @@ describe('KnowledgeQaView chat interface', () => {
     expect(container!.querySelector('[data-testid="qa-timeline"]')?.className).toContain('overflow-y-auto');
   });
 
+  it('leaves structural wrappers transparent and tints only the conversation surface', async () => {
+    await renderQa(async () => answer('不会调用'));
+    const layout = container!.querySelector<HTMLElement>('[data-testid="qa-two-column-layout"]')!;
+    const conversation = layout.querySelector<HTMLElement>('main')!;
+
+    expect(layout.className.split(/\s+/).some(token => token.startsWith('bg-space-950'))).toBe(false);
+    expect(layout.parentElement!.className.split(/\s+/).some(token => token.startsWith('bg-space-950'))).toBe(false);
+    expect(conversation.className).toContain('bg-space-950/[0.64]');
+  });
+
   it('falls back to the stored citation snapshot when the exact live card is unavailable', async () => {
     await renderQa(async (_config, _question, hits) => answer('可追溯回答', [hits[0].record.cardId]));
     await sendQuestion('GLM 的组成是什么？');

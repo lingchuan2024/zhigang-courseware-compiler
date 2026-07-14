@@ -67,6 +67,27 @@ afterEach(() => {
 });
 
 describe('NotesView V2 complete-note stage', () => {
+  it('keeps the active reading shell translucent while note content stays opaque', () => {
+    const master: CourseMasterNote = {
+      id: 'master-1', title: '机器学习', outline: [plan], chapters: [completedChapter], glossary: [], formulaIndex: [],
+      markdown: '# 机器学习\n\n## 广义线性模型\n\n完整章节正文。',
+      coverage: { totalCardIds: ['card-1'], coveredCardIds: ['card-1'], missingCardIds: [] }, status: 'completed', generatedFromStructureVersion: 2,
+    };
+    useStore.setState({ chapterPlan: [plan], chapterNotes: [completedChapter], courseMasterNote: master });
+
+    const container = render();
+    const readingRoot = container.firstElementChild as HTMLElement;
+    const header = readingRoot.querySelector<HTMLElement>(':scope > header')!;
+    const directory = readingRoot.querySelector<HTMLElement>('aside')!;
+    const noteSurfaces = readingRoot.querySelectorAll<HTMLElement>('main article section');
+
+    expect(readingRoot.className).toContain('bg-space-950/[0.82]');
+    expect(header.className).toContain('bg-space-900/[0.97]');
+    expect(directory.className).toContain('bg-space-900/[0.96]');
+    expect(noteSurfaces.length).toBeGreaterThan(0);
+    noteSurfaces.forEach(surface => expect(surface.className).toContain('bg-space-850'));
+  });
+
   it('shows a concrete proposed framework before generation and starts generation explicitly', () => {
     const start = vi.fn();
     useStore.setState({ startMasterNoteGeneration: start });
