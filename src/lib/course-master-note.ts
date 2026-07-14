@@ -95,12 +95,21 @@ export function assembleCourseMasterNote(input: AssembleCourseMasterNoteInput): 
     `${index + 1}. **${chapter.title}**${chapter.objective ? `：${chapter.objective}` : ''}`,
     ...chapter.framework.map(item => `   - ${item}`),
   ]).join('\n');
-  const body = usableChapters
-    .map(chapter => dedupeAdjacentMarkdown(chapter.markdown))
-    .filter(Boolean)
+  const overview = input.outline.length > 0
+    ? [
+        '## 课程概述',
+        `本课程围绕${input.outline.map(chapter => `“${chapter.title}”`).join('、')}展开。`,
+        `建议按照下列课程框架依次学习：先明确每章要解决的问题，再沿知识关系理解概念、方法与公式之间的联系。`,
+      ].join('\n\n')
+    : '';
+  const body = chapters
+    .map(chapter => chapter.status === 'completed' && chapter.markdown.trim()
+      ? dedupeAdjacentMarkdown(chapter.markdown)
+      : `## ${chapter.title}\n\n> 本章生成失败：${chapter.error ?? '尚未生成'}\n\n请使用“重新生成本章”补全此处。`)
     .join('\n\n---\n\n');
   const markdown = [
     `# ${input.title}`,
+    overview,
     input.outline.length > 0 ? `## 课程框架\n\n${framework}` : '',
     body,
   ].filter(Boolean).join('\n\n');

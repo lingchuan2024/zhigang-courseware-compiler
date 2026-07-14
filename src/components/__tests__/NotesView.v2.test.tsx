@@ -102,6 +102,33 @@ describe('NotesView V2 complete-note stage', () => {
     expect(retry).toHaveBeenCalledWith('chapter-2');
   });
 
+  it('shows every completed chapter in one document and uses the directory as anchor navigation', () => {
+    const secondPlan: ChapterPlanItem = {
+      id: 'chapter-2', title: '模型族比较', objective: '比较模型族', topicIds: ['t1'], framework: ['共同目标', '差异维度'],
+    };
+    const secondChapter: ChapterNote = {
+      ...secondPlan, markdown: '## 模型族比较\n\n第二章连续正文。', sourceCardIds: ['card-1'], status: 'completed', retryCount: 0,
+    };
+    const master: CourseMasterNote = {
+      id: 'master-1', title: '机器学习', outline: [plan, secondPlan], chapters: [completedChapter, secondChapter], glossary: [], formulaIndex: [],
+      markdown: '# 机器学习\n\n## 课程概述\n\n课程总览。\n\n## 广义线性模型\n\n完整章节正文。\n\n## 模型族比较\n\n第二章连续正文。',
+      coverage: { totalCardIds: ['card-1'], coveredCardIds: ['card-1'], missingCardIds: [] }, status: 'completed', generatedFromStructureVersion: 2,
+    };
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView });
+    useStore.setState({ chapterPlan: [plan, secondPlan], chapterNotes: [completedChapter, secondChapter], courseMasterNote: master });
+
+    const container = render();
+
+    expect(container.textContent).toContain('完整章节正文');
+    expect(container.textContent).toContain('第二章连续正文');
+    const directoryButton = Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes('模型族比较'))!;
+    act(() => directoryButton.click());
+    expect(scrollIntoView).toHaveBeenCalled();
+    expect(container.textContent).toContain('完整章节正文');
+    expect(container.textContent).toContain('第二章连续正文');
+  });
+
   it('does not treat whitespace-only markdown as a generated complete note', () => {
     useStore.setState({
       courseMasterNote: {

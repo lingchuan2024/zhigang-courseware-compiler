@@ -113,6 +113,7 @@ describe('course master note', () => {
 
     expect(result.status).toBe('completed');
     expect(result.markdown).toContain('# 机器学习');
+    expect(result.markdown).toContain('## 课程概述');
     expect(result.markdown).toContain('## 课程框架');
     expect(result.markdown.match(/共同内容/g)).toHaveLength(1);
     expect(result.coverage.coveredCardIds).toEqual(['card-a', 'card-b']);
@@ -140,7 +141,7 @@ describe('course master note', () => {
     expect(result.status).toBe('partial');
     expect(result.outline.map(item => item.title)).toEqual(['基础', '扩展']);
     expect(result.markdown).toContain('基础正文');
-    expect(result.markdown).toContain('扩展');
+    expect(result.markdown).toContain('## 扩展\n\n> 本章生成失败：模型返回为空');
     expect(result.coverage.missingCardIds).toEqual(['card-b']);
   });
 });

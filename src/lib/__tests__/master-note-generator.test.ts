@@ -98,6 +98,8 @@ describe('master note generator', () => {
     }, {}, completer);
 
     const synthesisA = requests.find(request => request.kind === 'topic-synthesis' && request.subjectId === 'topic-a')!;
+    expect(synthesisA.system).toContain('不得把知识卡片机械拼接');
+    expect(synthesisA.system).toContain('连续推导链');
     expect(synthesisA.user).toContain('card-a');
     expect(synthesisA.user).toContain('A-UNIQUE');
     expect(synthesisA.user).not.toContain('card-b');
@@ -110,6 +112,9 @@ describe('master note generator', () => {
     expect(planning.user).not.toContain('B-UNIQUE');
 
     const chapterOne = requests.find(request => request.kind === 'chapter-note' && request.subjectId === 'chapter-1')!;
+    expect(chapterOne.system).toContain('先给出本章知识框架');
+    expect(chapterOne.system).toContain('AI 教学补充');
+    expect(chapterOne.system).toContain('假设、符号、起点、连续步骤、结论和适用条件');
     expect(chapterOne.user).toContain('topic-a综合摘要');
     expect(chapterOne.user).not.toContain('topic-b综合摘要');
     expect(chapterOne.user).toContain('广义线性模型');
