@@ -4,13 +4,33 @@
 
 @layer components {
   .config-input {
-    @apply w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 outline-none transition-colors focus:border-celadon focus:ring-2 focus:ring-celadon/10;
+    @apply w-full rounded-lg border border-space-border bg-space-900 px-3 py-2.5 text-sm text-space-text outline-none transition-colors placeholder:text-space-muted/65 focus:border-celadon/70 focus:ring-2 focus:ring-celadon/10;
   }
 }
 
 @layer base {
+  :root {
+    color-scheme: dark;
+    background: #010207;
+  }
+
+  html {
+    min-height: 100%;
+    background: #010207;
+  }
+
   body {
-    @apply bg-paper text-charcoal font-ui;
+    @apply min-h-screen bg-space-950 font-ui text-space-text antialiased;
+    margin: 0;
+  }
+
+  ::selection {
+    background: rgba(120, 205, 227, 0.28);
+    color: #ffffff;
+  }
+
+  :focus-visible {
+    outline-color: #78cde3;
   }
 
   ::-webkit-scrollbar {
@@ -19,15 +39,15 @@
   }
 
   ::-webkit-scrollbar-track {
-    @apply bg-paper-dark;
+    @apply bg-space-900;
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-ink-light/40 rounded;
+    @apply rounded bg-space-border-strong/65;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-ink-light/60;
+    @apply bg-celadon/55;
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -41,23 +61,23 @@
 
 @layer components {
   .btn-primary {
-    @apply bg-ink text-white px-4 py-2 rounded-lg font-ui text-sm hover:bg-ink-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-ink-light/40;
+    @apply rounded-lg border border-celadon/45 bg-celadon px-4 py-2 font-ui text-sm font-medium text-space-950 shadow-[0_8px_24px_rgba(57,166,194,.12)] transition-colors hover:bg-celadon-light disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-celadon/35;
   }
 
   .btn-secondary {
-    @apply bg-celadon text-white px-4 py-2 rounded-lg font-ui text-sm hover:bg-celadon-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply rounded-lg border border-space-border-strong bg-space-750 px-4 py-2 font-ui text-sm text-space-text transition-colors hover:border-celadon/45 hover:bg-space-800 disabled:cursor-not-allowed disabled:opacity-50;
   }
 
   .btn-outline {
-    @apply border border-ink text-ink px-4 py-2 rounded-lg font-ui text-sm hover:bg-ink hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-ink/20;
+    @apply rounded-lg border border-space-border-strong bg-transparent px-4 py-2 font-ui text-sm text-ink-light transition-colors hover:border-celadon/50 hover:bg-celadon/10 hover:text-space-text disabled:cursor-not-allowed disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-celadon/20;
   }
 
   .btn-danger {
-    @apply border border-cinnabar/40 text-cinnabar px-4 py-2 rounded-lg font-ui text-sm hover:bg-cinnabar hover:text-white transition-colors;
+    @apply rounded-lg border border-cinnabar/40 bg-cinnabar/5 px-4 py-2 font-ui text-sm text-cinnabar-light transition-colors hover:bg-cinnabar/18 hover:text-white;
   }
 
   .card {
-    @apply bg-white border border-paper-dark rounded-xl p-4 shadow-sm;
+    @apply rounded-xl border border-space-border bg-space-850 p-4 shadow-[0_18px_48px_rgba(0,0,0,.16)];
   }
 
   .evidence-tag {
@@ -65,7 +85,7 @@
   }
 
   .page-number {
-    @apply font-mono text-xs text-ink-light;
+    @apply font-mono text-xs text-space-muted;
   }
 }
 
@@ -76,7 +96,7 @@
 
 .pptx-render-host .zhigang-pptx-slide {
   margin: 0 auto 32px !important;
-  box-shadow: 0 8px 28px rgba(28, 25, 23, 0.14);
-  outline: 1px solid rgba(214, 211, 209, 0.9);
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+  outline: 1px solid rgba(49, 83, 109, 0.72);
   scroll-margin-top: 16px;
 }
