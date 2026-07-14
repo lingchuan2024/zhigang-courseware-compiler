@@ -156,36 +156,40 @@ export function searchKnowledgeCardsWithContext(
   const limit = options.limit ?? 8;
   if (limit <= 0) return [];
 
-  const currentHits = searchKnowledgeCards(question, records, { ...options, limit });
-  const remaining = limit - currentHits.length;
-  if (remaining <= 0) return currentHits;
-
-  const historyLimit = Math.min(remaining, Math.max(1, Math.floor(limit / 2)));
-  const currentCardIds = new Set(currentHits.map(hit => hit.record.cardId));
-  const historyHitsByCardId = new Map<string, KnowledgeCardSearchHit>();
-  const currentScoreFloor = currentHits.length > 0
-    ? Math.min(...currentHits.map(hit => hit.score))
-    : Number.POSITIVE_INFINITY;
-  const historyScoreCeiling = currentScoreFloor * 0.5;
   const recentQuestions = history
     .filter(turn => turn.role === 'user')
     .map(turn => turn.content.trim())
     .filter(Boolean)
     .slice(-2)
     .reverse();
+  const currentHits = searchKnowledgeCards(question, records, { ...options, limit });
+  if (limit === 1 || recentQuestions.length === 0) return currentHits;
+
+  const reservedHistoryLimit = Math.min(2, Math.max(1, Math.floor(limit / 3)));
+  const openCapacity = Math.max(0, limit - currentHits.length);
+  const flexibleHistoryLimit = Math.min(Math.max(1, Math.floor(limit / 2)), openCapacity);
+  const historyLimit = Math.max(reservedHistoryLimit, flexibleHistoryLimit);
+  const currentCardIds = new Set(currentHits.map(hit => hit.record.cardId));
+  const historyHitsByCardId = new Map<string, KnowledgeCardSearchHit>();
 
   recentQuestions.forEach(contextQuestion => {
-    searchKnowledgeCards(contextQuestion, records, { ...options, limit: historyLimit }).forEach(hit => {
+    searchKnowledgeCards(contextQuestion, records, { ...options, limit }).forEach(hit => {
       if (currentCardIds.has(hit.record.cardId) || historyHitsByCardId.has(hit.record.cardId)) return;
-      historyHitsByCardId.set(hit.record.cardId, {
-        ...hit,
-        score: Math.min(hit.score * 0.25, historyScoreCeiling),
-      });
+      historyHitsByCardId.set(hit.record.cardId, hit);
     });
   });
 
-  const historyHits = [...historyHitsByCardId.values()]
+  const selectedHistoryHits = [...historyHitsByCardId.values()]
     .sort((a, b) => b.score - a.score || a.record.cardId.localeCompare(b.record.cardId))
     .slice(0, historyLimit);
-  return [...currentHits, ...historyHits];
+  const selectedCurrentHits = currentHits.slice(0, limit - selectedHistoryHits.length);
+  const currentScoreFloor = selectedCurrentHits.length > 0
+    ? Math.min(...selectedCurrentHits.map(hit => hit.score))
+    : Number.POSITIVE_INFINITY;
+  const historyScoreCeiling = currentScoreFloor * 0.5;
+  const historyHits = selectedHistoryHits.map(hit => ({
+    ...hit,
+    score: Math.min(hit.score * 0.25, historyScoreCeiling),
+  }));
+  return [...selectedCurrentHits, ...historyHits];
 }

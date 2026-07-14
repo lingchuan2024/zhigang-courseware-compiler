@@ -7,7 +7,6 @@ import type {
 } from '../../types';
 import type { KnowledgeCardSearchHit } from '../card-retrieval';
 import {
-  buildContextualRetrievalQuery,
   createCitationSnapshots,
   createConversationTitle,
   selectChatContext,
@@ -40,23 +39,6 @@ function hit(item: RetrievalRecord): KnowledgeCardSearchHit {
 }
 
 describe('QA conversation context', () => {
-  it('builds retrieval query from the current question and only the last two user questions', () => {
-    const history = [
-      turn('user', '最早的问题'),
-      turn('assistant', '不能进入检索查询的回答'),
-      turn('user', '中间的问题'),
-      turn('assistant', '另一个不能进入查询的回答'),
-      turn('user', '最近的问题'),
-    ];
-
-    expect(buildContextualRetrievalQuery('  当前问题是什么？  ', history)).toBe([
-      '当前问题是什么？',
-      '上下文问题：中间的问题',
-      '上下文问题：最近的问题',
-    ].join('\n'));
-    expect(buildContextualRetrievalQuery('当前问题是什么？', [])).toBe('当前问题是什么？');
-  });
-
   it('keeps at most the newest 12 messages in chronological order without mutating input', () => {
     const history = Array.from({ length: 14 }, (_, index) => turn(
       index % 2 === 0 ? 'user' : 'assistant',
@@ -93,6 +75,14 @@ describe('QA conversation context', () => {
 
     expect(selectChatContext(history, { maxMessages: 12, maxCharacters: 4 })).toEqual([
       turn('user', '…789'),
+    ]);
+  });
+
+  it('does not split combining or ZWJ graphemes in an oversized newest message suffix', () => {
+    const content = 'prefixe\u0301👨‍👩‍👧‍👦Z';
+
+    expect(selectChatContext([turn('user', content)], { maxMessages: 1, maxCharacters: 4 })).toEqual([
+      turn('user', '…e\u0301👨‍👩‍👧‍👦Z'),
     ]);
   });
 

@@ -32,20 +32,6 @@ export function createConversationTitle(question: string, maxLength = 24): strin
   return graphemes(normalized).slice(0, limit).join('');
 }
 
-export function buildContextualRetrievalQuery(
-  question: string,
-  history: ChatHistoryTurn[],
-  maxUserTurns = 2,
-): string {
-  const currentQuestion = question.trim();
-  const limit = Math.max(0, Math.floor(maxUserTurns));
-  const userTurns = history
-    .filter(turn => turn.role === 'user')
-    .map(turn => `上下文问题：${turn.content.trim()}`);
-  const recentUserTurns = limit > 0 ? userTurns.slice(-limit) : [];
-  return [currentQuestion, ...recentUserTurns].join('\n');
-}
-
 export function selectChatContext(
   history: ChatHistoryTurn[],
   limits: { maxMessages?: number; maxCharacters?: number } = {},
@@ -58,7 +44,7 @@ export function selectChatContext(
   let usedCharacters = 0;
   for (let index = history.length - 1; index >= 0 && selected.length < maxMessages; index -= 1) {
     const content = history[index].content.trim();
-    const characters = codePoints(content);
+    const characters = graphemes(content);
     const remainingCharacters = maxCharacters - usedCharacters;
     if (characters.length > remainingCharacters) {
       if (selected.length === 0) {

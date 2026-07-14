@@ -95,4 +95,48 @@ describe('knowledge card retrieval', () => {
     expect(historyOnlyHits).toHaveLength(2);
     expect(historyOnlyHits.every(hit => hit.score < Math.min(...currentHits.map(current => current.score)))).toBe(true);
   });
+
+  it('reserves a history-only slot when generic current hits fill the limit', () => {
+    const genericRecords = Array.from({ length: 5 }, (_, index) => (
+      buildRetrievalRecords([
+        card(`card-generic-${index}`, `course-generic-${index}`, `模型特点 ${index}`, `这个模型的特点 ${index}`),
+      ], `doc-generic-${index}`)
+    )).flat();
+    const records = [
+      ...genericRecords,
+      ...buildRetrievalRecords([
+        card('card-poisson-history', 'course-poisson', 'Poisson 分布', 'Poisson 的定义与性质'),
+      ], 'doc-poisson'),
+    ];
+
+    const hits = searchKnowledgeCardsWithContext(
+      '它有什么特点？',
+      [{ role: 'user', content: 'Poisson 是什么？' }],
+      records,
+      { limit: 4 },
+    );
+    const poissonIndex = hits.findIndex(hit => hit.record.cardId === 'card-poisson-history');
+
+    expect(hits).toHaveLength(4);
+    expect(poissonIndex).toBe(3);
+    expect(hits.slice(0, poissonIndex).every(hit => hit.record.cardId.startsWith('card-generic-'))).toBe(true);
+  });
+
+  it('backfills reserved capacity when history has no unique hits', () => {
+    const records = Array.from({ length: 5 }, (_, index) => (
+      buildRetrievalRecords([
+        card(`card-feature-${index}`, `course-feature-${index}`, `模型特点 ${index}`, `这个模型的特点 ${index}`),
+      ], `doc-feature-${index}`)
+    )).flat();
+
+    const hits = searchKnowledgeCardsWithContext(
+      '它有什么特点？',
+      [{ role: 'user', content: '它有什么特点？' }],
+      records,
+      { limit: 4 },
+    );
+
+    expect(hits).toHaveLength(4);
+    expect(new Set(hits.map(hit => hit.record.cardId)).size).toBe(4);
+  });
 });
