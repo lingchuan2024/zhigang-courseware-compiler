@@ -23,6 +23,13 @@ const ACTIVE_CONVERSATION_KEY = 'zhigang_qa_active_conversation';
 const activeGenerations = new Map<string, symbol>();
 const invalidatedGenerations = new Map<string, symbol>();
 const settledCancelledGenerations = new Set<symbol>();
+interface GenerationRuntime {
+  conversationId: string;
+  assistantMessageId?: string;
+  assistantMessage?: ChatMessage;
+  releaseRequested: boolean;
+}
+const generationRuntimes = new Map<symbol, GenerationRuntime>();
 const deletedConversationIds = new Set<string>();
 const deletionStates = new Map<string, 'pending' | 'succeeded' | 'failed'>();
 let provisionalConversationReservation: symbol | null = null;
@@ -119,6 +126,7 @@ function reserveGeneration(conversationId: string): symbol {
   }
   const token = Symbol(conversationId);
   activeGenerations.set(conversationId, token);
+  generationRuntimes.set(token, { conversationId, releaseRequested: false });
   useQaStore.setState(state => ({
     activeRequestConversationIds: state.activeRequestConversationIds.includes(conversationId)
       ? state.activeRequestConversationIds
@@ -149,21 +157,38 @@ function cleanupDeletionGuard(conversationId: string): void {
   deletionStates.delete(conversationId);
 }
 
+function finalizeInvalidatedGeneration(conversationId: string, token: symbol): void {
+  const runtime = generationRuntimes.get(token);
+  if (!runtime?.releaseRequested || !settledCancelledGenerations.has(token)) return;
+  if (invalidatedGenerations.get(conversationId) !== token) return;
+  invalidatedGenerations.delete(conversationId);
+  settledCancelledGenerations.delete(token);
+  generationRuntimes.delete(token);
+  cleanupDeletionGuard(conversationId);
+}
+
+function settleSuccessfulDeletionIfGenerationFinished(conversationId: string): void {
+  const token = invalidatedGenerations.get(conversationId);
+  if (!token || !generationRuntimes.get(token)?.releaseRequested) return;
+  settledCancelledGenerations.add(token);
+  finalizeInvalidatedGeneration(conversationId, token);
+}
+
 function releaseGeneration(conversationId: string, token: symbol): void {
+  const runtime = generationRuntimes.get(token);
+  if (runtime) runtime.releaseRequested = true;
   if (activeGenerations.get(conversationId) === token) {
     activeGenerations.delete(conversationId);
+    generationRuntimes.delete(token);
   } else if (invalidatedGenerations.get(conversationId) === token) {
     const deletionState = deletionStates.get(conversationId);
-    if (
-      (deletionState === 'failed' || deletionState === 'succeeded') &&
-      !settledCancelledGenerations.has(token)
-    ) {
-      return;
+    if (!runtime?.assistantMessageId && deletionState === 'failed') {
+      settledCancelledGenerations.add(token);
     }
-    invalidatedGenerations.delete(conversationId);
-    settledCancelledGenerations.delete(token);
-    cleanupDeletionGuard(conversationId);
+    if (deletionState === 'pending' || !settledCancelledGenerations.has(token)) return;
+    finalizeInvalidatedGeneration(conversationId, token);
   } else {
+    generationRuntimes.delete(token);
     return;
   }
   if (activeGenerations.has(conversationId)) return;
@@ -197,6 +222,7 @@ export function resetQaStoreRuntimeForTests(): void {
   activeGenerations.clear();
   invalidatedGenerations.clear();
   settledCancelledGenerations.clear();
+  generationRuntimes.clear();
   deletedConversationIds.clear();
   deletionStates.clear();
   provisionalConversationReservation = null;
@@ -240,10 +266,10 @@ async function refreshOwningConversation(conversationId: string, token: symbol):
   });
 }
 
-async function settleCancelledPlaceholder(
+async function reconcileCancelledAssistant(
   conversationId: string,
   token: symbol,
-  placeholder: ChatMessage,
+  allowCreateMissing: boolean,
 ): Promise<void> {
   if (invalidatedGenerations.get(conversationId) !== token) return;
   const deletionState = deletionStates.get(conversationId);
@@ -253,23 +279,35 @@ async function settleCancelledPlaceholder(
     return;
   }
   if (deletionState !== 'failed') return;
-  const interrupted: ChatMessage = {
-    ...placeholder,
-    status: 'interrupted',
-    error: '删除聊天失败，回答生成已中断',
-    updatedAt: nextTimestamp(),
-  };
-  await repository.saveChatMessage(interrupted);
+  const runtime = generationRuntimes.get(token);
+  if (!runtime?.assistantMessageId) return;
+  const exact = (await repository.listChatMessages(conversationId))
+    .find(item => item.id === runtime.assistantMessageId);
+  if (!exact && (!allowCreateMissing || !runtime.assistantMessage)) return;
+  const terminal = exact?.status === 'pending' || !exact
+    ? {
+        ...(exact ?? runtime.assistantMessage!),
+        status: 'interrupted' as const,
+        error: '删除聊天失败，回答生成已中断',
+        updatedAt: nextTimestamp(),
+      }
+    : exact;
+  if (terminal.status === 'interrupted' && exact?.status !== 'interrupted') {
+    await repository.saveChatMessage(terminal);
+  } else if (!exact) {
+    await repository.saveChatMessage(terminal);
+  }
   settledCancelledGenerations.add(token);
   useQaStore.setState(state => {
     if (state.activeConversationId !== conversationId) return {};
-    const exists = state.messages.some(item => item.id === interrupted.id);
+    const exists = state.messages.some(item => item.id === terminal.id);
     return {
       messages: exists
-        ? state.messages.map(item => item.id === interrupted.id ? interrupted : item)
-        : [...state.messages, interrupted],
+        ? state.messages.map(item => item.id === terminal.id ? terminal : item)
+        : [...state.messages, terminal],
     };
   });
+  finalizeInvalidatedGeneration(conversationId, token);
 }
 
 async function generateAnswer(input: GenerationInput): Promise<void> {
@@ -285,6 +323,11 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
     createdAt: placeholderTime,
     updatedAt: placeholderTime,
   };
+  const runtime = generationRuntimes.get(token);
+  if (runtime) {
+    runtime.assistantMessageId = placeholder.id;
+    runtime.assistantMessage = placeholder;
+  }
 
   let completed: ChatMessage;
   try {
@@ -332,6 +375,8 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
       error: undefined,
       updatedAt: nextTimestamp(),
     };
+    const completedRuntime = generationRuntimes.get(token);
+    if (completedRuntime) completedRuntime.assistantMessage = completed;
     await repository.saveChatMessage(completed);
     assertGenerationActive(conversationId, token);
     useQaStore.setState(state => (
@@ -345,7 +390,7 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
       invalidatedGenerations.get(conversationId) === token
     ) {
       try {
-        await settleCancelledPlaceholder(conversationId, token, placeholder);
+        await reconcileCancelledAssistant(conversationId, token, true);
       } catch (settleError) {
         useQaStore.setState(state => (
           state.activeConversationId === conversationId
@@ -552,6 +597,7 @@ export const useQaStore = create<QaState>((set, get) => ({
       await repository.deleteChatConversation(id);
       cascadeSucceeded = true;
       deletionStates.set(id, 'succeeded');
+      settleSuccessfulDeletionIfGenerationFinished(id);
       refreshedConversations = await repository.listChatConversations();
       const conversations = refreshedConversations;
       const selectionUnchanged = deletingActive
@@ -600,7 +646,12 @@ export const useQaStore = create<QaState>((set, get) => ({
       deletionStates.set(id, 'failed');
       let interruptionError: string | null = null;
       try {
-        await interruptPendingGenerationAfterDeleteFailure(id);
+        const invalidatedToken = invalidatedGenerations.get(id);
+        if (invalidatedToken) {
+          await reconcileCancelledAssistant(id, invalidatedToken, false);
+        } else {
+          await interruptPendingGenerationAfterDeleteFailure(id);
+        }
       } catch (interruptError) {
         interruptionError = errorMessage(interruptError);
       }

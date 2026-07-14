@@ -337,6 +337,63 @@ describe('QA conversation store', () => {
     expect(answerer).not.toHaveBeenCalled();
   });
 
+  it('reconciles its exact completed assistant when deletion fails after durable answer save', async () => {
+    const course = await createLibraryCourse({ name: '对账课程' });
+    await addDocument(course.id, 'reconcile-doc', '对账课件');
+    await replaceDocumentRetrievalRecords('reconcile-doc', [retrievalRecord({
+      id: 'reconcile-record',
+      cardId: 'reconcile-card',
+      courseId: course.id,
+      documentId: 'reconcile-doc',
+      title: '终态对账',
+      content: '终态对账知识',
+      keywords: ['终态对账'],
+      sourceExcerpt: '终态对账原文',
+    })]);
+    const completedPersisted = deferred<void>();
+    const completedPublicationGate = deferred<void>();
+    const realSaveMessage = repository.saveChatMessage;
+    vi.spyOn(repository, 'saveChatMessage').mockImplementation(async item => {
+      await realSaveMessage(item);
+      if (item.role === 'assistant' && item.status === 'completed') {
+        completedPersisted.resolve();
+        await completedPublicationGate.promise;
+      }
+    });
+    const answerer = vi.fn<QaAnswerer>().mockImplementation(async (_config, _question, hits) => (
+      completedAnswer('持久化完成回答', [hits[0].record.cardId])
+    ));
+    const send = useQaStore.getState().sendQuestion({ config, question: '终态对账', answerer });
+    await completedPersisted.promise;
+    const conversationId = useQaStore.getState().activeConversationId!;
+    expect(useQaStore.getState().messages.find(item => item.role === 'assistant')?.status).toBe('pending');
+    const deleteStarted = deferred<void>();
+    const deleteGate = deferred<void>();
+    vi.spyOn(repository, 'deleteChatConversation').mockImplementationOnce(async () => {
+      deleteStarted.resolve();
+      await deleteGate.promise;
+      throw new Error('删除事务失败');
+    });
+
+    const deletion = useQaStore.getState().deleteConversation(conversationId);
+    await deleteStarted.promise;
+    completedPublicationGate.resolve();
+    await send;
+    deleteGate.resolve();
+    await expect(deletion).rejects.toThrow('删除事务失败');
+
+    const storedAssistant = (await listChatMessages(conversationId)).find(item => item.role === 'assistant')!;
+    const visibleAssistant = useQaStore.getState().messages.find(item => item.id === storedAssistant.id)!;
+    expect(storedAssistant).toMatchObject({
+      status: 'completed',
+      content: '持久化完成回答',
+      answer: expect.objectContaining({ mode: 'cards' }),
+      citations: [expect.objectContaining({ cardId: 'reconcile-card', documentId: 'reconcile-doc' })],
+    });
+    expect(visibleAssistant).toEqual(storedAssistant);
+    expect(useQaStore.getState().activeRequestConversationIds).toEqual([]);
+  });
+
   it('keeps a successful cascade deleted when the following conversation refresh fails', async () => {
     const slow = deferred<RagAnswer>();
     const answerer = vi.fn<QaAnswerer>(() => slow.promise);
