@@ -1,6 +1,6 @@
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../../App';
 import {
   createLibraryCourse,
@@ -40,6 +40,9 @@ beforeEach(async () => {
   container = document.createElement('div');
   document.body.appendChild(container);
   root = createRoot(container);
+  vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
+  vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
+  vi.stubGlobal('cancelAnimationFrame', vi.fn());
 });
 
 afterEach(() => {
@@ -47,6 +50,8 @@ afterEach(() => {
   container?.remove();
   root = null;
   container = null;
+  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe('multi-course library navigation', () => {
@@ -74,7 +79,10 @@ describe('multi-course library navigation', () => {
 
   it('starts at home, creates a course, and opens its upload workspace', async () => {
     await act(async () => root!.render(createElement(App)));
-    expect(container!.textContent).toContain('从课件到知识网络');
+    expect(container!.textContent).toContain('知识被观测，星云才会发光。');
+    expect(container!.textContent).toContain('知纲');
+    expect(container!.textContent).not.toContain('OBSERVATORY ONLINE');
+    expect(container!.textContent).not.toContain('CURRENT SURVEY');
 
     await act(async () => button('进入课件库').click());
     expect(container!.textContent).toContain('课程与课件');
@@ -96,7 +104,30 @@ describe('multi-course library navigation', () => {
     await act(async () => root!.render(createElement(App)));
     await act(async () => button('进入课件库').click());
     await act(async () => button('返回首页').click());
-    expect(container!.textContent).toContain('从课件到知识网络');
+    expect(container!.textContent).toContain('知识被观测，星云才会发光。');
+  });
+
+  it('opens a course from its nebula hotspot', async () => {
+    const course = await createLibraryCourse({ name: '概率论' });
+    await upsertLibraryDocument({
+      id: 'probability-doc', courseId: course.id, title: '贝叶斯', fileName: 'bayes.pdf',
+      fileType: 'pdf', pageCount: 1, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await saveLibraryProjectSnapshot(course.id, 'probability-doc', {
+      knowledgeTopics: [{
+        id: 'bayes', courseId: course.id, name: '贝叶斯定理', aliases: [], summary: '', learningObjective: '',
+        sourceRanges: [{ documentId: 'probability-doc', startBlockId: 'a', endBlockId: 'b' }], childTopicIds: [],
+        importance: 'core', difficulty: 3, knowledgeGenre: 'concept', confidence: 0.9, status: 'generated',
+      }],
+      knowledgeCards: [],
+    });
+    await act(async () => root!.render(createElement(App)));
+
+    const hotspot = container!.querySelector<HTMLButtonElement>('[aria-label="打开课程：概率论"]')!;
+    await act(async () => hotspot.click());
+
+    expect(container!.textContent).toContain('课程与课件');
+    expect(useLibraryStore.getState().activeCourseId).toBe(course.id);
   });
 
   it('confirms and deletes one courseware with all derived content', async () => {
