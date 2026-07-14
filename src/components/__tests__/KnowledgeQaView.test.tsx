@@ -6,6 +6,7 @@ import {
   createLibraryCourse,
   replaceDocumentRetrievalRecords,
   resetLibraryRepositoryForTests,
+  saveChatConversation,
   upsertLibraryDocument,
 } from '../../lib/library-repository';
 import { useLibraryStore } from '../../store/useLibraryStore';
@@ -172,15 +173,18 @@ describe('KnowledgeQaView chat interface', () => {
     await renderQa(answerer);
     await sendQuestion('第一个问题');
     const firstId = useQaStore.getState().activeConversationId!;
+    expect(container!.querySelector('[data-testid="qa-chat-title"]')?.textContent).toBe('第一个问题');
 
     act(() => Array.from(container!.querySelectorAll('button')).find(button => button.textContent?.includes('新建聊天'))!.click());
     expect(container!.textContent).toContain('从全部课件知识卡片开始提问');
     await sendQuestion('第二个问题');
     const secondId = useQaStore.getState().activeConversationId!;
     expect(secondId).not.toBe(firstId);
+    expect(container!.querySelector('[data-testid="qa-chat-title"]')?.textContent).toBe('第二个问题');
 
     await act(async () => container!.querySelector<HTMLButtonElement>(`[data-conversation-id="${firstId}"]`)!.click());
     await waitFor(() => expect(container!.textContent).toContain('回答：第一个问题'));
+    expect(container!.querySelector('[data-testid="qa-chat-title"]')?.textContent).toBe('第一个问题');
     expect(container!.textContent).not.toContain('回答：第二个问题');
 
     await act(async () => container!.querySelector<HTMLButtonElement>(`[data-conversation-id="${secondId}"]`)!.click());
@@ -202,6 +206,7 @@ describe('KnowledgeQaView chat interface', () => {
       renameInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     });
     await waitFor(() => expect(container!.textContent).toContain('新标题'));
+    expect(container!.querySelector('[data-testid="qa-chat-title"]')?.textContent).toBe('新标题');
 
     const deleteButton = () => container!.querySelector<HTMLButtonElement>(`button[data-delete-conversation="${conversationId}"]`)!;
     act(() => deleteButton().click());
@@ -265,6 +270,23 @@ describe('KnowledgeQaView chat interface', () => {
     const drawer = container!.querySelector('[data-testid="citation-drawer"]')!;
     expect(drawer.textContent).toContain('卡片已更新或不可用，显示历史引用');
     expect(drawer.textContent).toContain('GLM 由随机成分');
+  });
+
+  it('places every conversation older than yesterday in the 更早 group', async () => {
+    const timestamp = Date.now() - 3 * 24 * 60 * 60 * 1000;
+    await saveChatConversation({
+      id: 'old-chat',
+      title: '三天前的聊天',
+      courseIds: [],
+      createdAt: timestamp,
+      updatedAt: timestamp,
+      lastOpenedAt: timestamp,
+    });
+
+    await renderQa(async () => answer('不会调用'));
+    const history = container!.querySelector('nav[aria-label="聊天历史"]')!;
+    expect(history.textContent).toContain('更早');
+    expect(history.textContent).not.toContain('过去 7 天');
   });
 
 });

@@ -29,7 +29,6 @@ function groupConversationsByDate(
   const buckets: Array<ConversationGroup & { test: (timestamp: number) => boolean }> = [
     { label: '今天', conversations: [], test: timestamp => timestamp >= today.getTime() },
     { label: '昨天', conversations: [], test: timestamp => timestamp >= today.getTime() - day },
-    { label: '过去 7 天', conversations: [], test: timestamp => timestamp >= today.getTime() - day * 7 },
     { label: '更早', conversations: [], test: () => true },
   ];
 
@@ -99,6 +98,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     [messages],
   );
   const conversationGroups = useMemo(() => groupConversationsByDate(conversations), [conversations]);
+  const activeConversation = conversations.find(conversation => conversation.id === activeConversationId);
   const activeInFlight = activeConversationId !== null
     && activeRequestConversationIds.includes(activeConversationId);
   const sendDisabled = !draft.trim() || loadingConversation || activeInFlight;
@@ -288,7 +288,9 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
         <header className="flex items-center justify-between border-b border-[#ded5c8] bg-[#faf7f1]/90 px-5 py-4 backdrop-blur md:px-8">
           <div>
             <p className="font-mono text-[9px] tracking-[0.22em] text-cinnabar">KNOWLEDGE CARD CHAT</p>
-            <h1 className="mt-1 font-song text-xl font-bold text-ink">全库知识问答</h1>
+            <h1 data-testid="qa-chat-title" className="mt-1 max-w-[52vw] truncate font-song text-xl font-bold text-ink">
+              {activeConversation?.title ?? '全库知识问答'}
+            </h1>
           </div>
           <span className="rounded-full border border-celadon/20 bg-celadon/5 px-3 py-1.5 text-xs text-ink">全部课件</span>
         </header>
