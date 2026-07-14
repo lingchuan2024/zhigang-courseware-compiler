@@ -7,7 +7,6 @@ import { KnowledgeNetworkCanvas } from './knowledge-network/KnowledgeNetworkCanv
 import { SourceEvidencePanel } from './knowledge-network/SourceEvidencePanel';
 import {
   buildCourseNetwork,
-  buildExpandedKnowledgeNetwork,
   buildLegacyCourseNetwork,
   buildLegacySourceDocuments,
   buildLegacyTeachingNetwork,
@@ -95,12 +94,12 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
     [evidences, expandedTopicId, legacyPackages, narrativePaths, teachingBlocks, teachingRelations, usesMarkdownArchitecture],
   );
   const currentNetwork: KnowledgeNetworkModel = useMemo(
-    () => expandedTopicId
-      ? buildExpandedKnowledgeNetwork(courseNetwork, teachingNetwork, expandedTopicId)
-      : courseNetwork,
+    () => expandedTopicId ? teachingNetwork : courseNetwork,
     [courseNetwork, expandedTopicId, teachingNetwork],
   );
-  const selectedNode = currentNetwork.nodes.find(node => node.id === selectedNodeId) ?? null;
+  const selectedNode = currentNetwork.nodes.find(node => node.id === selectedNodeId)
+    ?? courseNetwork.nodes.find(node => node.id === selectedNodeId)
+    ?? null;
   const selectedRelationCount = selectedNode
     ? currentNetwork.edges.filter(edge => edge.sourceId === selectedNode.id || edge.targetId === selectedNode.id).length
     : 0;
@@ -186,13 +185,13 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
                   <span className="text-stone-300">/</span>
                   <span className="max-w-48 truncate font-song font-bold text-[#173f35]">{selectedTopicLabel}</span>
                   <span className="text-stone-300">/</span>
-                  <span className="text-stone-500">内部网已展开</span>
+                  <span className="text-stone-500">二级知识网</span>
                 </>
               )}
             </div>
             <p className="mt-1 text-xs text-stone-500">
               {courseNetwork.nodes.length} 个核心知识 · {courseNetwork.edges.length} 个课程关系
-              {expandedTopicId && ` · 展开 ${teachingNetwork.nodes.length} 个内部节点`}
+              {expandedTopicId && ` · ${teachingNetwork.nodes.length} 个二级节点`}
             </p>
           </div>
         </div>
@@ -203,7 +202,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
             <input
               value={search}
               onChange={event => setSearch(event.target.value)}
-              placeholder="搜索课程与内部知识"
+              placeholder={expandedTopicId ? '搜索二级知识' : '搜索课程知识'}
               className="h-9 w-full rounded-xl border border-stone-200 bg-white pl-8 pr-3 text-sm text-stone-700 outline-none transition focus:border-[#6f998b] focus:ring-2 focus:ring-[#6f998b]/15"
               aria-label="搜索知识节点"
             />
@@ -232,13 +231,23 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1">
+          {expandedTopicId && (
+            <button
+              type="button"
+              aria-label="关闭二级知识网"
+              onClick={collapseTeachingNetwork}
+              className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-[#9cb8ae] bg-[#fffdfa]/95 px-3 py-2 text-sm font-medium text-[#285c50] shadow-sm backdrop-blur hover:bg-white"
+            >
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e4efe9] text-lg leading-none">×</span>
+              <span className="max-w-52 truncate">{selectedTopicLabel}</span>
+            </button>
+          )}
           <KnowledgeNetworkCanvas
             model={currentNetwork}
             selectedId={selectedNodeId}
             onSelect={selectNode}
             search={search}
             relationTypes={relationType === 'all' ? undefined : [relationType]}
-            onCollapseExpandedGroup={expandedTopicId ? collapseTeachingNetwork : undefined}
           />
           {expandedTopicId && teachingNetwork.nodes.length === 0 && <NetworkEmptyState onBack={collapseTeachingNetwork} />}
         </main>

@@ -105,20 +105,21 @@ describe('KnowledgeStructureView two-layer network', () => {
     expect(container.textContent).not.toContain('知识目录');
   });
 
-  it('expands and removes the internal network on the same canvas', () => {
+  it('replaces the course graph with the selected topic graph and closes back to the course graph', () => {
     const { container } = renderView();
     const topic = container.querySelector<SVGGElement>('[aria-label="概率模型"]')!;
     act(() => topic.dispatchEvent(new MouseEvent('click', { bubbles: true })));
 
-    expect(container.querySelector('[aria-label="最大似然估计"]')).not.toBeNull();
+    expect(container.querySelector('[aria-label="最大似然估计"]')).toBeNull();
     const teaching = container.querySelector<SVGGElement>('[aria-label="概率模型案例"]')!;
     expect(teaching).not.toBeNull();
     act(() => teaching.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(container.textContent).toContain('内部原文：概率模型案例');
 
-    expect(Array.from(container.querySelectorAll('header button')).some(button => button.textContent?.includes('收起内部网'))).toBe(false);
-    const collapse = container.querySelector<SVGGElement>('[aria-label="收起内部知识网"]')!;
-    act(() => collapse.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    expect(container.textContent).toContain('二级知识网');
+    const collapse = container.querySelector<HTMLButtonElement>('button[aria-label="关闭二级知识网"]')!;
+    expect(collapse).not.toBeNull();
+    act(() => collapse.click());
     expect(container.querySelector('[aria-label="概率模型案例"]')).toBeNull();
     expect(container.querySelector('[aria-label="最大似然估计"]')).not.toBeNull();
     expect(container.textContent).not.toContain('推荐路径');
@@ -182,7 +183,6 @@ describe('KnowledgeStructureView two-layer network', () => {
     act(() => topic.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(container.textContent).toContain('课程原文：旧版概率模型定义');
 
-    act(() => topic.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })));
     expect(container.querySelector('[aria-label="内部定义"]')).not.toBeNull();
   });
 

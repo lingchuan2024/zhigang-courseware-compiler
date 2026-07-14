@@ -8,7 +8,7 @@ import type {
   TopicNarrativePath,
   TopicRelation,
 } from '../../types';
-import { buildCourseNetwork, buildExpandedKnowledgeNetwork, buildTeachingNetwork } from '../knowledge-network-adapter';
+import { buildCourseNetwork, buildTeachingNetwork } from '../knowledge-network-adapter';
 
 const sourceRange: SourceRange = { documentId: 'doc-1', startBlockId: 'b1', endBlockId: 'b2' };
 
@@ -92,12 +92,7 @@ describe('knowledge network adapter', () => {
     expect(graph.nodes.map(node => node.sequence)).toEqual([1, 2]);
   });
 
-  it('expands a selected topic internal network in the same course graph', () => {
-    const course = buildCourseNetwork(
-      [topic('t1', 'GLM'), topic('t2', '最大似然估计')],
-      [{ id: 'r1', sourceTopicId: 't2', targetTopicId: 't1', type: 'hard_prerequisite', reason: '前置', confidence: 0.9 }],
-      { orderedTopicIds: ['t2', 't1'], steps: [] },
-    );
+  it('keeps the topic graph independent from the course graph', () => {
     const teaching = buildTeachingNetwork(
       't1',
       [
@@ -108,20 +103,12 @@ describe('knowledge network adapter', () => {
       { topicId: 't1', orderedTeachingBlockIds: ['b2', 'b1'], rationale: '先族后公式' },
     );
 
-    const graph = buildExpandedKnowledgeNetwork(course, teaching, 't1');
-
-    expect(graph.nodes.map(node => node.id)).toEqual(['t1', 't2', 'b1', 'b2']);
-    expect(graph.nodes.find(node => node.id === 'b1')).toMatchObject({
+    expect(teaching.nodes.map(node => node.id)).toEqual(['b1', 'b2']);
+    expect(teaching.nodes.find(node => node.id === 'b1')).toMatchObject({
       category: '公式体系',
       sequence: 2,
-      sequenceLabel: '2.2',
     });
-    expect(graph.edges.map(edge => edge.id)).toContain('tr1');
-    expect(graph.focusNodeIds).toEqual(['b1', 'b2']);
-    expect(graph.expandedGroup).toEqual({
-      topicId: 't1',
-      label: 'GLM · 内部知识网',
-      nodeIds: ['b1', 'b2'],
-    });
+    expect(teaching.nodes.some(node => node.kind === 'topic')).toBe(false);
+    expect(teaching.edges.map(edge => edge.id)).toContain('tr1');
   });
 });

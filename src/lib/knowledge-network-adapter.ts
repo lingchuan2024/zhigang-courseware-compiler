@@ -217,54 +217,6 @@ export function buildTeachingNetwork(
   };
 }
 
-/**
- * 将选中主题的第二层网投影到同一张课程画布。
- * 第一层始终保留，第二层可以作为一个可删除的聚焦子网。
- */
-export function buildExpandedKnowledgeNetwork(
-  courseNetwork: KnowledgeNetworkModel,
-  teachingNetwork: KnowledgeNetworkModel,
-  topicId: string,
-): KnowledgeNetworkModel {
-  if (teachingNetwork.nodes.length === 0) return courseNetwork;
-
-  const topicNode = courseNetwork.nodes.find(node => node.id === topicId);
-  const topicLabel = topicNode?.label ?? '当前知识';
-  const topicSequence = topicNode?.sequence;
-  const expandedTeachingNodes = teachingNetwork.nodes.map(node => ({
-    ...node,
-    sequenceLabel: topicSequence !== undefined && node.sequence !== undefined
-      ? `${topicSequence}.${node.sequence}`
-      : node.sequence !== undefined ? String(node.sequence) : undefined,
-  }));
-
-  const firstInternalNode = [...expandedTeachingNodes]
-    .sort((a, b) => a.order - b.order)[0];
-  const bridge: KnowledgeNetworkEdge = {
-    id: `expanded-${topicId}-${firstInternalNode.id}`,
-    sourceId: topicId,
-    targetId: firstInternalNode.id,
-    type: 'contains_internal',
-    label: '内部知识',
-    reason: '当前核心知识的第二层展开结构',
-    confidence: 1,
-    isPath: false,
-  };
-
-  return {
-    nodes: [...courseNetwork.nodes, ...expandedTeachingNodes],
-    edges: [...courseNetwork.edges, bridge, ...teachingNetwork.edges],
-    pathEdges: [],
-    warnings: [...courseNetwork.warnings, ...teachingNetwork.warnings],
-    focusNodeIds: expandedTeachingNodes.map(node => node.id),
-    expandedGroup: {
-      topicId,
-      label: `${topicLabel} · 内部知识网`,
-      nodeIds: expandedTeachingNodes.map(node => node.id),
-    },
-  };
-}
-
 function legacySourceRanges(evidenceIds: string[], evidenceMap: Map<string, EvidenceAtom>): SourceRange[] {
   return evidenceIds.flatMap((id): SourceRange[] => {
     const evidence = evidenceMap.get(id);
