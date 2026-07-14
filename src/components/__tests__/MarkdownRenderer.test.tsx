@@ -124,7 +124,7 @@ describe('MarkdownRenderer', () => {
     const btn = container.querySelector('button[data-marker="cite-2"]') as HTMLButtonElement;
     expect(btn).not.toBeNull();
     // Valid citation should not have the grey warning class
-    expect(btn.className).not.toContain('text-stone-400');
+    expect(btn.className).not.toContain('text-space-faint');
     expect(btn.className).toContain('text-cinnabar');
   });
 
@@ -138,7 +138,7 @@ describe('MarkdownRenderer', () => {
     const btn = container.querySelector('button[data-marker="cite-99"]') as HTMLButtonElement;
     expect(btn).not.toBeNull();
     // Invalid citation should have grey styling
-    expect(btn.className).toContain('text-stone-400');
+    expect(btn.className).toContain('text-space-faint');
     expect(btn.className).toContain('cursor-default');
   });
 

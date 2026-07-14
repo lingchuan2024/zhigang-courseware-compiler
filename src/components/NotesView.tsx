@@ -330,32 +330,32 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
   const citations = activeKp?.note?.citations || [];
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden bg-stone-50">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950 text-space-text">
       {/* 顶部栏 */}
-      <header className="bg-white border-b border-stone-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+      <header className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-6 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-4">
           <button
             onClick={() => navigateToStage('structure')}
-            className="p-1.5 rounded hover:bg-stone-100 transition-colors"
+            className="rounded p-1.5 transition-colors hover:bg-space-750"
             title="返回知识结构"
             aria-label="返回知识结构"
           >
-            <svg className="w-5 h-5 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5 text-space-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 18l-6-6 6-6" />
             </svg>
           </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-1.5 rounded hover:bg-stone-100 transition-colors"
+            className="rounded p-1.5 transition-colors hover:bg-space-750"
             title="切换目录"
           >
-            <svg className="w-5 h-5 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-5 w-5 text-space-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
           <div>
-            <h1 className="font-song text-lg font-bold text-stone-900">{courseDoc?.title || '课件笔记'}</h1>
-            <div className="flex items-center gap-3 text-xs text-stone-500 mt-0.5">
+            <h1 className="font-song text-lg font-bold text-space-text">{courseDoc?.title || '课件笔记'}</h1>
+            <div className="mt-0.5 flex items-center gap-3 text-xs text-space-muted">
               <span>{orderedTopics.length} 个知识点</span>
               <span>·</span>
               <span>{completedCount}/{packages.length} 已生成笔记</span>
@@ -367,7 +367,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
               )}
               <span>·</span>
               <span className="flex items-center gap-1">
-                <span className={`w-2 h-2 rounded-full ${orderMode === 'ai-recommended' ? 'bg-cinnabar' : 'bg-stone-400'}`}></span>
+                <span className={`h-2 w-2 rounded-full ${orderMode === 'ai-recommended' ? 'bg-cinnabar' : 'bg-space-faint'}`}></span>
                 {orderMode === 'ai-recommended' ? 'AI推荐顺序' : 'PPT原顺序'}
               </span>
             </div>
@@ -381,7 +381,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
               onClick={() => {
                 failedPackages.forEach(p => regenerateNote(p.topic.id));
               }}
-              className="px-3 py-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+              className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-300 transition-colors hover:bg-amber-400/15"
             >
               重试失败项 ({failedPackages.length})
             </button>
@@ -389,21 +389,21 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
           {!modelConfig?.apiKey && (
             <button
               onClick={onOpenSettings}
-              className="px-3 py-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+              className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-300 transition-colors hover:bg-amber-400/15"
             >
               配置AI模型
             </button>
           )}
           {/* 视图切换 */}
-          <div className="flex bg-stone-100 rounded-lg p-0.5">
+          <div className="flex rounded-lg bg-space-750 p-0.5">
             {views.map(v => (
               <button
                 key={v.key}
                 onClick={() => setCurrentView(v.key)}
                 className={`px-3 py-1.5 text-xs rounded-md transition-all ${
                   currentView === v.key
-                    ? 'bg-white text-stone-900 shadow-sm font-medium'
-                    : 'text-stone-500 hover:text-stone-700'
+                    ? 'bg-space-850 text-space-text shadow-sm font-medium'
+                    : 'text-space-muted hover:text-space-text'
                 }`}
                 title={v.desc}
               >
@@ -412,11 +412,11 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
             ))}
           </div>
 
-          <div className="w-px h-6 bg-stone-200"></div>
+          <div className="h-6 w-px bg-space-border"></div>
 
           <button
             onClick={() => setOrderMode(orderMode === 'original' ? 'ai-recommended' : 'original')}
-            className="px-3 py-1.5 text-xs border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1"
+            className="btn-outline flex items-center gap-1"
           >
             {orderMode === 'original' ? (
               <>
@@ -437,7 +437,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
 
           <button
             onClick={() => exportNotes()}
-            className="px-3 py-1.5 text-xs border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors flex items-center gap-1"
+            className="btn-outline flex items-center gap-1"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -447,19 +447,19 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
 
           <button
             onClick={regenerateAll}
-            className="px-3 py-1.5 text-xs border border-stone-300 rounded-lg hover:bg-stone-50 transition-colors"
+            className="btn-outline"
           >重新生成</button>
 
           <button
             onClick={() => { if (confirm('确定重置所有数据？此操作不可撤销。')) reset(); }}
-            className="px-3 py-1.5 text-xs text-stone-500 hover:text-cinnabar transition-colors"
+            className="px-3 py-1.5 text-xs text-space-muted transition-colors hover:text-cinnabar"
           >重置</button>
         </div>
       </header>
 
       {staleMarker && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
-          <span className="text-sm text-amber-700">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-amber-400/20 bg-amber-400/10 px-6 py-2">
+          <span className="text-sm text-amber-300">
             {staleMarker.reason === 'structure-edited'
               ? '知识结构已修改，笔记需要重新生成'
               : staleMarker.reason === 'evidence-edited'
@@ -468,7 +468,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
           </span>
           <button
             onClick={() => regenerateAll()}
-            className="text-xs text-amber-700 font-medium hover:text-amber-900 px-3 py-1 rounded hover:bg-amber-100"
+            className="rounded px-3 py-1 text-xs font-medium text-amber-300 hover:bg-amber-400/15 hover:text-amber-200"
           >
             重新生成
           </button>
@@ -478,11 +478,11 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧目录 */}
         {sidebarOpen && (
-          <aside className="w-64 border-r border-stone-200 bg-white overflow-y-auto flex-shrink-0">
+          <aside className="w-64 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900">
             <div className="p-3">
-              <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-3 px-2 flex items-center justify-between">
+              <div className="mb-3 flex items-center justify-between px-2 text-xs font-semibold uppercase tracking-wider text-space-faint">
                 <span>目录</span>
-                <span className="text-stone-300 font-normal normal-case tracking-normal">{orderedTopics.length}</span>
+                <span className="font-normal normal-case tracking-normal text-space-faint">{orderedTopics.length}</span>
               </div>
               <nav className="space-y-0.5">
                 {orderedTopics.map((topic) => {
@@ -495,20 +495,20 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
                       onClick={() => setActiveTopicId(topic.id)}
                       className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-all ${
                         isActive
-                          ? 'bg-stone-900 text-white shadow-sm'
-                          : 'hover:bg-stone-100 text-stone-700'
+                          ? 'bg-celadon/12 text-space-text ring-1 ring-celadon/25'
+                          : 'text-space-muted hover:bg-space-750 hover:text-space-text'
                       }`}
                     >
                       <div className="flex items-start gap-2">
                         <span className={`font-mono text-xs flex-shrink-0 mt-0.5 w-6 text-center ${
-                          isActive ? 'text-cinnabar' : 'text-stone-400'
+                          isActive ? 'text-celadon' : 'text-space-faint'
                         }`}>
                           {String(orderNum + 1).padStart(2, '0')}
                         </span>
                         <div className="flex-1 min-w-0">
                           <div className="font-medium truncate leading-snug">{topic.title}</div>
                           <div className={`text-xs mt-1 flex items-center gap-1.5 ${
-                            isActive ? 'text-white/60' : 'text-stone-400'
+                            isActive ? 'text-space-muted' : 'text-space-faint'
                           }`}>
                             <span>P.{topic.originalPageNumbers.join(',')}</span>
                             {kp?.note ? (
@@ -518,7 +518,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
                             ) : kp?.topic.noteStatus === 'generating' ? (
                               <span className={isActive ? 'text-amber-400' : 'text-amber-500'}>生成中...</span>
                             ) : (
-                              <span className={isActive ? 'text-white/30' : 'text-stone-300'}>待生成</span>
+                              <span className="text-space-faint">待生成</span>
                             )}
                           </div>
                         </div>
@@ -536,22 +536,22 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
           {activeKp && activeTopic ? (
             <div className="max-w-3xl mx-auto px-8 py-8">
               {/* 知识点标题 */}
-              <div className="mb-8 pb-6 border-b border-stone-200">
+              <div className="mb-8 border-b border-space-border pb-6">
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  <span className="text-xs px-2.5 py-1 bg-stone-100 text-stone-600 rounded-md font-medium">
+                  <span className="rounded-md bg-space-750 px-2.5 py-1 text-xs font-medium text-space-muted">
                     {TYPE_LABELS[activeTopic.type] || activeTopic.type}
                   </span>
                   {activeTopic.importance === 'core' && (
                     <span className="text-xs px-2.5 py-1 bg-cinnabar/10 text-cinnabar rounded-md font-medium">核心知识点</span>
                   )}
-                  <span className="text-xs text-stone-400 flex items-center gap-1">
+                  <span className="flex items-center gap-1 text-xs text-space-faint">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                     第 {activeTopic.originalPageNumbers.join(', ')} 页
                   </span>
                   {activeKp.note && (
-                    <span className="text-xs text-stone-400 flex items-center gap-1">
+                    <span className="flex items-center gap-1 text-xs text-space-faint">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
@@ -559,16 +559,16 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
                     </span>
                   )}
                 </div>
-                <h1 className="font-song text-3xl font-bold text-stone-900 mb-3 leading-tight">
+                <h1 className="mb-3 font-song text-3xl font-bold leading-tight text-space-text">
                   {activeKp.note?.title || activeTopic.title}
                 </h1>
-                <p className="text-stone-500 text-base leading-relaxed">
+                <p className="text-base leading-relaxed text-space-muted">
                   {activeTopic.learningGoal}
                 </p>
                 {activeKp.note?.shortSummary && (
-                  <div className="mt-4 p-4 bg-stone-50 rounded-lg border-l-4 border-cinnabar/30">
-                    <p className="text-stone-600 italic text-sm leading-relaxed">
-                      <span className="font-medium not-italic text-stone-500">摘要：</span>
+                  <div className="mt-4 rounded-lg border-l-4 border-celadon/35 bg-celadon/5 p-4">
+                    <p className="text-sm italic leading-relaxed text-space-muted">
+                      <span className="font-medium not-italic text-space-text">摘要：</span>
                       {activeKp.note.shortSummary}
                     </p>
                   </div>
@@ -577,7 +577,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
                   {activeKp.topic.noteStatus === 'failed' && (
                     <button
                       onClick={() => regenerateNote(activeTopic.id)}
-                      className="text-xs px-3 py-1.5 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors flex items-center gap-1"
+                      className="flex items-center gap-1 rounded-lg bg-red-400/10 px-3 py-1.5 text-xs text-red-300 transition-colors hover:bg-red-400/15"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -586,7 +586,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
                     </button>
                   )}
                   {activeKp.note?.warnings && activeKp.note.warnings.length > 0 && (
-                    <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg">
+                    <div className="flex items-center gap-1 rounded-lg bg-amber-400/10 px-3 py-1.5 text-xs text-amber-300">
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
@@ -604,7 +604,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
               />
 
               {/* 知识点导航 */}
-              <div className="mt-12 pt-6 border-t border-stone-200">
+              <div className="mt-12 border-t border-space-border pt-6">
                 <div className="flex justify-between items-stretch gap-4">
                   {(() => {
                     const idx = orderedTopics.findIndex(t => t.id === activeTopic.id);
@@ -615,47 +615,47 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
                         {prev ? (
                           <button
                             onClick={() => setActiveTopicId(prev.id)}
-                            className="flex-1 group p-4 rounded-xl border border-stone-200 hover:border-stone-300 hover:bg-stone-50 transition-all text-left"
+                            className="group flex-1 rounded-xl border border-space-border bg-space-850 p-4 text-left transition-all hover:border-celadon/30 hover:bg-space-750"
                           >
-                            <div className="text-xs text-stone-400 mb-1 flex items-center gap-1">
+                            <div className="mb-1 flex items-center gap-1 text-xs text-space-faint">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                               </svg>
                               上一个知识点
                             </div>
-                            <div className="font-medium text-stone-700 group-hover:text-cinnabar transition-colors">
+                            <div className="font-medium text-space-muted transition-colors group-hover:text-celadon">
                               {prev.title}
                             </div>
-                            <div className="text-xs text-stone-400 mt-1">
+                            <div className="mt-1 text-xs text-space-faint">
                               P.{prev.originalPageNumbers.join(',')}
                             </div>
                           </button>
                         ) : (
-                          <div className="flex-1 p-4 rounded-xl border border-stone-100 bg-stone-50/50">
-                            <div className="text-xs text-stone-300">这是第一个知识点</div>
+                          <div className="flex-1 rounded-xl border border-space-border bg-space-900/60 p-4">
+                            <div className="text-xs text-space-faint">这是第一个知识点</div>
                           </div>
                         )}
                         {next ? (
                           <button
                             onClick={() => setActiveTopicId(next.id)}
-                            className="flex-1 group p-4 rounded-xl border border-stone-200 hover:border-cinnabar/30 hover:bg-cinnabar/5 transition-all text-right"
+                            className="group flex-1 rounded-xl border border-space-border bg-space-850 p-4 text-right transition-all hover:border-celadon/30 hover:bg-space-750"
                           >
-                            <div className="text-xs text-stone-400 mb-1 flex items-center gap-1 justify-end">
+                            <div className="mb-1 flex items-center justify-end gap-1 text-xs text-space-faint">
                               下一个知识点
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                               </svg>
                             </div>
-                            <div className="font-medium text-stone-700 group-hover:text-cinnabar transition-colors">
+                            <div className="font-medium text-space-muted transition-colors group-hover:text-celadon">
                               {next.title}
                             </div>
-                            <div className="text-xs text-stone-400 mt-1">
+                            <div className="mt-1 text-xs text-space-faint">
                               P.{next.originalPageNumbers.join(',')}
                             </div>
                           </button>
                         ) : (
-                          <div className="flex-1 p-4 rounded-xl border border-stone-100 bg-stone-50/50 text-right">
-                            <div className="text-xs text-stone-300">这是最后一个知识点</div>
+                          <div className="flex-1 rounded-xl border border-space-border bg-space-900/60 p-4 text-right">
+                            <div className="text-xs text-space-faint">这是最后一个知识点</div>
                           </div>
                         )}
                       </>
@@ -665,15 +665,15 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
               </div>
             </div>
           ) : (
-            <div className="flex flex-col items-center justify-center h-full text-stone-400 gap-4">
-              <svg className="w-16 h-16 text-stone-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex h-full flex-col items-center justify-center gap-4 text-space-faint">
+              <svg className="h-16 w-16 text-space-border-strong" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
               </svg>
               <div className="text-center">
-                <p className="text-lg text-stone-500">
+                <p className="text-lg text-space-muted">
                   {packages.length === 0 ? '暂无笔记' : '选择一个知识点开始学习'}
                 </p>
-                <p className="text-sm text-stone-400 mt-1">
+                <p className="mt-1 text-sm text-space-faint">
                   {packages.length === 0
                     ? '请先上传课件并生成知识结构'
                     : '从左侧目录选择知识点'

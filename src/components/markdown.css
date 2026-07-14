@@ -9,7 +9,7 @@
  */
 
 .prose-content {
-  color: #44403c; /* stone-700 */
+  color: #b9c7d7;
   font-size: 15px;
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -36,7 +36,7 @@
 /* Inline emphasis */
 .prose-content strong {
   font-weight: 600;
-  color: #1c1917; /* stone-900 */
+  color: #f2f6fb;
 }
 
 .prose-content em {
@@ -63,7 +63,7 @@
 }
 
 .prose-content li::marker {
-  color: #78716c; /* stone-500 */
+  color: #6f879f;
 }
 
 /* Nested list indentation */
@@ -98,7 +98,7 @@
 .prose-content hr {
   margin: 1.5rem 0;
   border: 0;
-  border-top: 1px solid #e7e5e4; /* stone-200 */
+  border-top: 1px solid rgba(150, 184, 214, 0.16);
 }
 
 /* Images */

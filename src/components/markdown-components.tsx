@@ -60,14 +60,14 @@ interface AnchorProps {
 const AnchorComponent: ComponentType<AnchorProps> = ({ href, children }) => {
   if (!isSafeUrl(href)) {
     // Dangerous or missing URL: render the text without a clickable link.
-    return <span className="text-stone-500">{children}</span>;
+    return <span className="text-space-muted">{children}</span>;
   }
   return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-600 hover:underline break-words"
+      className="text-celadon hover:underline break-words"
     >
       {children}
     </a>
@@ -97,7 +97,7 @@ const CodeComponent: ComponentType<CodeProps> = ({ className, children }) => {
   }
 
   return (
-    <code className="px-1.5 py-0.5 bg-stone-100 text-stone-800 rounded text-[0.9em] font-mono border border-stone-200 break-words">
+    <code className="rounded border border-space-border bg-space-750 px-1.5 py-0.5 font-mono text-[0.9em] text-space-text break-words">
       {children}
     </code>
   );
@@ -121,13 +121,13 @@ const PreComponent: ComponentType<PreProps> = ({ children, node }) => {
   const lang = langMatch ? langMatch[1] : '';
 
   return (
-    <div className="my-4 rounded-lg overflow-hidden border border-stone-200">
+    <div className="my-4 overflow-hidden rounded-lg border border-space-border">
       {lang && (
-        <div className="bg-stone-100 px-3 py-1 text-xs text-stone-500 border-b border-stone-200 font-mono">
+        <div className="border-b border-space-border bg-space-750 px-3 py-1 font-mono text-xs text-space-muted">
           {lang}
         </div>
       )}
-      <pre className="bg-stone-50 p-4 overflow-x-auto text-sm m-0">{children}</pre>
+      <pre className="m-0 overflow-x-auto bg-space-950 p-4 text-sm text-space-text">{children}</pre>
     </div>
   );
 };
@@ -137,12 +137,12 @@ const PreComponent: ComponentType<PreProps> = ({ children, node }) => {
 /* ------------------------------------------------------------------ */
 
 const HEADING_CLASSES: Record<string, string> = {
-  h1: 'text-2xl font-bold text-stone-900 mt-8 mb-4 pb-2 border-b border-stone-200',
-  h2: 'text-xl font-bold text-stone-900 mt-7 mb-3',
-  h3: 'text-lg font-semibold text-stone-800 mt-6 mb-2',
-  h4: 'text-base font-semibold text-stone-800 mt-5 mb-2',
-  h5: 'text-sm font-semibold text-stone-700 mt-4 mb-1',
-  h6: 'text-xs font-semibold text-stone-600 mt-3 mb-1 uppercase tracking-wider',
+  h1: 'text-2xl font-bold text-space-text mt-8 mb-4 pb-2 border-b border-space-border',
+  h2: 'text-xl font-bold text-space-text mt-7 mb-3',
+  h3: 'text-lg font-semibold text-space-text mt-6 mb-2',
+  h4: 'text-base font-semibold text-space-text mt-5 mb-2',
+  h5: 'text-sm font-semibold text-space-muted mt-4 mb-1',
+  h6: 'text-xs font-semibold text-space-faint mt-3 mb-1 uppercase tracking-wider',
 };
 
 function makeHeading(tag: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6') {
@@ -163,7 +163,7 @@ interface TableProps {
 
 const TableComponent: ComponentType<TableProps> = ({ children }) => (
   <div className="my-4 overflow-x-auto">
-    <table className="min-w-full border-collapse border border-stone-300 text-sm">
+    <table className="min-w-full border-collapse border border-space-border text-sm">
       {children}
     </table>
   </div>
@@ -174,7 +174,7 @@ const ThComponent: ComponentType<{ children?: ReactNode; style?: CSSProperties }
   style,
 }) => (
   <th
-    className="border border-stone-300 px-3 py-2 text-left font-semibold text-stone-700 bg-stone-100"
+    className="border border-space-border bg-space-750 px-3 py-2 text-left font-semibold text-space-text"
     style={style}
   >
     {children}
@@ -185,7 +185,7 @@ const TdComponent: ComponentType<{ children?: ReactNode; style?: CSSProperties }
   children,
   style,
 }) => (
-  <td className="border border-stone-300 px-3 py-2 text-stone-700" style={style}>
+  <td className="border border-space-border px-3 py-2 text-space-muted" style={style}>
     {children}
   </td>
 );
@@ -199,7 +199,7 @@ interface BlockquoteProps {
 }
 
 const BlockquoteComponent: ComponentType<BlockquoteProps> = ({ children }) => (
-  <blockquote className="border-l-4 border-stone-300 pl-4 py-1 my-4 bg-stone-50/50 rounded-r text-stone-600">
+  <blockquote className="my-4 rounded-r border-l-4 border-celadon/45 bg-celadon/5 py-1 pl-4 text-space-muted">
     {children}
   </blockquote>
 );
@@ -242,7 +242,7 @@ export function createMarkdownComponents(
           className={`font-mono text-xs cursor-pointer px-0.5 rounded mx-px align-super transition-colors ${
             isValid
               ? 'text-cinnabar hover:underline bg-cinnabar/5'
-              : 'text-stone-400 bg-stone-100 cursor-default'
+              : 'text-space-faint bg-space-750 cursor-default'
           }`}
           title={isValid ? `点击跳转到引用 ${displayNum}` : `引用 ${displayNum} 无对应证据`}
           data-marker={m}

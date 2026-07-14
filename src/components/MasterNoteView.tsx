@@ -109,61 +109,61 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
   };
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#f5f1e8]">
-      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-stone-200 bg-[#fffdfa] px-5">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950 text-space-text">
+      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => navigateToStage('cards')} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="返回知识卡片">←</button>
-          <button type="button" onClick={() => setDirectoryOpen(value => !value)} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="切换章节目录">☰</button>
+          <button type="button" onClick={() => navigateToStage('cards')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识卡片">←</button>
+          <button type="button" onClick={() => setDirectoryOpen(value => !value)} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="切换章节目录">☰</button>
           <div className="min-w-0">
-            <h1 className="truncate font-song text-xl font-bold text-[#173f35]">完整笔记</h1>
-            <p className="mt-0.5 text-xs text-stone-500">
+            <h1 className="truncate font-song text-xl font-bold text-space-text">完整笔记</h1>
+            <p className="mt-0.5 text-xs text-space-muted">
               {usableMaster ? `已完成 ${generatedCount}/${plan.length} 章` : '先确认课程框架，再按章生成并组装'}
             </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!modelConfig?.apiKey && <button type="button" onClick={onOpenSettings} className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-700">配置 AI 模型</button>}
+          {!modelConfig?.apiKey && <button type="button" onClick={onOpenSettings} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">配置 AI 模型</button>}
           {!usableMaster && !isRunning && (
-            <button type="button" onClick={() => void startGeneration()} className="rounded-lg bg-[#c84b31] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#ae3f2a]">生成完整笔记</button>
+            <button type="button" onClick={() => void startGeneration()} className="btn-primary">生成完整笔记</button>
           )}
           {usableMaster && (
             <>
-              <button type="button" onClick={() => setEvidenceOpen(true)} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-700 hover:bg-stone-50">查看本章依据</button>
-              <button type="button" onClick={exportMarkdown} className="rounded-lg border border-stone-300 bg-white px-3 py-2 text-xs text-stone-700 hover:bg-stone-50">导出 Markdown</button>
+              <button type="button" onClick={() => setEvidenceOpen(true)} className="btn-outline">查看本章依据</button>
+              <button type="button" onClick={exportMarkdown} className="btn-outline">导出 Markdown</button>
             </>
           )}
         </div>
       </header>
 
       {isRunning && (
-        <div className="border-b border-[#d8e7df] bg-[#edf5f0] px-5 py-3 text-sm text-[#35695b]">
+        <div className="border-b border-celadon/20 bg-celadon/5 px-5 py-3 text-sm text-celadon">
           <div className="flex items-center justify-between gap-4">
             <span>{progress.message || '正在生成完整笔记'}</span>
             <span className="font-mono text-xs">{Math.round(estimatedProgress)}%</span>
           </div>
-          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white"><div className="h-full rounded-full bg-[#4f9380] transition-all" style={{ width: `${Math.max(3, estimatedProgress)}%` }} /></div>
+          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-space-750"><div className="h-full rounded-full bg-celadon transition-all" style={{ width: `${Math.max(3, estimatedProgress)}%` }} /></div>
         </div>
       )}
 
       {isPartial && (
-        <div className="border-b border-amber-200 bg-amber-50 px-5 py-2.5 text-xs text-amber-800">部分章节生成失败，已完成内容会保留；可在左侧选择失败章节单独重试。</div>
+        <div className="border-b border-amber-400/20 bg-amber-400/10 px-5 py-2.5 text-xs text-amber-300">部分章节生成失败，已完成内容会保留；可在左侧选择失败章节单独重试。</div>
       )}
 
       <div className="relative flex min-h-0 flex-1">
         {directoryOpen && (
-          <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-stone-200 bg-[#fffdfa] p-3">
-            <p className="px-3 pb-2 pt-1 text-[11px] font-semibold tracking-[0.16em] text-stone-400">课程框架</p>
+          <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900 p-3">
+            <p className="px-3 pb-2 pt-1 text-[11px] font-semibold tracking-[0.16em] text-space-faint">课程框架</p>
             <nav className="space-y-1">
               {plan.map((chapter, index) => {
                 const note = noteById.get(chapter.id) ?? masterNote?.chapters.find(item => item.id === chapter.id);
                 const active = chapter.id === activePlan?.id;
                 return (
-                  <button key={chapter.id} type="button" onClick={() => jumpToChapter(chapter.id)} className={`w-full rounded-xl px-3 py-3 text-left transition ${active ? 'bg-[#173f35] text-white shadow-sm' : 'text-stone-700 hover:bg-[#edf4ef]'}`}>
+                  <button key={chapter.id} type="button" onClick={() => jumpToChapter(chapter.id)} className={`w-full rounded-xl px-3 py-3 text-left transition ${active ? 'bg-celadon/12 text-space-text ring-1 ring-celadon/25' : 'text-space-muted hover:bg-space-750 hover:text-space-text'}`}>
                     <div className="flex gap-3">
-                      <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-[#f4d8a8] text-[#173f35]' : 'bg-[#dfece5] text-[#35695b]'}`}>{index + 1}</span>
+                      <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-celadon text-space-950' : 'bg-space-750 text-space-muted'}`}>{index + 1}</span>
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-2 text-sm font-medium leading-5">{chapter.title}</p>
-                        <p className={`mt-1 text-[11px] ${note?.status === 'failed' ? 'text-red-500' : active ? 'text-white/60' : 'text-stone-400'}`}>{chapterStateLabel(note)}</p>
+                        <p className={`mt-1 text-[11px] ${note?.status === 'failed' ? 'text-red-400' : active ? 'text-space-muted' : 'text-space-faint'}`}>{chapterStateLabel(note)}</p>
                       </div>
                     </div>
                   </button>
@@ -176,18 +176,18 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
         <main className="min-w-0 flex-1 overflow-y-auto px-8 py-8">
           <article className="mx-auto max-w-4xl">
             {!usableMaster && !isRunning && (
-              <div className="mb-5 rounded-2xl border border-[#d8e7df] bg-[#edf5f0] p-5">
-                <h2 className="font-song text-xl font-bold text-[#173f35]">尚未生成完整笔记</h2>
-                <p className="mt-2 text-sm leading-6 text-stone-600">下面是根据知识网学习顺序形成的初始课程框架。生成时会先综合并列知识、串联公式与概念，再逐章写作。</p>
+              <div className="mb-5 rounded-2xl border border-celadon/20 bg-celadon/5 p-5">
+                <h2 className="font-song text-xl font-bold text-space-text">尚未生成完整笔记</h2>
+                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据知识网学习顺序形成的初始课程框架。生成时会先综合并列知识、串联公式与概念，再逐章写作。</p>
               </div>
             )}
             {!usableMaster ? (
-              <div className="rounded-2xl border border-stone-200 bg-[#fffdfa] px-8 py-7 shadow-[0_8px_30px_rgba(23,63,53,.05)]">
+              <div className="rounded-2xl border border-space-border bg-space-850 px-8 py-7 shadow-nebula-panel">
                 <MarkdownRenderer content={outlineMarkdown(plan)} className="text-[15px] leading-8" />
               </div>
             ) : (
               <div className="space-y-6">
-                <section className="rounded-2xl border border-stone-200 bg-[#fffdfa] px-8 py-7 shadow-[0_8px_30px_rgba(23,63,53,.05)]">
+                <section className="rounded-2xl border border-space-border bg-space-850 px-8 py-7 shadow-nebula-panel">
                   <MarkdownRenderer content={coursePreamble(masterNote?.title || '课程', plan)} className="text-[15px] leading-8" />
                 </section>
                 {chapters.map((chapter, index) => {
@@ -198,18 +198,18 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
                       id={`note-${chapterPlan.id}`}
                       data-chapter-id={chapterPlan.id}
                       key={chapterPlan.id}
-                      className="scroll-mt-6 rounded-2xl border border-stone-200 bg-[#fffdfa] px-8 py-7 shadow-[0_8px_30px_rgba(23,63,53,.05)]"
+                      className="scroll-mt-6 rounded-2xl border border-space-border bg-space-850 px-8 py-7 shadow-nebula-panel"
                     >
                       {chapter?.status === 'completed' && chapter.markdown.trim() ? (
                         <MarkdownRenderer content={chapter.markdown} className="text-[15px] leading-8" />
                       ) : chapter?.status === 'failed' ? (
-                        <div className="rounded-xl border border-red-200 bg-red-50 p-5">
-                          <h2 className="font-song text-xl font-bold text-red-800">{chapterPlan.title}生成失败</h2>
-                          <p className="mt-2 text-sm text-red-700">{chapter.error || '模型没有返回有效正文'}</p>
-                          <button type="button" disabled={isRunning} onClick={() => void retryChapter(chapterPlan.id)} className="mt-4 rounded-lg bg-[#173f35] px-4 py-2 text-sm text-white disabled:opacity-50">重试本章</button>
+                        <div className="rounded-xl border border-red-400/20 bg-red-400/10 p-5">
+                          <h2 className="font-song text-xl font-bold text-red-300">{chapterPlan.title}生成失败</h2>
+                          <p className="mt-2 text-sm text-red-300/85">{chapter.error || '模型没有返回有效正文'}</p>
+                          <button type="button" disabled={isRunning} onClick={() => void retryChapter(chapterPlan.id)} className="btn-primary mt-4 disabled:opacity-50">重试本章</button>
                         </div>
                       ) : (
-                        <div className="text-sm text-stone-500">{chapterPlan.title}尚未生成。</div>
+                        <div className="text-sm text-space-muted">{chapterPlan.title}尚未生成。</div>
                       )}
                     </section>
                   );
@@ -220,28 +220,28 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
         </main>
 
         {evidenceOpen && (
-          <div className="absolute inset-0 z-20 flex justify-end bg-[#173f35]/20" onClick={() => setEvidenceOpen(false)}>
-            <aside className="h-full w-80 overflow-y-auto border-l border-stone-200 bg-[#fffdfa] p-4 shadow-2xl" onClick={event => event.stopPropagation()}>
+          <div className="absolute inset-0 z-20 flex justify-end bg-space-950/70 backdrop-blur-sm" onClick={() => setEvidenceOpen(false)}>
+            <aside className="h-full w-80 overflow-y-auto border-l border-space-border bg-space-900 p-4 shadow-2xl" onClick={event => event.stopPropagation()}>
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm font-bold text-[#173f35]">本章依据</h2>
-                <button type="button" onClick={() => setEvidenceOpen(false)} aria-label="关闭本章依据" className="grid h-8 w-8 place-items-center rounded-lg text-stone-500 hover:bg-stone-100">×</button>
+                <h2 className="text-sm font-bold text-space-text">本章依据</h2>
+                <button type="button" onClick={() => setEvidenceOpen(false)} aria-label="关闭本章依据" className="grid h-8 w-8 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text">×</button>
               </div>
-              <p className="mt-1 text-xs leading-5 text-stone-400">当前阅读章节使用的知识卡片；原始证据仍保留在卡片页。</p>
+              <p className="mt-1 text-xs leading-5 text-space-faint">当前阅读章节使用的知识卡片；原始证据仍保留在卡片页。</p>
               <div className="mt-4 space-y-3">
                 {activeCards.length > 0 ? activeCards.map(item => (
-                  <section key={item.id} className="rounded-xl border border-stone-200 bg-white p-4">
-                    <p className="text-xs font-semibold text-[#35695b]">{item.topicName}</p>
-                    <h3 className="mt-1 text-sm font-medium text-stone-800">{item.title}</h3>
-                    <p className="mt-2 text-xs leading-6 text-stone-500">{item.conciseSummary}</p>
+                  <section key={item.id} className="rounded-xl border border-space-border bg-space-850 p-4">
+                    <p className="text-xs font-semibold text-celadon">{item.topicName}</p>
+                    <h3 className="mt-1 text-sm font-medium text-space-text">{item.title}</h3>
+                    <p className="mt-2 text-xs leading-6 text-space-muted">{item.conciseSummary}</p>
                   </section>
                 )) : (
-                  <div className="rounded-xl border border-dashed border-stone-300 p-4 text-xs leading-6 text-stone-400">
+                  <div className="rounded-xl border border-dashed border-space-border p-4 text-xs leading-6 text-space-faint">
                     {activeChapter?.status === 'failed' ? '本章尚未成功绑定知识卡片。' : '当前章节没有可显示的知识卡片。'}
                   </div>
                 )}
               </div>
               {masterNote && (
-                <div className="mt-5 rounded-xl bg-[#f5f1e8] p-4 text-xs text-stone-500">
+                <div className="mt-5 rounded-xl bg-space-750 p-4 text-xs text-space-muted">
                   卡片覆盖 {masterNote.coverage.coveredCardIds.length}/{masterNote.coverage.totalCardIds.length}
                 </div>
               )}

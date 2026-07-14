@@ -104,8 +104,8 @@ export function MarkdownWithCitations({
     const el = document.getElementById(`citation-${marker}`);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('bg-amber-50');
-      setTimeout(() => el.classList.remove('bg-amber-50'), 2000);
+      el.classList.add('bg-amber-400/10');
+      setTimeout(() => el.classList.remove('bg-amber-400/10'), 2000);
     }
   }, []);
 
@@ -123,8 +123,8 @@ export function MarkdownWithCitations({
       />
 
       {citations.length > 0 && (
-        <div className="mt-10 pt-6 border-t border-stone-200">
-          <h3 className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-4">
+        <div className="mt-10 border-t border-space-border pt-6">
+          <h3 className="mb-4 text-xs font-semibold uppercase tracking-wider text-space-faint">
             引用来源
           </h3>
           <div className="space-y-3">
@@ -155,7 +155,7 @@ export function MarkdownWithCitations({
                   className={`p-3 rounded-lg border transition-colors duration-300 ${
                     activeCitation === c.marker
                       ? 'border-cinnabar bg-cinnabar/5'
-                      : 'border-stone-200 bg-white hover:bg-stone-50'
+                      : 'border-space-border bg-space-850 hover:bg-space-750'
                   }`}
                 >
                   <div className="flex items-start gap-3">
@@ -169,16 +169,16 @@ export function MarkdownWithCitations({
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
                         {pageRange && (
-                          <span className="text-xs px-2 py-0.5 bg-stone-100 text-stone-600 rounded">
+                          <span className="rounded bg-space-750 px-2 py-0.5 text-xs text-space-muted">
                             {pageRange}
                           </span>
                         )}
-                        <span className="text-xs text-stone-400">
+                        <span className="text-xs text-space-faint">
                           {c.evidenceIds.length} 条证据
                         </span>
                       </div>
                       {preview && (
-                        <p className="text-xs text-stone-500 leading-relaxed line-clamp-2">
+                        <p className="line-clamp-2 text-xs leading-relaxed text-space-muted">
                           {preview}
                         </p>
                       )}
