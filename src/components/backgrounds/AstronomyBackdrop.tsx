@@ -46,8 +46,9 @@ interface AstronomyBackdropProps {
 }
 
 export function AstronomyBackdrop({ variant }: AstronomyBackdropProps) {
-  const [failed, setFailed] = useState(false);
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
   const backdrop = BACKDROPS[variant];
+  const failed = failedSrc === backdrop.src;
 
   return (
     <div
@@ -61,7 +62,7 @@ export function AstronomyBackdrop({ variant }: AstronomyBackdropProps) {
           alt=""
           className={`absolute inset-0 h-full w-full object-cover ${backdrop.imageClassName}`}
           decoding="async"
-          onError={() => setFailed(true)}
+          onError={() => setFailedSrc(backdrop.src)}
           src={backdrop.src}
         />
       )}

@@ -84,6 +84,7 @@ describe('AstronomyBackdrop', () => {
     expect(backdrop).not.toBeNull();
     expect(image?.src).toContain(filename);
     expect(image?.alt).toBe('');
+    expect(image?.getAttribute('decoding')).toBe('async');
     expect(image?.className).toBe(`${IMAGE_BASE_CLASS_NAME} ${imageClassName}`);
     expect(layerClassNames).toContain(`${LAYER_BASE_CLASS_NAME} ${washClassName}`);
     expect(backdrop?.getAttribute('aria-hidden')).toBe('true');
@@ -104,5 +105,20 @@ describe('AstronomyBackdrop', () => {
     expect(layerClassNames).toHaveLength(2);
     expect(layerClassNames).toContain(`${LAYER_BASE_CLASS_NAME} ${QA_WASH_CLASS_NAME}`);
     expect(layerClassNames).toContain(VIGNETTE_CLASS_NAME);
+  });
+
+  it('attempts the new asset after a failed variant changes', () => {
+    act(() => root.render(createElement(AstronomyBackdrop, { variant: 'workspace' })));
+
+    const failedImage = container.querySelector('img')!;
+    act(() => failedImage.dispatchEvent(new Event('error', { bubbles: true })));
+    act(() => root.render(createElement(AstronomyBackdrop, { variant: 'reading' })));
+
+    const backdrop = container.querySelector<HTMLElement>('[data-astronomy-backdrop="reading"]');
+    const image = backdrop?.querySelector('img');
+
+    expect(image).not.toBeNull();
+    expect(image!.src).toContain('southern-ring-reading');
+    expect(backdrop?.getAttribute('data-astronomy-status')).toBe('ready');
   });
 });
