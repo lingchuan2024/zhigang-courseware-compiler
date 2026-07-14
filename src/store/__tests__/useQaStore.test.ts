@@ -229,6 +229,68 @@ describe('QA conversation store', () => {
     expect(useQaStore.getState().activeRequestConversationIds).not.toContain(conversationId);
   });
 
+  it('marks a pending answer interrupted when cascade deletion itself fails', async () => {
+    const slow = deferred<RagAnswer>();
+    const answerer = vi.fn<QaAnswerer>(() => slow.promise);
+    const send = useQaStore.getState().sendQuestion({ config, question: '删除失败问题', answerer });
+    await waitFor(() => expect(answerer).toHaveBeenCalledOnce());
+    const conversationId = useQaStore.getState().activeConversationId!;
+    vi.spyOn(repository, 'deleteChatConversation').mockRejectedValueOnce(new Error('删除事务失败'));
+
+    await expect(useQaStore.getState().deleteConversation(conversationId)).rejects.toThrow('删除事务失败');
+
+    const interrupted = (await listChatMessages(conversationId)).find(item => item.role === 'assistant')!;
+    expect(interrupted).toMatchObject({
+      status: 'interrupted',
+      error: '删除聊天失败，回答生成已中断',
+    });
+    expect(useQaStore.getState().messages.find(item => item.id === interrupted.id)).toMatchObject({
+      status: 'interrupted',
+    });
+    expect(useQaStore.getState().activeRequestConversationIds).not.toContain(conversationId);
+
+    const replacement = deferred<RagAnswer>();
+    const replacementAnswerer = vi.fn<QaAnswerer>(() => replacement.promise);
+    const replacementSend = useQaStore.getState().sendQuestion({
+      config,
+      question: '删除失败后的新问题',
+      answerer: replacementAnswerer,
+    });
+    await waitFor(() => expect(replacementAnswerer).toHaveBeenCalledOnce());
+    expect(useQaStore.getState().activeRequestConversationIds).toEqual([conversationId]);
+
+    slow.resolve(completedAnswer('迟到回答'));
+    await send;
+    expect(useQaStore.getState().activeRequestConversationIds).toEqual([conversationId]);
+    expect((await listChatMessages(conversationId)).find(item => item.id === interrupted.id)?.status).toBe('interrupted');
+    replacement.resolve(completedAnswer('新回答'));
+    await replacementSend;
+    expect(useQaStore.getState().activeRequestConversationIds).toEqual([]);
+  });
+
+  it('keeps a successful cascade deleted when the following conversation refresh fails', async () => {
+    const slow = deferred<RagAnswer>();
+    const answerer = vi.fn<QaAnswerer>(() => slow.promise);
+    const send = useQaStore.getState().sendQuestion({ config, question: '刷新失败问题', answerer });
+    await waitFor(() => expect(answerer).toHaveBeenCalledOnce());
+    const conversationId = useQaStore.getState().activeConversationId!;
+    const refreshSpy = vi.spyOn(repository, 'listChatConversations')
+      .mockRejectedValueOnce(new Error('列表刷新失败'));
+
+    await expect(useQaStore.getState().deleteConversation(conversationId)).resolves.toBeUndefined();
+
+    expect(useQaStore.getState().conversations.some(item => item.id === conversationId)).toBe(false);
+    expect(useQaStore.getState().activeConversationId).toBeNull();
+    expect(useQaStore.getState().messages).toEqual([]);
+    expect(useQaStore.getState().error).toContain('聊天已删除');
+    refreshSpy.mockRestore();
+    slow.resolve(completedAnswer('不应复活的回答'));
+    await send;
+
+    expect(await listChatMessages(conversationId)).toEqual([]);
+    expect((await listChatConversations()).some(item => item.id === conversationId)).toBe(false);
+  });
+
   it('does not let a slow active deletion override a later conversation selection', async () => {
     await saveChatConversation(conversation('older', 1));
     await saveChatConversation(conversation('deleting', 2));
@@ -311,6 +373,32 @@ describe('QA conversation store', () => {
     const stored = await listChatMessages(conversationId);
     expect(stored.map(item => item.content)).toEqual(['问题一', '回答一']);
     expect(stored.every(item => item.status === 'completed')).toBe(true);
+  });
+
+  it('reserves a blank draft synchronously so two immediate sends create only one chat', async () => {
+    const saveGate = deferred<void>();
+    const realSaveConversation = repository.saveChatConversation;
+    vi.spyOn(repository, 'saveChatConversation').mockImplementation(async item => {
+      await saveGate.promise;
+      return realSaveConversation(item);
+    });
+    const answerer = vi.fn<QaAnswerer>().mockResolvedValue(completedAnswer('唯一回答'));
+
+    const firstSend = useQaStore.getState().sendQuestion({ config, question: '第一次发送', answerer });
+    const secondSend = useQaStore.getState().sendQuestion({ config, question: '双击发送', answerer });
+
+    expect(useQaStore.getState().conversations).toEqual([]);
+    expect(useQaStore.getState().messages).toEqual([]);
+    expect(useQaStore.getState().activeConversationId).toBeNull();
+    await expect(secondSend).rejects.toThrow('新聊天正在创建');
+
+    saveGate.resolve();
+    await firstSend;
+    const conversations = await listChatConversations();
+    expect(conversations).toHaveLength(1);
+    const stored = await listChatMessages(conversations[0].id);
+    expect(stored.filter(item => item.role === 'user').map(item => item.content)).toEqual(['第一次发送']);
+    expect(answerer).toHaveBeenCalledOnce();
   });
 
   it('allows different conversations to generate concurrently without crossing results', async () => {

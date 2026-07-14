@@ -21,7 +21,10 @@ import {
 
 const ACTIVE_CONVERSATION_KEY = 'zhigang_qa_active_conversation';
 const activeGenerations = new Map<string, symbol>();
+const invalidatedGenerations = new Map<string, symbol>();
 const deletedConversationIds = new Set<string>();
+const deletionStates = new Map<string, 'pending' | 'succeeded' | 'failed'>();
+let provisionalConversationReservation: symbol | null = null;
 let selectionEpoch = 0;
 let lastTimestamp = 0;
 
@@ -123,9 +126,38 @@ function reserveGeneration(conversationId: string): symbol {
   return token;
 }
 
+function reserveProvisionalConversation(): symbol {
+  if (provisionalConversationReservation) {
+    throw new Error('新聊天正在创建，请稍后再试');
+  }
+  const token = Symbol('provisional-conversation');
+  provisionalConversationReservation = token;
+  return token;
+}
+
+function releaseProvisionalConversation(token: symbol | null): void {
+  if (token && provisionalConversationReservation === token) {
+    provisionalConversationReservation = null;
+  }
+}
+
+function cleanupDeletionGuard(conversationId: string): void {
+  const state = deletionStates.get(conversationId);
+  if (invalidatedGenerations.has(conversationId) || state === 'pending') return;
+  deletedConversationIds.delete(conversationId);
+  deletionStates.delete(conversationId);
+}
+
 function releaseGeneration(conversationId: string, token: symbol): void {
-  if (activeGenerations.get(conversationId) !== token) return;
-  activeGenerations.delete(conversationId);
+  if (activeGenerations.get(conversationId) === token) {
+    activeGenerations.delete(conversationId);
+  } else if (invalidatedGenerations.get(conversationId) === token) {
+    invalidatedGenerations.delete(conversationId);
+    cleanupDeletionGuard(conversationId);
+  } else {
+    return;
+  }
+  if (activeGenerations.has(conversationId)) return;
   useQaStore.setState(state => ({
     activeRequestConversationIds: state.activeRequestConversationIds.filter(id => id !== conversationId),
   }));
@@ -142,6 +174,9 @@ function assertGenerationActive(conversationId: string, token: symbol): void {
 
 function invalidateConversation(conversationId: string): void {
   deletedConversationIds.add(conversationId);
+  deletionStates.set(conversationId, 'pending');
+  const token = activeGenerations.get(conversationId);
+  if (token) invalidatedGenerations.set(conversationId, token);
   activeGenerations.delete(conversationId);
   useQaStore.setState(state => ({
     activeRequestConversationIds: state.activeRequestConversationIds.filter(id => id !== conversationId),
@@ -151,7 +186,10 @@ function invalidateConversation(conversationId: string): void {
 /** Clears module-scoped async ownership after tests or a hot-module replacement. */
 export function resetQaStoreRuntimeForTests(): void {
   activeGenerations.clear();
+  invalidatedGenerations.clear();
   deletedConversationIds.clear();
+  deletionStates.clear();
+  provisionalConversationReservation = null;
   selectionEpoch = 0;
   lastTimestamp = 0;
 }
@@ -292,6 +330,31 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
   }
 }
 
+async function interruptPendingGenerationAfterDeleteFailure(conversationId: string): Promise<void> {
+  const messages = await repository.listChatMessages(conversationId);
+  const now = nextTimestamp();
+  const interruptedById = new Map<string, ChatMessage>();
+  for (const message of messages) {
+    if (message.role !== 'assistant' || message.status !== 'pending') continue;
+    const interrupted: ChatMessage = {
+      ...message,
+      status: 'interrupted',
+      error: '删除聊天失败，回答生成已中断',
+      updatedAt: now,
+    };
+    await repository.saveChatMessage(interrupted);
+    interruptedById.set(interrupted.id, interrupted);
+  }
+  if (interruptedById.size === 0) return;
+  useQaStore.setState(state => (
+    state.activeConversationId === conversationId
+      ? {
+          messages: state.messages.map(item => interruptedById.get(item.id) ?? item),
+        }
+      : {}
+  ));
+}
+
 async function retryStoredMessage(
   assistant: ChatMessage,
   config: ModelConfig,
@@ -426,14 +489,20 @@ export const useQaStore = create<QaState>((set, get) => ({
     const deletingActive = get().activeConversationId === id;
     const deleteEpoch = deletingActive ? ++selectionEpoch : selectionEpoch;
     invalidateConversation(id);
+    let cascadeSucceeded = false;
+    let refreshedConversations: ChatConversation[] | null = null;
     try {
       await repository.deleteChatConversation(id);
-      const conversations = await repository.listChatConversations();
+      cascadeSucceeded = true;
+      deletionStates.set(id, 'succeeded');
+      refreshedConversations = await repository.listChatConversations();
+      const conversations = refreshedConversations;
       const selectionUnchanged = deletingActive
         && selectionEpoch === deleteEpoch
         && get().activeConversationId === id;
       if (!selectionUnchanged) {
         set({ conversations });
+        cleanupDeletionGuard(id);
         return;
       }
       const activeConversationId = conversations[0]?.id ?? null;
@@ -451,9 +520,40 @@ export const useQaStore = create<QaState>((set, get) => ({
         loadingConversation: false,
         error: null,
       });
+      cleanupDeletionGuard(id);
     } catch (error) {
+      if (cascadeSucceeded) {
+        deletionStates.set(id, 'succeeded');
+        const activeWasDeleted = get().activeConversationId === id;
+        if (activeWasDeleted) persistActiveConversationId(null);
+        set(state => ({
+          conversations: refreshedConversations ?? state.conversations.filter(item => item.id !== id),
+          ...(activeWasDeleted ? {
+            activeConversationId: null,
+            messages: [],
+            selectedCitation: null,
+            loadingConversation: false,
+          } : {}),
+          error: `聊天已删除，但刷新列表失败：${errorMessage(error)}`,
+        }));
+        cleanupDeletionGuard(id);
+        return;
+      }
+
+      deletionStates.set(id, 'failed');
       deletedConversationIds.delete(id);
-      set({ error: `删除聊天失败：${errorMessage(error)}` });
+      let interruptionError: string | null = null;
+      try {
+        await interruptPendingGenerationAfterDeleteFailure(id);
+      } catch (interruptError) {
+        interruptionError = errorMessage(interruptError);
+      }
+      cleanupDeletionGuard(id);
+      set({
+        error: interruptionError
+          ? `删除聊天失败：${errorMessage(error)}；中断回答失败：${interruptionError}`
+          : `删除聊天失败：${errorMessage(error)}`,
+      });
       throw error;
     }
   },
@@ -475,6 +575,7 @@ export const useQaStore = create<QaState>((set, get) => ({
       ? get().conversations.find(item => item.id === conversationId)
       : undefined;
     const isNewConversation = !conversationId || !conversation;
+    const provisionalReservation = isNewConversation ? reserveProvisionalConversation() : null;
     if (!conversationId || !conversation) {
       const now = nextTimestamp();
       conversationId = createId('conversation');
@@ -488,7 +589,13 @@ export const useQaStore = create<QaState>((set, get) => ({
       };
     }
 
-    const token = reserveGeneration(conversationId);
+    let token: symbol;
+    try {
+      token = reserveGeneration(conversationId);
+    } catch (error) {
+      releaseProvisionalConversation(provisionalReservation);
+      throw error;
+    }
     const userTime = nextTimestamp();
     const userMessage: ChatMessage = {
       id: createId('user'),
@@ -531,6 +638,7 @@ export const useQaStore = create<QaState>((set, get) => ({
       } else if (get().activeConversationId === conversationId) {
         set(state => ({ messages: [...state.messages, userMessage], error: null }));
       }
+      releaseProvisionalConversation(provisionalReservation);
 
       await generateAnswer({
         conversationId,
@@ -546,6 +654,7 @@ export const useQaStore = create<QaState>((set, get) => ({
       }
       set({ error: `保存问题失败：${errorMessage(error)}` });
     } finally {
+      releaseProvisionalConversation(provisionalReservation);
       releaseGeneration(conversationId, token);
     }
   },
