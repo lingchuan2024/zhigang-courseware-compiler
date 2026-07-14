@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react';
+import type { KnowledgeCard } from '../types';
 import { useStore } from '../store/useStore';
 import { resolveSourceRanges } from '../lib/source-range-resolver';
+import { prepareGeneratedMarkdown } from '../lib/generated-markdown';
 import { MarkdownRenderer } from './MarkdownRenderer';
 
 const CARD_STATUS_LABELS: Record<string, string> = {
@@ -11,6 +13,66 @@ const CARD_STATUS_LABELS: Record<string, string> = {
   stale: '需要更新',
   failed: '生成失败',
 };
+
+function normalizeHeadingLabel(value: string): string {
+  return value
+    .replace(/\s+#+\s*$/, '')
+    .replace(/[*_`]/g, '')
+    .replace(/\s+/g, '')
+    .trim();
+}
+
+function hasHeading(markdown: string, title: string): boolean {
+  const expected = normalizeHeadingLabel(title);
+  return markdown.split('\n').some(line => {
+    const match = line.match(/^\s{0,3}#{1,6}\s+(.+?)\s*$/);
+    return Boolean(match && normalizeHeadingLabel(match[1]) === expected);
+  });
+}
+
+function structuredSection(markdown: string, title: string, body: string): string {
+  if (!body || hasHeading(markdown, title)) return '';
+  return `## ${title}\n\n${body}`;
+}
+
+function buildCardMarkdown(card: KnowledgeCard): string {
+  const detailedNote = prepareGeneratedMarkdown(card.detailedNote);
+  const parts = [
+    card.conciseSummary ? `> ${card.conciseSummary}` : '',
+    detailedNote,
+    structuredSection(
+      detailedNote,
+      '关键要点',
+      card.keyPoints?.map(item => `- ${item}`).join('\n') ?? '',
+    ),
+    structuredSection(
+      detailedNote,
+      '成立条件与适用边界',
+      card.applicableConditions?.map(item => `- ${item}`).join('\n') ?? '',
+    ),
+    structuredSection(
+      detailedNote,
+      '示例',
+      card.examples?.map(item => `- ${item}`).join('\n') ?? '',
+    ),
+    structuredSection(
+      detailedNote,
+      '公式',
+      card.formulas?.map(formula => `$$\n${formula.formula}\n$$\n\n${formula.description}`).join('\n\n') ?? '',
+    ),
+    structuredSection(
+      detailedNote,
+      '易错点',
+      card.misconceptions?.map(item => `- ${item}`).join('\n') ?? '',
+    ),
+    structuredSection(
+      detailedNote,
+      '理解检查',
+      card.selfCheckQuestions?.map((item, index) => `${index + 1}. ${item}`).join('\n') ?? '',
+    ),
+  ];
+  return prepareGeneratedMarkdown(parts.filter(Boolean).join('\n\n'));
+}
 
 function MarkdownKnowledgeCardsView() {
   const documents = useStore(state => state.sourceDocuments);
@@ -41,28 +103,10 @@ function MarkdownKnowledgeCardsView() {
     () => activeCard ? resolveSourceRanges(activeCard.sourceRanges, documents) : [],
     [activeCard, documents],
   );
-  const cardMarkdown = activeCard ? [
-    activeCard.conciseSummary ? `> ${activeCard.conciseSummary}` : '',
-    activeCard.detailedNote,
-    activeCard.keyPoints?.length
-      ? `## 关键要点\n\n${activeCard.keyPoints.map(item => `- ${item}`).join('\n')}`
-      : '',
-    activeCard.applicableConditions?.length
-      ? `## 成立条件与适用边界\n\n${activeCard.applicableConditions.map(item => `- ${item}`).join('\n')}`
-      : '',
-    activeCard.examples?.length
-      ? `## 示例\n\n${activeCard.examples.map(item => `- ${item}`).join('\n')}`
-      : '',
-    activeCard.formulas?.length
-      ? `## 公式\n\n${activeCard.formulas.map(formula => `$$\n${formula.formula}\n$$\n\n${formula.description}`).join('\n\n')}`
-      : '',
-    activeCard.misconceptions?.length
-      ? `## 易错点\n\n${activeCard.misconceptions.map(item => `- ${item}`).join('\n')}`
-      : '',
-    activeCard.selfCheckQuestions?.length
-      ? `## 理解检查\n\n${activeCard.selfCheckQuestions.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
-      : '',
-  ].filter(Boolean).join('\n\n') : '';
+  const cardMarkdown = useMemo(
+    () => activeCard ? buildCardMarkdown(activeCard) : '',
+    [activeCard],
+  );
   const hasCompleteNoteData = Boolean(
     courseMasterNote?.markdown.trim() || chapterNotes.length > 0 || topicSyntheses.length > 0,
   );

@@ -81,6 +81,44 @@ describe('KnowledgeCardsView', () => {
     expect(container.textContent).toContain('GLM 原文公式');
   });
 
+  it('repairs legacy fenced markdown and LaTeX delimiters when rendering a card', () => {
+    const cards = useStore.getState().knowledgeCards;
+    useStore.setState({
+      knowledgeCards: cards.map((card, index) => index === 0 ? {
+        ...card,
+        detailedNote: '```markdown\n## 公式说明\n\n\\[\ng(\\mu)=x^\\top\\beta\n\\]\n```',
+      } : card),
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    roots.push(root);
+    act(() => root.render(createElement(KnowledgeCardsView)));
+
+    expect(container.querySelector('pre')).toBeNull();
+    expect(Array.from(container.querySelectorAll('h2')).some(heading => heading.textContent === '公式说明')).toBe(true);
+    expect(container.querySelector('.katex-display')).not.toBeNull();
+  });
+
+  it('does not append a structured section when the card body already contains it', () => {
+    const cards = useStore.getState().knowledgeCards;
+    useStore.setState({
+      knowledgeCards: cards.map((card, index) => index === 0 ? {
+        ...card,
+        detailedNote: '## 关键要点\n\n正文已经组织了关键要点。',
+      } : card),
+    });
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    roots.push(root);
+    act(() => root.render(createElement(KnowledgeCardsView)));
+
+    const matchingHeadings = Array.from(container.querySelectorAll('h2'))
+      .filter(heading => heading.textContent === '关键要点');
+    expect(matchingHeadings).toHaveLength(1);
+  });
+
   it('offers complete-note generation as the next distinct stage', () => {
     const container = document.createElement('div');
     document.body.appendChild(container);
