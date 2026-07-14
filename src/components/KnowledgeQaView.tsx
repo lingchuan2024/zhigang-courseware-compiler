@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { listRetrievalRecords } from '../lib/library-repository';
 import { useLibraryStore } from '../store/useLibraryStore';
 import { useQaStore, type QaAnswerer } from '../store/useQaStore';
@@ -76,21 +76,63 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
 
   const [draft, setDraft] = useState('');
   const [records, setRecords] = useState<RetrievalRecord[]>([]);
+  const [recordsStatus, setRecordsStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [recordsError, setRecordsError] = useState<string | null>(null);
+  const [recordsValidatedFor, setRecordsValidatedFor] = useState<string | null>(null);
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameDraft, setRenameDraft] = useState('');
   const [actionError, setActionError] = useState<string | null>(null);
   const timelineRef = useRef<HTMLDivElement | null>(null);
+  const backgroundRef = useRef<HTMLDivElement | null>(null);
   const nearBottomRef = useRef(true);
-  const submittingRef = useRef(false);
+  const draftRevisionRef = useRef(0);
+  const citationTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const citationWasOpenRef = useRef(false);
 
   useEffect(() => {
-    void initialize();
-    void listRetrievalRecords().then(setRecords).catch(() => undefined);
-  }, [initialize]);
+    if (!initialized) void initialize();
+  }, [initialize, initialized]);
+
+  const selectedCitationKey = selectedCitation
+    ? `${selectedCitation.cardId}:${selectedCitation.documentId}`
+    : '__library__';
+  useEffect(() => {
+    let active = true;
+    setRecordsStatus('loading');
+    setRecordsError(null);
+    setRecordsValidatedFor(null);
+    void listRetrievalRecords()
+      .then(nextRecords => {
+        if (!active) return;
+        setRecords(nextRecords);
+        setRecordsStatus('ready');
+        setRecordsValidatedFor(selectedCitationKey);
+      })
+      .catch(caught => {
+        if (!active) return;
+        setRecordsStatus('error');
+        setRecordsError(caught instanceof Error ? caught.message : String(caught));
+        setRecordsValidatedFor(selectedCitationKey);
+      });
+    return () => { active = false; };
+  }, [selectedCitationKey]);
 
   useEffect(() => {
-    if (!selectedCitation) return;
-    void listRetrievalRecords().then(setRecords).catch(() => undefined);
+    if (selectedCitation) {
+      citationWasOpenRef.current = true;
+      return;
+    }
+    if (!citationWasOpenRef.current) return;
+    citationWasOpenRef.current = false;
+    const trigger = citationTriggerRef.current;
+    if (trigger?.isConnected) trigger.focus();
+  }, [selectedCitation]);
+
+  useEffect(() => {
+    const background = backgroundRef.current;
+    if (!background) return;
+    if (selectedCitation) background.setAttribute('inert', '');
+    else background.removeAttribute('inert');
   }, [selectedCitation]);
 
   const orderedMessages = useMemo(
@@ -103,33 +145,48 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     && activeRequestConversationIds.includes(activeConversationId);
   const sendDisabled = !draft.trim() || loadingConversation || activeInFlight;
 
-  useEffect(() => {
+  const lastMessage = orderedMessages[orderedMessages.length - 1];
+  const lastMessageScrollKey = lastMessage
+    ? `${lastMessage.id}:${lastMessage.status}:${lastMessage.updatedAt}:${lastMessage.content}`
+    : `empty:${activeConversationId ?? 'draft'}`;
+  useLayoutEffect(() => {
     const timeline = timelineRef.current;
     if (!timeline || !nearBottomRef.current) return;
     timeline.scrollTop = timeline.scrollHeight;
-  }, [orderedMessages.length, activeConversationId]);
+  }, [lastMessageScrollKey, activeConversationId]);
 
   const reportActionError = (caught: unknown) => {
     setActionError(caught instanceof Error ? caught.message : String(caught));
   };
 
   const submitQuestion = async () => {
+    const submittedDraft = draft;
     const question = draft.trim();
-    if (!question || loadingConversation || activeInFlight || submittingRef.current) return;
+    if (!question || loadingConversation || activeInFlight) return;
     if (!modelConfig?.apiKey) {
       onOpenSettings();
       return;
     }
-    submittingRef.current = true;
+    const submittedRevision = draftRevisionRef.current;
     setActionError(null);
     try {
       await sendQuestion({ config: modelConfig, question, answerer });
-      setDraft('');
+      setDraft(currentDraft => {
+        if (
+          draftRevisionRef.current !== submittedRevision
+          || currentDraft !== submittedDraft
+        ) return currentDraft;
+        draftRevisionRef.current += 1;
+        return '';
+      });
     } catch (caught) {
       reportActionError(caught);
-    } finally {
-      submittingRef.current = false;
     }
+  };
+
+  const clearDraftForNavigation = () => {
+    draftRevisionRef.current += 1;
+    setDraft('');
   };
 
   const saveRename = async (id: string) => {
@@ -172,11 +229,17 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
       && record.documentId === selectedCitation.documentId
     )) ?? null
     : null;
+  const citationRecordsStatus = recordsValidatedFor === selectedCitationKey
+    ? recordsStatus
+    : 'loading';
 
   return (
+    <div className="relative h-[calc(100dvh-4rem)] min-h-0 overflow-hidden bg-[#f5f0e7]">
     <div
+      ref={backgroundRef}
       data-testid="qa-two-column-layout"
-      className="relative grid min-h-[calc(100vh-4rem)] grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#f5f0e7] text-ink md:grid-cols-[264px_minmax(0,1fr)] md:grid-rows-1"
+      aria-hidden={selectedCitation ? true : undefined}
+      className="grid h-[calc(100dvh-4rem)] min-h-0 grid-rows-[auto_minmax(0,1fr)] overflow-hidden bg-[#f5f0e7] text-ink md:grid-cols-[264px_minmax(0,1fr)] md:grid-rows-1"
     >
       <aside className="z-10 flex max-h-[220px] min-h-0 flex-col border-b border-[#d8cebf] bg-[#eae2d5] md:max-h-none md:border-b-0 md:border-r">
         <div className="border-b border-[#d8cebf] p-4 md:p-5">
@@ -184,6 +247,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
             type="button"
             onClick={() => {
               nearBottomRef.current = true;
+              clearDraftForNavigation();
               startNewChat();
             }}
             className="w-full rounded-xl border border-ink/20 bg-[#faf7f0] px-4 py-3 text-left font-song text-sm font-bold text-ink shadow-[0_2px_0_rgba(29,65,56,0.08)] transition hover:-translate-y-px hover:border-celadon/70 hover:bg-white"
@@ -235,6 +299,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                               data-conversation-id={conversation.id}
                               onClick={() => {
                                 nearBottomRef.current = true;
+                                clearDraftForNavigation();
                                 void selectConversation(conversation.id).catch(reportActionError);
                               }}
                               className="w-full truncate px-3 py-3 pr-16 text-left text-sm text-stone-700"
@@ -296,6 +361,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
         </header>
 
         <div
+          data-testid="qa-timeline"
           ref={timelineRef}
           onScroll={event => {
             const element = event.currentTarget;
@@ -316,13 +382,13 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
               {orderedMessages.map(message => (
                 <article key={message.id} className={message.role === 'user' ? 'flex justify-end' : ''}>
                   {message.role === 'user' ? (
-                    <div className="max-w-[88%] rounded-[20px] rounded-tr-[5px] bg-ink px-5 py-3.5 text-sm leading-7 text-[#fffdf8] shadow-sm md:max-w-[76%]">
+                    <div className="max-w-[88%] whitespace-pre-wrap rounded-[20px] rounded-tr-[5px] bg-ink px-5 py-3.5 text-sm leading-7 text-[#fffdf8] shadow-sm md:max-w-[76%]">
                       {message.content}
                     </div>
                   ) : (
                     <div className="w-full border-l-2 border-celadon/35 pl-4 md:pl-6">
                       {message.status === 'pending' && (
-                        <div className="flex items-center gap-3 py-3 text-sm text-stone-500">
+                        <div role="status" aria-live="polite" className="flex items-center gap-3 py-3 text-sm text-stone-500">
                           <span className="inline-flex gap-1" aria-hidden="true">
                             <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-cinnabar" />
                             <i className="h-1.5 w-1.5 animate-pulse rounded-full bg-cinnabar [animation-delay:150ms]" />
@@ -363,7 +429,10 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                               type="button"
                               key={`${citation.cardId}-${citation.documentId}-${index}`}
                               data-card-id={citation.cardId}
-                              onClick={() => openCitation(citation)}
+                              onClick={event => {
+                                citationTriggerRef.current = event.currentTarget;
+                                openCitation(citation);
+                              }}
                               className="rounded-lg border border-celadon/25 bg-[#fbf9f4] px-3 py-2 text-left text-xs text-ink transition hover:-translate-y-px hover:border-celadon hover:bg-white"
                             >
                               <span className="mr-1.5 font-mono text-[10px] text-cinnabar">[{index + 1}]</span>
@@ -391,9 +460,16 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
             <div className="flex items-end gap-2 rounded-2xl border border-[#d5cab9] bg-white p-2 shadow-[0_8px_28px_rgba(48,42,34,0.07)] focus-within:border-celadon focus-within:ring-2 focus-within:ring-celadon/10">
               <textarea
                 value={draft}
-                onChange={event => setDraft(event.target.value)}
+                onChange={event => {
+                  draftRevisionRef.current += 1;
+                  setDraft(event.target.value);
+                }}
                 onKeyDown={event => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
+                  const nativeEvent = event.nativeEvent;
+                  const composing = nativeEvent.isComposing
+                    || nativeEvent.keyCode === 229
+                    || nativeEvent.which === 229;
+                  if (event.key === 'Enter' && !event.shiftKey && !composing) {
                     event.preventDefault();
                     void submitQuestion();
                   }
@@ -417,10 +493,14 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
         </div>
       </main>
 
+    </div>
+
       {selectedCitation && (
         <CitationDrawer
           citation={selectedCitation}
-          record={exactRecord}
+          record={citationRecordsStatus === 'ready' ? exactRecord : null}
+          recordsStatus={citationRecordsStatus}
+          recordsError={recordsError}
           onClose={closeCitation}
           onOpenDocument={() => { void openDocument(selectedCitation.documentId); }}
         />
@@ -432,31 +512,78 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
 interface CitationDrawerProps {
   citation: ChatCitationSnapshot;
   record: RetrievalRecord | null;
+  recordsStatus: 'loading' | 'ready' | 'error';
+  recordsError: string | null;
   onClose: () => void;
   onOpenDocument: () => void;
 }
 
-function CitationDrawer({ citation, record, onClose, onOpenDocument }: CitationDrawerProps) {
-  const displayingSnapshot = !record;
+function CitationDrawer({
+  citation,
+  record,
+  recordsStatus,
+  recordsError,
+  onClose,
+  onOpenDocument,
+}: CitationDrawerProps) {
+  const dialogRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const displayingSnapshot = recordsStatus === 'ready' && !record;
   const content = record?.content ?? citation.content;
   const sourceExcerpt = record?.sourceExcerpt ?? citation.sourceExcerpt;
+
+  useEffect(() => {
+    closeButtonRef.current?.focus();
+  }, []);
+
+  const handleDialogKeyDown = (event: React.KeyboardEvent<HTMLElement>) => {
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      onClose();
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>(
+      'button:not([disabled]), [href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+    ) ?? []);
+    if (focusable.length === 0) {
+      event.preventDefault();
+      dialogRef.current?.focus();
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-ink/20 backdrop-blur-[2px]" onMouseDown={event => {
       if (event.target === event.currentTarget) onClose();
     }}>
       <aside
+        ref={dialogRef}
         data-testid="citation-drawer"
-        aria-label="知识卡片引用详情"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="citation-drawer-title"
+        tabIndex={-1}
+        onKeyDown={handleDialogKeyDown}
         className="absolute inset-y-0 right-0 flex w-full max-w-[440px] flex-col border-l border-[#d8cebf] bg-[#faf7f0] shadow-[-18px_0_55px_rgba(29,65,56,0.14)]"
       >
         <header className="flex items-start justify-between border-b border-[#ded5c8] px-6 py-5">
           <div className="min-w-0 pr-4">
             <p className="font-mono text-[9px] tracking-[0.2em] text-cinnabar">CITATION SNAPSHOT</p>
-            <h2 className="mt-1 font-song text-xl font-bold text-ink">知识卡片索引</h2>
+            <h2 id="citation-drawer-title" className="mt-1 font-song text-xl font-bold text-ink">知识卡片索引</h2>
           </div>
           <button
             type="button"
+            ref={closeButtonRef}
             aria-label="关闭引用详情"
             onClick={onClose}
             className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#d8cebf] text-xl text-stone-500 hover:border-ink hover:text-ink"
@@ -466,9 +593,20 @@ function CitationDrawer({ citation, record, onClose, onOpenDocument }: CitationD
         </header>
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
+          {recordsStatus === 'loading' && (
+            <div role="status" className="mb-5 rounded-xl border border-celadon/20 bg-celadon/5 px-3 py-2.5 text-xs leading-5 text-stone-600">
+              正在核对最新知识卡片…
+            </div>
+          )}
           {displayingSnapshot && (
             <div className="mb-5 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
               卡片已更新或不可用，显示历史引用
+            </div>
+          )}
+          {recordsStatus === 'error' && (
+            <div className="mb-5 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-800">
+              暂时无法核对最新卡片，显示历史引用
+              {recordsError ? <span className="mt-1 block text-amber-700">{recordsError}</span> : null}
             </div>
           )}
           <p className="text-xs leading-5 text-stone-400">{citation.courseName} · {citation.documentTitle}</p>

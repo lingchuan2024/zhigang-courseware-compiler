@@ -462,6 +462,7 @@ export const useQaStore = create<QaState>((set, get) => ({
   error: null,
 
   initialize: async () => {
+    if (get().initialized) return;
     const epoch = ++selectionEpoch;
     set({ loadingConversation: true, error: null });
     try {
@@ -708,6 +709,7 @@ export const useQaStore = create<QaState>((set, get) => ({
         await repository.deleteChatConversation(conversationId).catch(() => undefined);
       }
       set({ error: `保存问题失败：${errorMessage(error)}` });
+      throw error;
     } finally {
       releaseProvisionalConversation(provisionalReservation);
       releaseGeneration(conversationId, token);

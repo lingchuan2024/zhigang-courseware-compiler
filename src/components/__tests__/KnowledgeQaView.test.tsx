@@ -2,6 +2,7 @@ import { IDBFactory } from 'fake-indexeddb';
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import * as repository from '../../lib/library-repository';
 import {
   createLibraryCourse,
   replaceDocumentRetrievalRecords,
@@ -12,7 +13,7 @@ import {
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { resetQaStoreRuntimeForTests, useQaStore, type QaAnswerer } from '../../store/useQaStore';
 import { useStore } from '../../store/useStore';
-import type { RagAnswer } from '../../types';
+import type { ChatMessage, RagAnswer } from '../../types';
 import { KnowledgeQaView } from '../KnowledgeQaView';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -49,6 +50,16 @@ function answer(content: string, cardIds: string[] = []): RagAnswer {
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
+
 async function waitFor(assertion: () => void): Promise<void> {
   for (let attempt = 0; attempt < 50; attempt += 1) {
     try {
@@ -71,10 +82,19 @@ function setTextarea(value: string): HTMLTextAreaElement {
   return textarea;
 }
 
-function pressEnter(textarea: HTMLTextAreaElement, shiftKey = false): void {
-  act(() => textarea.dispatchEvent(new KeyboardEvent('keydown', {
-    key: 'Enter', shiftKey, bubbles: true, cancelable: true,
-  })));
+function pressEnter(
+  textarea: HTMLTextAreaElement,
+  options: { shiftKey?: boolean; isComposing?: boolean; keyCode?: number } = {},
+): void {
+  const event = new KeyboardEvent('keydown', {
+    key: 'Enter', shiftKey: options.shiftKey, bubbles: true, cancelable: true,
+  });
+  if (options.isComposing) Object.defineProperty(event, 'isComposing', { value: true });
+  if (options.keyCode) {
+    Object.defineProperty(event, 'keyCode', { value: options.keyCode });
+    Object.defineProperty(event, 'which', { value: options.keyCode });
+  }
+  act(() => textarea.dispatchEvent(event));
 }
 
 async function sendQuestion(question: string): Promise<void> {
@@ -232,7 +252,7 @@ describe('KnowledgeQaView chat interface', () => {
     const answerer = vi.fn<QaAnswerer>(async () => answer('收到'));
     await renderQa(answerer);
     const textarea = setTextarea('第一行');
-    pressEnter(textarea, true);
+    pressEnter(textarea, { shiftKey: true });
     setTextarea('第一行\n');
     expect(answerer).not.toHaveBeenCalled();
     expect(textarea.value).toBe('第一行\n');
@@ -256,6 +276,135 @@ describe('KnowledgeQaView chat interface', () => {
     expect(textarea.value).toBe('这个草稿不能丢');
   });
 
+  it('retains the exact draft when durable message persistence fails', async () => {
+    vi.spyOn(repository, 'saveChatMessage').mockRejectedValueOnce(new Error('本地写入失败'));
+    const answerer = vi.fn<QaAnswerer>();
+    await renderQa(answerer);
+
+    const textarea = setTextarea('不能丢失的问题');
+    pressEnter(textarea);
+    await waitFor(() => expect(container!.textContent).toContain('本地写入失败'));
+
+    expect(answerer).not.toHaveBeenCalled();
+    expect(textarea.value).toBe('不能丢失的问题');
+    expect(useQaStore.getState().conversations).toEqual([]);
+  });
+
+  it('allows chat B to send while chat A is generating without A clearing B draft', async () => {
+    const first = deferred<RagAnswer>();
+    const second = deferred<RagAnswer>();
+    const answerer = vi.fn<QaAnswerer>((_config, question) => (
+      question === '聊天 A' ? first.promise : second.promise
+    ));
+    await renderQa(answerer);
+
+    pressEnter(setTextarea('聊天 A'));
+    await waitFor(() => expect(answerer).toHaveBeenCalledOnce());
+    act(() => Array.from(container!.querySelectorAll('button')).find(button => button.textContent?.includes('新建聊天'))!.click());
+    const secondDraft = setTextarea('聊天 B');
+    pressEnter(secondDraft);
+    await waitFor(() => expect(answerer).toHaveBeenCalledTimes(2));
+    expect(secondDraft.value).toBe('聊天 B');
+
+    first.resolve(answer('A 完成'));
+    await waitFor(() => expect(useQaStore.getState().activeRequestConversationIds).toHaveLength(1));
+    expect(secondDraft.value).toBe('聊天 B');
+
+    second.resolve(answer('B 完成'));
+    await waitFor(() => expect(container!.textContent).toContain('B 完成'));
+    await waitFor(() => expect(secondDraft.value).toBe(''));
+  });
+
+  it('keeps an in-flight answer alive when the QA view unmounts and remounts', async () => {
+    const pending = deferred<RagAnswer>();
+    const answerer = vi.fn<QaAnswerer>(() => pending.promise);
+    await renderQa(answerer);
+    pressEnter(setTextarea('跨页面生成'));
+    await waitFor(() => expect(answerer).toHaveBeenCalledOnce());
+
+    act(() => root!.unmount());
+    root = createRoot(container!);
+    await renderQa(answerer);
+    expect(container!.textContent).toContain('正在检索知识卡片');
+
+    pending.resolve(answer('跨页面回答完成'));
+    await waitFor(() => expect(container!.textContent).toContain('跨页面回答完成'));
+    expect(container!.textContent).not.toContain('本次生成已中断');
+  });
+
+  it('ignores Enter while an IME composition is active or reports key code 229', async () => {
+    const answerer = vi.fn<QaAnswerer>();
+    await renderQa(answerer);
+    const textarea = setTextarea('正在输入中文');
+
+    pressEnter(textarea, { isComposing: true });
+    pressEnter(textarea, { keyCode: 229 });
+
+    expect(answerer).not.toHaveBeenCalled();
+    expect(textarea.value).toBe('正在输入中文');
+  });
+
+  it('scrolls on an in-place answer transition only when the reader stayed near the bottom', async () => {
+    await renderQa(async () => answer('不会调用'));
+    const timeline = container!.querySelector<HTMLElement>('[data-testid="qa-timeline"]')!;
+    Object.defineProperty(timeline, 'scrollHeight', { configurable: true, get: () => 1000 });
+    Object.defineProperty(timeline, 'clientHeight', { configurable: true, get: () => 300 });
+    const pending: ChatMessage = {
+      id: 'assistant-scroll', conversationId: 'chat', role: 'assistant', content: '', status: 'pending', createdAt: 1, updatedAt: 1,
+    };
+    act(() => useQaStore.setState({ messages: [pending] }));
+
+    timeline.scrollTop = 680;
+    act(() => timeline.dispatchEvent(new Event('scroll', { bubbles: true })));
+    act(() => useQaStore.setState({ messages: [{
+      ...pending, content: '很长的完成回答'.repeat(100), status: 'completed', updatedAt: 2,
+      answer: answer('很长的完成回答'.repeat(100)),
+    }] }));
+    expect(timeline.scrollTop).toBe(1000);
+
+    timeline.scrollTop = 100;
+    act(() => timeline.dispatchEvent(new Event('scroll', { bubbles: true })));
+    act(() => useQaStore.setState(state => ({ messages: state.messages.map(message => ({
+      ...message, content: `${message.content}追加`, updatedAt: 3,
+    })) })));
+    expect(timeline.scrollTop).toBe(100);
+  });
+
+  it('keeps citation focus inside an accessible modal and restores its trigger on Escape', async () => {
+    await renderQa(async (_config, _question, hits) => answer('带引用的回答', [hits[0].record.cardId]));
+    await sendQuestion('GLM 的组成是什么？');
+    const trigger = container!.querySelector<HTMLButtonElement>('button[data-card-id="card-1"]')!;
+    act(() => {
+      trigger.focus();
+      trigger.click();
+    });
+
+    const dialog = container!.querySelector<HTMLElement>('[data-testid="citation-drawer"]')!;
+    expect(dialog.getAttribute('role')).toBe('dialog');
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(container!.querySelector('[data-testid="qa-two-column-layout"]')?.getAttribute('aria-hidden')).toBe('true');
+    const close = dialog.querySelector<HTMLButtonElement>('button[aria-label="关闭引用详情"]')!;
+    const openDocumentButton = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button'))
+      .find(button => button.textContent === '打开对应课件')!;
+    expect(document.activeElement).toBe(close);
+
+    act(() => close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', shiftKey: true, bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(openDocumentButton);
+    act(() => openDocumentButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
+    expect(document.activeElement).toBe(close);
+    act(() => close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
+
+    expect(container!.querySelector('[data-testid="citation-drawer"]')).toBeNull();
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('uses a definite dynamic viewport height so the timeline owns scrolling', async () => {
+    await renderQa(async () => answer('不会调用'));
+    expect(container!.querySelector('[data-testid="qa-two-column-layout"]')?.className)
+      .toContain('h-[calc(100dvh-4rem)]');
+    expect(container!.querySelector('[data-testid="qa-timeline"]')?.className).toContain('overflow-y-auto');
+  });
+
   it('falls back to the stored citation snapshot when the exact live card is unavailable', async () => {
     await renderQa(async (_config, _question, hits) => answer('可追溯回答', [hits[0].record.cardId]));
     await sendQuestion('GLM 的组成是什么？');
@@ -268,6 +417,7 @@ describe('KnowledgeQaView chat interface', () => {
     act(() => container!.querySelector<HTMLButtonElement>('button[data-card-id="card-1"]')!.click());
 
     const drawer = container!.querySelector('[data-testid="citation-drawer"]')!;
+    await waitFor(() => expect(drawer.textContent).toContain('卡片已更新或不可用，显示历史引用'));
     expect(drawer.textContent).toContain('卡片已更新或不可用，显示历史引用');
     expect(drawer.textContent).toContain('GLM 由随机成分');
   });

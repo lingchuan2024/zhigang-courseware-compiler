@@ -592,7 +592,8 @@ describe('QA conversation store', () => {
     const answerer = vi.fn<QaAnswerer>().mockResolvedValue(completedAnswer('不应调用'));
     vi.spyOn(repository, 'saveChatConversation').mockRejectedValueOnce(new Error('数据库写入失败'));
 
-    await useQaStore.getState().sendQuestion({ config, question: '新聊天问题', answerer });
+    await expect(useQaStore.getState().sendQuestion({ config, question: '新聊天问题', answerer }))
+      .rejects.toThrow('数据库写入失败');
 
     expect(useQaStore.getState().conversations).toEqual([]);
     expect(useQaStore.getState().messages).toEqual([]);
@@ -606,7 +607,8 @@ describe('QA conversation store', () => {
     const answerer = vi.fn<QaAnswerer>().mockResolvedValue(completedAnswer('不应调用'));
     vi.spyOn(repository, 'saveChatMessage').mockRejectedValueOnce(new Error('消息写入失败'));
 
-    await useQaStore.getState().sendQuestion({ config, question: '新聊天问题', answerer });
+    await expect(useQaStore.getState().sendQuestion({ config, question: '新聊天问题', answerer }))
+      .rejects.toThrow('消息写入失败');
 
     expect(await listChatConversations()).toEqual([]);
     expect(useQaStore.getState().conversations).toEqual([]);
@@ -621,11 +623,28 @@ describe('QA conversation store', () => {
     const answerer = vi.fn<QaAnswerer>().mockResolvedValue(completedAnswer('不应调用'));
     vi.spyOn(repository, 'saveChatMessage').mockRejectedValueOnce(new Error('消息写入失败'));
 
-    await useQaStore.getState().sendQuestion({ config, question: '新问题', answerer });
+    await expect(useQaStore.getState().sendQuestion({ config, question: '新问题', answerer }))
+      .rejects.toThrow('消息写入失败');
 
     expect(useQaStore.getState().messages.map(item => item.content)).toEqual(['已有内容']);
     expect((await listChatMessages('chat')).map(item => item.content)).toEqual(['已有内容']);
     expect(answerer).not.toHaveBeenCalled();
+  });
+
+  it('does not reinitialize or interrupt in-memory work after initialization completed', async () => {
+    const pending = message('pending-live', 'chat', 'assistant', 'pending', 2, '');
+    useQaStore.setState({
+      ...initialQaState,
+      initialized: true,
+      activeConversationId: 'chat',
+      messages: [pending],
+    });
+    const interrupt = vi.spyOn(repository, 'interruptPendingChatMessages');
+
+    await useQaStore.getState().initialize();
+
+    expect(interrupt).not.toHaveBeenCalled();
+    expect(useQaStore.getState().messages).toEqual([pending]);
   });
 
   it('passes bounded history into contextual retrieval and snapshots the exact selected hit', async () => {
