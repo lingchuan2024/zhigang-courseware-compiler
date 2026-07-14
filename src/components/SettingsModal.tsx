@@ -49,25 +49,25 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/45 grid place-items-center p-4">
-      <div className="w-full max-w-3xl max-h-[92vh] overflow-y-auto bg-[#fbfaf7] rounded-2xl shadow-2xl border border-stone-200">
-        <header className="sticky top-0 z-10 bg-[#fbfaf7]/95 backdrop-blur border-b border-stone-200 px-6 py-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-4 backdrop-blur-sm">
+      <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-2xl border border-space-border-strong bg-space-850 shadow-2xl">
+        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-space-border bg-space-850/95 px-6 py-4 backdrop-blur-xl">
           <div>
             <h2 className="font-song text-xl font-bold text-ink">服务配置</h2>
-            <p className="text-xs text-stone-500 mt-1">文档解析与知识生成使用两套独立服务</p>
+            <p className="mt-1 text-xs text-space-muted">文档解析与知识生成使用两套独立服务</p>
           </div>
-          <button onClick={onClose} className="w-8 h-8 rounded-full hover:bg-stone-100 text-stone-500 text-xl" aria-label="关闭">×</button>
+          <button onClick={onClose} className="h-8 w-8 rounded-full text-xl text-space-muted hover:bg-space-750 hover:text-white" aria-label="关闭">×</button>
         </header>
 
         <div className="p-6 space-y-6">
-          <section className="bg-white border border-stone-200 rounded-xl p-5">
+          <section className="rounded-xl border border-space-border bg-space-900/70 p-5">
             <div className="flex items-start justify-between mb-5">
               <div>
-                <p className="text-xs uppercase tracking-wider text-celadon-dark font-semibold">01 · 文档解析</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-celadon">01 · 文档解析</p>
                 <h3 className="font-song text-lg font-bold text-ink mt-1">MinerU 精准解析 API</h3>
-                <p className="text-xs text-stone-500 mt-1">上传 PDF/PPTX，异步生成 Markdown、公式和表格。</p>
+                <p className="mt-1 text-xs text-space-muted">上传 PDF/PPTX，异步生成 Markdown、公式和表格。</p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${mineruValid ? 'bg-celadon/10 text-celadon-dark' : 'bg-amber-50 text-amber-700'}`}>
+              <span className={`rounded-full border px-2 py-1 text-xs ${mineruValid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-300'}`}>
                 {mineruValid ? '已配置' : '未配置'}
               </span>
             </div>
@@ -94,20 +94,20 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </select>
               </Field>
             </div>
-            <div className="flex gap-5 mt-4 text-sm text-stone-600">
+            <div className="mt-4 flex gap-5 text-sm text-ink-light">
               <label className="flex items-center gap-2"><input type="checkbox" checked={mineru.enableFormula} onChange={event => setMineru({ ...mineru, enableFormula: event.target.checked })} />识别公式</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={mineru.enableTable} onChange={event => setMineru({ ...mineru, enableTable: event.target.checked })} />识别表格</label>
             </div>
           </section>
 
-          <section className="bg-white border border-stone-200 rounded-xl p-5">
+          <section className="rounded-xl border border-space-border bg-space-900/70 p-5">
             <div className="flex items-start justify-between mb-5">
               <div>
                 <p className="text-xs uppercase tracking-wider text-cinnabar font-semibold">02 · 知识生成</p>
                 <h3 className="font-song text-lg font-bold text-ink mt-1">OpenAI-compatible 模型</h3>
-                <p className="text-xs text-stone-500 mt-1">用于主题提取、结构合并、学习顺序与笔记生成。</p>
+                <p className="mt-1 text-xs text-space-muted">用于主题提取、结构合并、学习顺序与笔记生成。</p>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${model.apiKey && modelValidation.valid ? 'bg-celadon/10 text-celadon-dark' : 'bg-amber-50 text-amber-700'}`}>
+              <span className={`rounded-full border px-2 py-1 text-xs ${model.apiKey && modelValidation.valid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-300'}`}>
                 {model.apiKey && modelValidation.valid ? '已配置' : '未配置'}
               </span>
             </div>
@@ -125,16 +125,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               </div>
             </div>
             {model.apiKey && !modelValidation.valid && modelValidation.message && (
-              <p className="mt-3 text-sm text-cinnabar bg-red-50 border border-red-100 rounded-lg px-3 py-2">{modelValidation.message}</p>
+              <p className="mt-3 rounded-lg border border-cinnabar/25 bg-cinnabar/10 px-3 py-2 text-sm text-cinnabar-light">{modelValidation.message}</p>
             )}
           </section>
 
-          <p className="text-xs text-stone-500 leading-5">
+          <p className="text-xs leading-5 text-space-muted">
             API Key 仅保存在当前浏览器本机存储，不会写入项目导出内容或 Git。纯前端环境无法提供服务端级别的密钥保护，请仅在受信任设备上使用。
           </p>
         </div>
 
-        <footer className="sticky bottom-0 bg-[#fbfaf7]/95 backdrop-blur border-t border-stone-200 px-6 py-4 flex justify-between gap-3">
+        <footer className="sticky bottom-0 flex justify-between gap-3 border-t border-space-border bg-space-850/95 px-6 py-4 backdrop-blur-xl">
           <button className="text-sm text-cinnabar hover:underline" onClick={() => { setMinerUConfig(null); setModelConfig(null); setMineru(DEFAULT_MINERU); setModel(DEFAULT_MODEL); }}>清除全部配置</button>
           <div className="flex gap-3">
             <button className="btn-outline" onClick={onClose}>取消</button>
@@ -149,7 +149,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="block text-xs font-medium text-stone-600 mb-1.5">{label}</span>
+      <span className="mb-1.5 block text-xs font-medium text-ink-light">{label}</span>
       {children}
     </label>
   );
