@@ -1,6 +1,8 @@
-import type { ModelConfig } from '../types';
+import type { ChatHistoryTurn, ModelConfig, RagAnswer, RagAnswerSection } from '../types';
 import type { KnowledgeCardSearchHit } from './card-retrieval';
 import { callChatCompletion } from './model-v2';
+
+export type { RagAnswer, RagAnswerSection } from '../types';
 
 export interface RagRequest {
   mode: 'cards' | 'general';
@@ -9,17 +11,6 @@ export interface RagRequest {
 }
 
 export type RagCompleter = (request: RagRequest) => Promise<unknown>;
-
-export interface RagAnswerSection {
-  source: 'cards' | 'general';
-  content: string;
-  cardIds: string[];
-}
-
-export interface RagAnswer {
-  mode: 'cards' | 'mixed' | 'general';
-  sections: RagAnswerSection[];
-}
 
 function record(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -45,18 +36,29 @@ function createModelCompleter(config: ModelConfig): RagCompleter {
   };
 }
 
+function formatRecentDialogue(history: ChatHistoryTurn[]): string {
+  if (history.length === 0) return '';
+  const turns = history.map(turn => `${turn.role === 'user' ? '用户' : '助手'}：${turn.content.trim()}`);
+  return `最近对话：\n${turns.join('\n')}`;
+}
+
+function createQuestionPrompt(question: string, history: ChatHistoryTurn[]): string[] {
+  return [formatRecentDialogue(history), `当前问题：${question.trim()}`].filter(Boolean);
+}
+
 export async function answerWithKnowledgeCards(
   config: ModelConfig,
   question: string,
   hits: KnowledgeCardSearchHit[],
   injectedCompleter?: RagCompleter,
+  history: ChatHistoryTurn[] = [],
 ): Promise<RagAnswer> {
   const complete = injectedCompleter ?? createModelCompleter(config);
   if (hits.length === 0) {
     const response = record(await complete({
       mode: 'general',
       system: '直接回答用户问题。当前没有命中课件知识卡片，不得伪造课程引用。返回 JSON：{ answer }。',
-      user: `用户问题：${question}`,
+      user: createQuestionPrompt(question, history).join('\n\n'),
     }));
     const answer = text(response.answer) || text(response.generalAnswer);
     return {
@@ -70,11 +72,12 @@ export async function answerWithKnowledgeCards(
     mode: 'cards',
     system: [
       '优先根据给定知识卡片回答问题，不得把未提供的课件内容伪装成卡片事实。',
+      '历史回答只能用于理解指代和对话意图，不能作为课程事实来源；课程事实必须来自本次提供的知识卡片。',
       '可以在 generalSupplement 中补充通用知识，但必须与卡片回答分开。',
       '返回 JSON：{ cardAnswer, citations, generalSupplement }。citations 只能使用提供的 cardId。',
     ].join('\n'),
     user: [
-      `用户问题：${question}`,
+      ...createQuestionPrompt(question, history),
       '知识卡片正文：',
       JSON.stringify(hits.map(hit => ({
         cardId: hit.record.cardId,
