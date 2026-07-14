@@ -62,8 +62,15 @@ function transactionDone(transaction: IDBTransaction): Promise<void> {
 async function openLibraryDb(): Promise<IDBDatabase | null> {
   if (typeof indexedDB === 'undefined') return null;
   if (dbPromise) return dbPromise;
-  dbPromise = new Promise(resolve => {
+  let settled = false;
+  const openingPromise = new Promise<IDBDatabase | null>(resolve => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
+    const settleUnavailable = () => {
+      if (settled) return;
+      settled = true;
+      if (dbPromise === openingPromise) dbPromise = null;
+      resolve(null);
+    };
     request.onupgradeneeded = () => {
       const db = request.result;
       if (!db.objectStoreNames.contains(COURSES)) db.createObjectStore(COURSES, { keyPath: 'id' });
@@ -87,13 +94,30 @@ async function openLibraryDb(): Promise<IDBDatabase | null> {
         store.createIndex('conversationCreatedAt', ['conversationId', 'createdAt'], { unique: false });
       }
     };
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      const db = request.result;
+      db.onversionchange = () => {
+        db.close();
+        if (dbPromise === openingPromise) dbPromise = null;
+      };
+      if (settled) {
+        db.close();
+        return;
+      }
+      settled = true;
+      resolve(db);
+    };
     request.onerror = () => {
       console.warn('Unable to open course library IndexedDB:', request.error);
-      resolve(null);
+      settleUnavailable();
+    };
+    request.onblocked = () => {
+      console.warn('Course library IndexedDB upgrade blocked; using memory fallback.');
+      settleUnavailable();
     };
   });
-  return dbPromise;
+  dbPromise = openingPromise;
+  return openingPromise;
 }
 
 export async function createLibraryCourse(input: { name: string; description?: string }): Promise<LibraryCourse> {

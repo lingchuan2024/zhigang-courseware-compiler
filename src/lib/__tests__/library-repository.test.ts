@@ -1,4 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { IDBFactory } from 'fake-indexeddb';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatConversation, ChatMessage, ProjectState, RetrievalRecord } from '../../types';
 import {
   createLibraryCourse,
@@ -20,6 +21,7 @@ import {
 } from '../library-repository';
 import { saveState } from '../persistence';
 
+const DB_NAME = 'zhigang-library';
 const localStorageValues = new Map<string, string>();
 Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
@@ -30,6 +32,47 @@ Object.defineProperty(globalThis, 'localStorage', {
     clear: () => localStorageValues.clear(),
   },
 });
+Object.defineProperty(globalThis, 'indexedDB', {
+  configurable: true,
+  writable: true,
+  value: new IDBFactory(),
+});
+
+function idbRequest<T>(request: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB request failed'));
+  });
+}
+
+function openDatabase(version?: number): Promise<IDBDatabase> {
+  return idbRequest(version ? indexedDB.open(DB_NAME, version) : indexedDB.open(DB_NAME));
+}
+
+function createVersionOneDatabase(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      const courses = db.createObjectStore('courses', { keyPath: 'id' });
+      courses.put({
+        id: 'legacy-course',
+        name: '旧课程',
+        documentIds: [],
+        createdAt: 1,
+        updatedAt: 10,
+      });
+      const documents = db.createObjectStore('documents', { keyPath: 'id' });
+      documents.createIndex('courseId', 'courseId', { unique: false });
+      db.createObjectStore('snapshots', { keyPath: 'documentId' });
+      const retrieval = db.createObjectStore('retrieval-records', { keyPath: 'id' });
+      retrieval.createIndex('documentId', 'documentId', { unique: false });
+      retrieval.createIndex('courseId', 'courseId', { unique: false });
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('Unable to create version 1 database'));
+  });
+}
 
 function snapshot(documentId: string, courseId: string, title: string): Partial<ProjectState> {
   return {
@@ -96,6 +139,12 @@ function message(
 describe('library repository', () => {
   beforeEach(async () => {
     localStorageValues.clear();
+    await resetLibraryRepositoryForTests();
+    globalThis.indexedDB = new IDBFactory();
+  });
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
     await resetLibraryRepositoryForTests();
   });
 
@@ -205,6 +254,13 @@ describe('library repository', () => {
     expect((await listChatConversations()).map(item => item.id)).toEqual(['conversation-2']);
     expect(await listChatMessages('conversation-1')).toEqual([]);
     expect((await listChatMessages('conversation-2')).map(item => item.id)).toEqual(['message-other']);
+
+    const db = await openDatabase();
+    const storedMessages = await idbRequest(
+      db.transaction('qa-messages', 'readonly').objectStore('qa-messages').getAll(),
+    ) as ChatMessage[];
+    db.close();
+    expect(storedMessages.map(item => item.id)).toEqual(['message-other']);
   });
 
   it('interrupts only pending assistant messages', async () => {
@@ -232,6 +288,91 @@ describe('library repository', () => {
     expect(messages.find(item => item.id === pendingUser.id)).toEqual(pendingUser);
     expect(messages.find(item => item.id === completedAssistant.id)).toEqual(completedAssistant);
     expect(messages.find(item => item.id === failedAssistant.id)).toEqual(failedAssistant);
+
+    const db = await openDatabase();
+    const storedMessage = await idbRequest(
+      db.transaction('qa-messages', 'readonly').objectStore('qa-messages').get(pendingAssistant.id),
+    ) as ChatMessage;
+    db.close();
+    expect(storedMessage.status).toBe('interrupted');
+    expect(storedMessage.updatedAt).toBe(100);
     now.mockRestore();
+  });
+
+  it('upgrades version 1 data and creates the QA stores and indexes', async () => {
+    const versionOneDb = await createVersionOneDatabase();
+    versionOneDb.close();
+
+    expect((await listLibraryCourses()).map(course => course.id)).toEqual(['legacy-course']);
+
+    const db = await openDatabase();
+    expect(db.version).toBe(2);
+    expect(Array.from(db.objectStoreNames)).toEqual(expect.arrayContaining([
+      'courses',
+      'documents',
+      'snapshots',
+      'retrieval-records',
+      'qa-conversations',
+      'qa-messages',
+    ]));
+    const course = await idbRequest(
+      db.transaction('courses', 'readonly').objectStore('courses').get('legacy-course'),
+    );
+    const conversationStore = db.transaction('qa-conversations', 'readonly').objectStore('qa-conversations');
+    const messageStore = db.transaction('qa-messages', 'readonly').objectStore('qa-messages');
+    const conversationIndexes = Array.from(conversationStore.indexNames);
+    const messageIndexes = Array.from(messageStore.indexNames);
+    const updatedAtKeyPath = conversationStore.index('updatedAt').keyPath;
+    const conversationIdKeyPath = messageStore.index('conversationId').keyPath;
+    const conversationCreatedAtKeyPath = messageStore.index('conversationCreatedAt').keyPath;
+    db.close();
+    expect(course).toMatchObject({ id: 'legacy-course' });
+    expect(conversationIndexes).toContain('updatedAt');
+    expect(messageIndexes).toEqual(expect.arrayContaining(['conversationId', 'conversationCreatedAt']));
+    expect(updatedAtKeyPath).toBe('updatedAt');
+    expect(conversationIdKeyPath).toBe('conversationId');
+    expect(conversationCreatedAtKeyPath).toEqual(['conversationId', 'createdAt']);
+  });
+
+  it('falls back when an upgrade is blocked and retries after the blocker closes', async () => {
+    const versionOneDb = await createVersionOneDatabase();
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const blockedList = listLibraryCourses();
+    const outcome = await Promise.race([
+      blockedList.then(() => 'settled' as const),
+      new Promise<'pending'>(resolve => setTimeout(() => resolve('pending'), 25)),
+    ]);
+
+    versionOneDb.close();
+    await blockedList;
+    await new Promise(resolve => setTimeout(resolve, 0));
+    await saveChatConversation(conversation('after-block', 20));
+    const db = await openDatabase();
+    const storedConversation = await idbRequest(
+      db.transaction('qa-conversations', 'readonly').objectStore('qa-conversations').get('after-block'),
+    );
+    db.close();
+
+    expect(outcome).toBe('settled');
+    expect(warning).toHaveBeenCalledWith('Course library IndexedDB upgrade blocked; using memory fallback.');
+    expect((await listChatConversations()).map(item => item.id)).toContain('after-block');
+    expect(storedConversation).toMatchObject({ id: 'after-block' });
+  });
+
+  it('closes an open repository connection when another version is requested', async () => {
+    await listLibraryCourses();
+    const upgradeRequest = indexedDB.open(DB_NAME, 3);
+    const upgrade = idbRequest(upgradeRequest);
+    const outcome = await Promise.race([
+      upgrade.then(() => 'opened' as const),
+      new Promise<'blocked'>(resolve => {
+        upgradeRequest.onblocked = () => resolve('blocked');
+      }),
+    ]);
+
+    await resetLibraryRepositoryForTests();
+    const upgradedDb = await upgrade;
+    upgradedDb.close();
+    expect(outcome).toBe('opened');
   });
 });
