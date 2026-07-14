@@ -1,6 +1,8 @@
 import type {
   ChatConversation,
   ChatMessage,
+  CourseNebulaSummary,
+  GenerationStatus,
   LibraryCourse,
   LibraryDocument,
   ProjectState,
@@ -8,15 +10,17 @@ import type {
 } from '../types';
 import { buildRetrievalRecords } from './card-retrieval';
 import { deleteDocumentSource } from './document-source';
+import { buildCourseNebulaSummary, type NebulaSnapshotInput } from './nebula/nebula-summary';
 
 const DB_NAME = 'zhigang-library';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const COURSES = 'courses';
 const DOCUMENTS = 'documents';
 const SNAPSHOTS = 'snapshots';
 const RETRIEVAL = 'retrieval-records';
 const QA_CONVERSATIONS = 'qa-conversations';
 const QA_MESSAGES = 'qa-messages';
+const NEBULA_SUMMARIES = 'nebula-summaries';
 const LOCAL_STORAGE_UNAVAILABLE = 'Local course library storage is temporarily unavailable. Please retry.';
 
 interface SnapshotRecord {
@@ -32,6 +36,7 @@ const memory = {
   retrieval: new Map<string, RetrievalRecord>(),
   conversations: new Map<string, ChatConversation>(),
   messages: new Map<string, ChatMessage>(),
+  nebulaSummaries: new Map<string, CourseNebulaSummary>(),
 };
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -94,6 +99,9 @@ async function openLibraryDb(): Promise<IDBDatabase | null> {
         const store = db.createObjectStore(QA_MESSAGES, { keyPath: 'id' });
         store.createIndex('conversationId', 'conversationId', { unique: false });
         store.createIndex('conversationCreatedAt', ['conversationId', 'createdAt'], { unique: false });
+      }
+      if (!db.objectStoreNames.contains(NEBULA_SUMMARIES)) {
+        db.createObjectStore(NEBULA_SUMMARIES, { keyPath: 'courseId' });
       }
     };
     request.onsuccess = () => {
@@ -217,6 +225,7 @@ export async function deleteLibraryDocumentCascade(documentId: string): Promise<
           updatedAt: Date.now(),
         });
       }
+      await rebuildCourseNebulaSummary(document.courseId);
     }
     await deleteDocumentSource(snapshot?.snapshot.document?.sourceKey ?? documentId);
     return;
@@ -246,6 +255,7 @@ export async function deleteLibraryDocumentCascade(documentId: string): Promise<
   }
   await transactionDone(tx);
   await deleteDocumentSource(snapshot?.snapshot.document?.sourceKey ?? documentId);
+  if (document) await rebuildCourseNebulaSummary(document.courseId);
 }
 
 export async function deleteLibraryCourseCascade(courseId: string): Promise<void> {
@@ -266,11 +276,12 @@ export async function deleteLibraryCourseCascade(courseId: string): Promise<void
       if (retrieval.courseId === courseId || documentIds.has(retrieval.documentId)) memory.retrieval.delete(id);
     }
     memory.courses.delete(courseId);
+    memory.nebulaSummaries.delete(courseId);
     await Promise.all(sourceKeys.map(sourceKey => deleteDocumentSource(sourceKey)));
     return;
   }
 
-  const tx = db.transaction([COURSES, DOCUMENTS, SNAPSHOTS, RETRIEVAL], 'readwrite');
+  const tx = db.transaction([COURSES, DOCUMENTS, SNAPSHOTS, RETRIEVAL, NEBULA_SUMMARIES], 'readwrite');
   const courseStore = tx.objectStore(COURSES);
   const documentStore = tx.objectStore(DOCUMENTS);
   const snapshotStore = tx.objectStore(SNAPSHOTS);
@@ -286,6 +297,7 @@ export async function deleteLibraryCourseCascade(courseId: string): Promise<void
   documentIds.forEach(documentId => snapshotStore.delete(documentId));
   retrieval.forEach(record => retrievalStore.delete(record.id));
   courseStore.delete(courseId);
+  tx.objectStore(NEBULA_SUMMARIES).delete(courseId);
   await transactionDone(tx);
   await Promise.all(snapshots.map((snapshot, index) =>
     deleteDocumentSource(snapshot?.snapshot.document?.sourceKey ?? documentIds[index])));
@@ -343,11 +355,96 @@ export async function saveLibraryProjectSnapshot(
   const db = await openLibraryDb();
   if (!db) {
     memory.snapshots.set(documentId, record);
+    await rebuildCourseNebulaSummary(courseId);
     return;
   }
   const tx = db.transaction(SNAPSHOTS, 'readwrite');
   tx.objectStore(SNAPSHOTS).put(record);
   await transactionDone(tx);
+  await rebuildCourseNebulaSummary(courseId);
+}
+
+function toNebulaCardStatus(status: GenerationStatus | undefined): NebulaSnapshotInput['cards'][number]['status'] {
+  if (status === 'failed') return 'failed';
+  if (status === 'partial' || status === 'generating' || status === 'stale') return 'partial';
+  if (status === 'pending') return 'none';
+  return 'complete';
+}
+
+function snapshotToNebulaInput(record: SnapshotRecord): NebulaSnapshotInput {
+  return {
+    documentId: record.documentId,
+    topics: (record.snapshot.knowledgeTopics ?? []).map(topic => ({
+      id: topic.id,
+      name: topic.name,
+      aliases: topic.aliases,
+      importance: topic.importance,
+      sourceRangeCount: topic.sourceRanges.length,
+    })),
+    cards: (record.snapshot.knowledgeCards ?? []).map(card => ({
+      topicId: card.topicId,
+      status: toNebulaCardStatus(card.status),
+    })),
+  };
+}
+
+/** Rebuilds only the compact home-page payload; full project data remains in snapshots. */
+export async function rebuildCourseNebulaSummary(courseId: string): Promise<CourseNebulaSummary | null> {
+  const db = await openLibraryDb();
+  if (!db) {
+    const course = memory.courses.get(courseId);
+    if (!course) {
+      memory.nebulaSummaries.delete(courseId);
+      return null;
+    }
+    const documents = Array.from(memory.documents.values()).filter(document => document.courseId === courseId);
+    const snapshots = documents
+      .map(document => memory.snapshots.get(document.id))
+      .filter((record): record is SnapshotRecord => Boolean(record))
+      .map(snapshotToNebulaInput);
+    const summary = buildCourseNebulaSummary({ course, documents, snapshots });
+    memory.nebulaSummaries.set(courseId, clone(summary));
+    return summary;
+  }
+
+  const readTx = db.transaction([COURSES, DOCUMENTS, SNAPSHOTS], 'readonly');
+  const course = await requestValue(readTx.objectStore(COURSES).get(courseId)) as LibraryCourse | undefined;
+  if (!course) {
+    const deleteTx = db.transaction(NEBULA_SUMMARIES, 'readwrite');
+    deleteTx.objectStore(NEBULA_SUMMARIES).delete(courseId);
+    await transactionDone(deleteTx);
+    return null;
+  }
+  const documents = await requestValue(
+    readTx.objectStore(DOCUMENTS).index('courseId').getAll(courseId),
+  ) as LibraryDocument[];
+  const snapshotStore = readTx.objectStore(SNAPSHOTS);
+  const snapshotRecords = await Promise.all(
+    documents.map(document => requestValue(snapshotStore.get(document.id)) as Promise<SnapshotRecord | undefined>),
+  );
+  await transactionDone(readTx);
+
+  const summary = buildCourseNebulaSummary({
+    course,
+    documents,
+    snapshots: snapshotRecords
+      .filter((record): record is SnapshotRecord => Boolean(record))
+      .map(snapshotToNebulaInput),
+  });
+  const writeTx = db.transaction(NEBULA_SUMMARIES, 'readwrite');
+  writeTx.objectStore(NEBULA_SUMMARIES).put(summary);
+  await transactionDone(writeTx);
+  return summary;
+}
+
+export async function listCourseNebulaSummaries(): Promise<CourseNebulaSummary[]> {
+  const db = await openLibraryDb();
+  const summaries = db
+    ? await requestValue(
+      db.transaction(NEBULA_SUMMARIES, 'readonly').objectStore(NEBULA_SUMMARIES).getAll(),
+    ) as CourseNebulaSummary[]
+    : Array.from(memory.nebulaSummaries.values()).map(clone);
+  return summaries.sort((left, right) => right.updatedAt - left.updatedAt || left.courseId.localeCompare(right.courseId));
 }
 
 export async function loadLibraryProjectSnapshot(documentId: string): Promise<Partial<ProjectState> | null> {
@@ -492,6 +589,7 @@ export async function resetLibraryRepositoryForTests(): Promise<void> {
   memory.retrieval.clear();
   memory.conversations.clear();
   memory.messages.clear();
+  memory.nebulaSummaries.clear();
   if (typeof indexedDB === 'undefined') return;
   const db = await dbPromise;
   db?.close();

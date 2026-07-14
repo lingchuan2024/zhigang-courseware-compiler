@@ -9,6 +9,7 @@ import {
   interruptPendingChatMessages,
   listChatConversations,
   listChatMessages,
+  listCourseNebulaSummaries,
   listLibraryCourses,
   listLibraryDocuments,
   listRetrievalRecords,
@@ -92,6 +93,57 @@ function snapshot(documentId: string, courseId: string, title: string): Partial<
   };
 }
 
+function snapshotWithTopic(
+  documentId: string,
+  courseId: string,
+  title: string,
+  topicId: string,
+  topicName: string,
+  sourceRangeCount = 1,
+): Partial<ProjectState> {
+  return {
+    ...snapshot(documentId, courseId, title),
+    knowledgeTopics: [{
+      id: topicId,
+      courseId,
+      name: topicName,
+      aliases: [],
+      summary: '',
+      learningObjective: '',
+      sourceRanges: Array.from({ length: sourceRangeCount }, (_, index) => ({
+        documentId,
+        startBlockId: `block-${index}`,
+        endBlockId: `block-${index}`,
+      })),
+      childTopicIds: [],
+      importance: 'core',
+      difficulty: 3,
+      knowledgeGenre: 'concept',
+      confidence: 0.9,
+      status: 'generated',
+    }],
+    knowledgeCards: [{
+      id: `card-${topicId}`,
+      courseId,
+      topicId,
+      topicName,
+      teachingBlockId: `teaching-${topicId}`,
+      teachingType: 'definition',
+      title: topicName,
+      conciseSummary: '',
+      detailedNote: '',
+      sourceRanges: [],
+      keywords: [],
+      aliases: [],
+      prerequisiteTopicIds: [],
+      relatedTopicIds: [],
+      confidence: 0.9,
+      reviewStatus: 'generated',
+      status: 'completed',
+    }],
+  };
+}
+
 function record(cardId: string, courseId: string, documentId: string): RetrievalRecord {
   return {
     id: `retrieval-${cardId}`,
@@ -167,6 +219,48 @@ describe('library repository', () => {
     expect((await listLibraryDocuments(course.id)).map(item => item.id)).toEqual(['doc-2', 'doc-1']);
     expect((await loadLibraryProjectSnapshot('doc-1'))?.document?.title).toBe('第一讲');
     expect((await loadLibraryProjectSnapshot('doc-2'))?.document?.title).toBe('第二讲');
+  });
+
+  it('persists merged nebula summaries and rebuilds them during cascades', async () => {
+    const course = await createLibraryCourse({ name: '机器学习' });
+    await upsertLibraryDocument({
+      id: 'doc-1', courseId: course.id, title: '第一讲', fileName: 'lecture1.pdf',
+      fileType: 'pdf', pageCount: 10, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
+    });
+    await upsertLibraryDocument({
+      id: 'doc-2', courseId: course.id, title: '第二讲', fileName: 'lecture2.pdf',
+      fileType: 'pdf', pageCount: 12, stage: 'cards', status: 'ready', uploadedAt: 3, updatedAt: 4,
+    });
+    await saveLibraryProjectSnapshot(
+      course.id,
+      'doc-1',
+      snapshotWithTopic('doc-1', course.id, '第一讲', 'softmax-a', 'Softmax', 2),
+    );
+    await saveLibraryProjectSnapshot(
+      course.id,
+      'doc-2',
+      snapshotWithTopic('doc-2', course.id, '第二讲', 'softmax-b', ' softmax ', 1),
+    );
+
+    expect((await listCourseNebulaSummaries())[0]).toMatchObject({
+      courseId: course.id,
+      documentCount: 2,
+      knowledgeCount: 1,
+      completedCardCount: 1,
+    });
+    expect((await listCourseNebulaSummaries())[0].stars[0]).toMatchObject({
+      sourceDocumentCount: 2,
+      evidenceCount: 3,
+    });
+
+    await deleteLibraryDocumentCascade('doc-2');
+    expect((await listCourseNebulaSummaries())[0].stars[0]).toMatchObject({
+      sourceDocumentCount: 1,
+      evidenceCount: 2,
+    });
+
+    await deleteLibraryCourseCascade(course.id);
+    expect(await listCourseNebulaSummaries()).toEqual([]);
   });
 
   it('replaces retrieval records for one document without changing another document', async () => {
@@ -353,14 +447,14 @@ describe('library repository', () => {
     now.mockRestore();
   });
 
-  it('upgrades version 1 data and creates the QA stores and indexes', async () => {
+  it('upgrades version 1 data and creates the QA and nebula stores and indexes', async () => {
     const versionOneDb = await createVersionOneDatabase();
     versionOneDb.close();
 
     expect((await listLibraryCourses()).map(course => course.id)).toEqual(['legacy-course']);
 
     const db = await openDatabase();
-    expect(db.version).toBe(2);
+    expect(db.version).toBe(3);
     expect(Array.from(db.objectStoreNames)).toEqual(expect.arrayContaining([
       'courses',
       'documents',
@@ -368,6 +462,7 @@ describe('library repository', () => {
       'retrieval-records',
       'qa-conversations',
       'qa-messages',
+      'nebula-summaries',
     ]));
     const course = await idbRequest(
       db.transaction('courses', 'readonly').objectStore('courses').get('legacy-course'),
@@ -422,7 +517,7 @@ describe('library repository', () => {
   });
 
   it('rejects a write when the IndexedDB open request errors', async () => {
-    const futureDb = await openDatabase(3);
+    const futureDb = await openDatabase(4);
     futureDb.close();
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
@@ -433,7 +528,7 @@ describe('library repository', () => {
 
   it('closes an open repository connection when another version is requested', async () => {
     await listLibraryCourses();
-    const upgradeRequest = indexedDB.open(DB_NAME, 3);
+    const upgradeRequest = indexedDB.open(DB_NAME, 4);
     const upgrade = idbRequest(upgradeRequest);
     const outcome = await Promise.race([
       upgrade.then(() => 'opened' as const),
