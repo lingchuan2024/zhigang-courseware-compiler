@@ -12,17 +12,7 @@ import {
   searchKnowledgeCardsWithContext,
   type KnowledgeCardSearchHit,
 } from '../lib/card-retrieval';
-import {
-  deleteChatConversation,
-  interruptPendingChatMessages,
-  listChatConversations,
-  listChatMessages,
-  listLibraryCourses,
-  listLibraryDocuments,
-  listRetrievalRecords,
-  saveChatConversation,
-  saveChatMessage,
-} from '../lib/library-repository';
+import * as repository from '../lib/library-repository';
 import {
   createCitationSnapshots,
   createConversationTitle,
@@ -30,9 +20,12 @@ import {
 } from '../lib/qa-conversation-context';
 
 const ACTIVE_CONVERSATION_KEY = 'zhigang_qa_active_conversation';
-const requestCounts = new Map<string, number>();
+const activeGenerations = new Map<string, symbol>();
+const deletedConversationIds = new Set<string>();
 let selectionEpoch = 0;
 let lastTimestamp = 0;
+
+class GenerationCancelledError extends Error {}
 
 export interface QaAnswerer {
   (
@@ -113,27 +106,54 @@ function answerContent(answer: RagAnswer): string {
   return answer.sections.map(section => section.content.trim()).filter(Boolean).join('\n\n');
 }
 
-function addRequestOwner(conversationId: string): void {
-  const currentCount = requestCounts.get(conversationId) ?? 0;
-  requestCounts.set(conversationId, currentCount + 1);
-  if (currentCount > 0) return;
+function reserveGeneration(conversationId: string): symbol {
+  if (activeGenerations.has(conversationId)) {
+    throw new Error('当前聊天正在生成回答');
+  }
+  if (deletedConversationIds.has(conversationId)) {
+    throw new Error('聊天已被删除');
+  }
+  const token = Symbol(conversationId);
+  activeGenerations.set(conversationId, token);
   useQaStore.setState(state => ({
     activeRequestConversationIds: state.activeRequestConversationIds.includes(conversationId)
       ? state.activeRequestConversationIds
       : [...state.activeRequestConversationIds, conversationId],
   }));
+  return token;
 }
 
-function removeRequestOwner(conversationId: string): void {
-  const remaining = (requestCounts.get(conversationId) ?? 1) - 1;
-  if (remaining > 0) {
-    requestCounts.set(conversationId, remaining);
-    return;
-  }
-  requestCounts.delete(conversationId);
+function releaseGeneration(conversationId: string, token: symbol): void {
+  if (activeGenerations.get(conversationId) !== token) return;
+  activeGenerations.delete(conversationId);
   useQaStore.setState(state => ({
     activeRequestConversationIds: state.activeRequestConversationIds.filter(id => id !== conversationId),
   }));
+}
+
+function assertGenerationActive(conversationId: string, token: symbol): void {
+  if (
+    deletedConversationIds.has(conversationId) ||
+    activeGenerations.get(conversationId) !== token
+  ) {
+    throw new GenerationCancelledError();
+  }
+}
+
+function invalidateConversation(conversationId: string): void {
+  deletedConversationIds.add(conversationId);
+  activeGenerations.delete(conversationId);
+  useQaStore.setState(state => ({
+    activeRequestConversationIds: state.activeRequestConversationIds.filter(id => id !== conversationId),
+  }));
+}
+
+/** Clears module-scoped async ownership after tests or a hot-module replacement. */
+export function resetQaStoreRuntimeForTests(): void {
+  activeGenerations.clear();
+  deletedConversationIds.clear();
+  selectionEpoch = 0;
+  lastTimestamp = 0;
 }
 
 function completedHistoryBefore(messages: ChatMessage[], userMessageId: string): ChatHistoryTurn[] {
@@ -147,16 +167,19 @@ function completedHistoryBefore(messages: ChatMessage[], userMessageId: string):
 interface GenerationInput {
   conversationId: string;
   userMessage: ChatMessage;
+  token: symbol;
   config: ModelConfig;
   answerer?: QaAnswerer;
   retryOfMessageId?: string;
 }
 
-async function refreshOwningConversation(conversationId: string): Promise<void> {
+async function refreshOwningConversation(conversationId: string, token: symbol): Promise<void> {
+  assertGenerationActive(conversationId, token);
   const current = useQaStore.getState().conversations.find(item => item.id === conversationId);
   if (!current) return;
   const updated = { ...current, updatedAt: nextTimestamp() };
-  await saveChatConversation(updated);
+  await repository.saveChatConversation(updated);
+  assertGenerationActive(conversationId, token);
   useQaStore.setState(state => {
     if (!state.conversations.some(item => item.id === conversationId)) return {};
     return {
@@ -170,7 +193,7 @@ async function refreshOwningConversation(conversationId: string): Promise<void> 
 }
 
 async function generateAnswer(input: GenerationInput): Promise<void> {
-  const { conversationId, userMessage, config, retryOfMessageId } = input;
+  const { conversationId, userMessage, token, config, retryOfMessageId } = input;
   const placeholderTime = nextTimestamp();
   const placeholder: ChatMessage = {
     id: createId('assistant'),
@@ -183,24 +206,29 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
     updatedAt: placeholderTime,
   };
 
-  if (useQaStore.getState().activeConversationId === conversationId) {
-    useQaStore.setState(state => ({ messages: [...state.messages, placeholder], error: null }));
-  }
-  addRequestOwner(conversationId);
-
+  let completed: ChatMessage;
   try {
-    await saveChatMessage(placeholder);
-    const storedMessages = await listChatMessages(conversationId);
+    assertGenerationActive(conversationId, token);
+    await repository.saveChatMessage(placeholder);
+    assertGenerationActive(conversationId, token);
+    if (useQaStore.getState().activeConversationId === conversationId) {
+      useQaStore.setState(state => ({ messages: [...state.messages, placeholder], error: null }));
+    }
+
+    const storedMessages = await repository.listChatMessages(conversationId);
+    assertGenerationActive(conversationId, token);
     const history = selectChatContext(completedHistoryBefore(storedMessages, userMessage.id));
     const owningConversation = useQaStore.getState().conversations.find(item => item.id === conversationId)
-      ?? (await listChatConversations()).find(item => item.id === conversationId);
-    if (!owningConversation) return;
+      ?? (await repository.listChatConversations()).find(item => item.id === conversationId);
+    assertGenerationActive(conversationId, token);
+    if (!owningConversation) throw new GenerationCancelledError();
     const courseIds = owningConversation.courseIds;
     const [records, courses, documents] = await Promise.all([
-      listRetrievalRecords(courseIds.length > 0 ? { courseIds } : undefined),
-      listLibraryCourses(),
-      listLibraryDocuments(),
+      repository.listRetrievalRecords(courseIds.length > 0 ? { courseIds } : undefined),
+      repository.listLibraryCourses(),
+      repository.listLibraryDocuments(),
     ]);
+    assertGenerationActive(conversationId, token);
     const hits = searchKnowledgeCardsWithContext(
       userMessage.content,
       history,
@@ -213,8 +241,9 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
       hits,
       history,
     );
+    assertGenerationActive(conversationId, token);
     const cardIds = answer.sections.flatMap(section => section.cardIds);
-    const completed: ChatMessage = {
+    completed = {
       ...placeholder,
       content: answerContent(answer),
       status: 'completed',
@@ -223,21 +252,23 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
       error: undefined,
       updatedAt: nextTimestamp(),
     };
-    await saveChatMessage(completed);
-    await refreshOwningConversation(conversationId);
+    await repository.saveChatMessage(completed);
+    assertGenerationActive(conversationId, token);
     useQaStore.setState(state => (
       state.activeConversationId === conversationId
         ? { messages: state.messages.map(item => item.id === completed.id ? completed : item) }
         : {}
     ));
   } catch (error) {
+    if (error instanceof GenerationCancelledError) return;
     const failed: ChatMessage = {
       ...placeholder,
       status: 'failed',
       error: errorMessage(error),
       updatedAt: nextTimestamp(),
     };
-    await saveChatMessage(failed).catch(() => undefined);
+    if (activeGenerations.get(conversationId) !== token || deletedConversationIds.has(conversationId)) return;
+    await repository.saveChatMessage(failed).catch(() => undefined);
     useQaStore.setState(state => (
       state.activeConversationId === conversationId
         ? {
@@ -246,8 +277,18 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
           }
         : {}
     ));
-  } finally {
-    removeRequestOwner(conversationId);
+    return;
+  }
+
+  try {
+    await refreshOwningConversation(conversationId, token);
+  } catch (error) {
+    if (error instanceof GenerationCancelledError) return;
+    useQaStore.setState(state => (
+      state.activeConversationId === conversationId
+        ? { error: `回答已保存，但聊天时间更新失败：${errorMessage(error)}` }
+        : {}
+    ));
   }
 }
 
@@ -259,18 +300,36 @@ async function retryStoredMessage(
   if (assistant.role !== 'assistant' || !['failed', 'interrupted'].includes(assistant.status)) {
     throw new Error('只能重试失败或中断的回答');
   }
-  const storedMessages = await listChatMessages(assistant.conversationId);
-  const assistantIndex = storedMessages.findIndex(item => item.id === assistant.id);
-  const precedingMessages = assistantIndex >= 0 ? storedMessages.slice(0, assistantIndex) : storedMessages;
+  const storedMessages = await repository.listChatMessages(assistant.conversationId);
+  const messagesById = new Map(storedMessages.map(item => [item.id, item]));
+  let originalAssistant = messagesById.get(assistant.id);
+  if (!originalAssistant) throw new Error('重试消息已不存在');
+  const visited = new Set<string>();
+  while (originalAssistant.retryOfMessageId) {
+    if (visited.has(originalAssistant.id)) throw new Error('重试链已损坏');
+    visited.add(originalAssistant.id);
+    const parent = messagesById.get(originalAssistant.retryOfMessageId);
+    if (!parent || parent.role !== 'assistant') throw new Error('重试链已损坏');
+    originalAssistant = parent;
+  }
+  const assistantIndex = storedMessages.findIndex(item => item.id === originalAssistant.id);
+  if (assistantIndex < 0) throw new Error('重试消息已不存在');
+  const precedingMessages = storedMessages.slice(0, assistantIndex);
   const userMessage = [...precedingMessages].reverse().find(item => item.role === 'user');
   if (!userMessage) throw new Error('找不到原始问题');
-  await generateAnswer({
-    conversationId: assistant.conversationId,
-    userMessage,
-    config,
-    answerer,
-    retryOfMessageId: assistant.id,
-  });
+  const token = reserveGeneration(assistant.conversationId);
+  try {
+    await generateAnswer({
+      conversationId: assistant.conversationId,
+      userMessage,
+      token,
+      config,
+      answerer,
+      retryOfMessageId: assistant.id,
+    });
+  } finally {
+    releaseGeneration(assistant.conversationId, token);
+  }
 }
 
 export const useQaStore = create<QaState>((set, get) => ({
@@ -287,13 +346,13 @@ export const useQaStore = create<QaState>((set, get) => ({
     const epoch = ++selectionEpoch;
     set({ loadingConversation: true, error: null });
     try {
-      await interruptPendingChatMessages();
-      const conversations = await listChatConversations();
+      await repository.interruptPendingChatMessages();
+      const conversations = await repository.listChatConversations();
       const savedId = readActiveConversationId();
       const activeConversationId = conversations.some(item => item.id === savedId)
         ? savedId
         : conversations[0]?.id ?? null;
-      const messages = activeConversationId ? await listChatMessages(activeConversationId) : [];
+      const messages = activeConversationId ? await repository.listChatMessages(activeConversationId) : [];
       if (epoch !== selectionEpoch) return;
       persistActiveConversationId(activeConversationId);
       set({
@@ -336,12 +395,13 @@ export const useQaStore = create<QaState>((set, get) => ({
       activeConversationId: id,
       selectedCitation: null,
       loadingConversation: true,
+      messages: [],
       error: null,
       conversations: state.conversations.map(item => item.id === id ? opened : item),
     }));
     try {
-      await saveChatConversation(opened);
-      const messages = await listChatMessages(id);
+      await repository.saveChatConversation(opened);
+      const messages = await repository.listChatMessages(id);
       if (epoch !== selectionEpoch || get().activeConversationId !== id) return;
       set({ messages, loadingConversation: false });
     } catch (error) {
@@ -356,7 +416,7 @@ export const useQaStore = create<QaState>((set, get) => ({
     const conversation = get().conversations.find(item => item.id === id);
     if (!conversation) throw new Error('聊天不存在');
     const updated = { ...conversation, title: normalizedTitle, updatedAt: nextTimestamp() };
-    await saveChatConversation(updated);
+    await repository.saveChatConversation(updated);
     set(state => ({
       conversations: sortConversations(state.conversations.map(item => item.id === id ? updated : item)),
     }));
@@ -364,40 +424,57 @@ export const useQaStore = create<QaState>((set, get) => ({
 
   deleteConversation: async id => {
     const deletingActive = get().activeConversationId === id;
-    if (deletingActive) selectionEpoch += 1;
-    await deleteChatConversation(id);
-    const conversations = await listChatConversations();
-    if (!deletingActive) {
-      set({ conversations });
-      return;
+    const deleteEpoch = deletingActive ? ++selectionEpoch : selectionEpoch;
+    invalidateConversation(id);
+    try {
+      await repository.deleteChatConversation(id);
+      const conversations = await repository.listChatConversations();
+      const selectionUnchanged = deletingActive
+        && selectionEpoch === deleteEpoch
+        && get().activeConversationId === id;
+      if (!selectionUnchanged) {
+        set({ conversations });
+        return;
+      }
+      const activeConversationId = conversations[0]?.id ?? null;
+      const messages = activeConversationId ? await repository.listChatMessages(activeConversationId) : [];
+      if (selectionEpoch !== deleteEpoch || get().activeConversationId !== id) {
+        set({ conversations });
+        return;
+      }
+      persistActiveConversationId(activeConversationId);
+      set({
+        conversations,
+        messages,
+        activeConversationId,
+        selectedCitation: null,
+        loadingConversation: false,
+        error: null,
+      });
+    } catch (error) {
+      deletedConversationIds.delete(id);
+      set({ error: `删除聊天失败：${errorMessage(error)}` });
+      throw error;
     }
-    const activeConversationId = conversations[0]?.id ?? null;
-    const messages = activeConversationId ? await listChatMessages(activeConversationId) : [];
-    persistActiveConversationId(activeConversationId);
-    set({
-      conversations,
-      messages,
-      activeConversationId,
-      selectedCitation: null,
-      loadingConversation: false,
-      error: null,
-    });
   },
 
   sendQuestion: async input => {
+    if (get().loadingConversation) throw new Error('聊天正在加载，请稍后再试');
     if (input.retryOfMessageId) {
       const existing = get().messages.find(item => item.id === input.retryOfMessageId);
-      if (!existing) throw new Error('找不到需要重试的回答');
+      if (!existing) throw new Error('重试消息已不存在');
       await retryStoredMessage(existing, input.config, input.answerer);
       return;
     }
 
     const question = input.question.trim();
     if (!question) throw new Error('问题不能为空');
+    const selectionAtStart = selectionEpoch;
     let conversationId = get().activeConversationId;
     let conversation = conversationId
       ? get().conversations.find(item => item.id === conversationId)
       : undefined;
+    const isNewConversation = !conversationId || !conversation;
     if (!conversationId || !conversation) {
       const now = nextTimestamp();
       conversationId = createId('conversation');
@@ -409,19 +486,9 @@ export const useQaStore = create<QaState>((set, get) => ({
         updatedAt: now,
         lastOpenedAt: now,
       };
-      selectionEpoch += 1;
-      persistActiveConversationId(conversationId);
-      set(state => ({
-        conversations: sortConversations([conversation!, ...state.conversations]),
-        activeConversationId: conversationId,
-        messages: [],
-        selectedCitation: null,
-        initialized: true,
-        error: null,
-      }));
-      await saveChatConversation(conversation);
     }
 
+    const token = reserveGeneration(conversationId);
     const userTime = nextTimestamp();
     const userMessage: ChatMessage = {
       id: createId('user'),
@@ -432,21 +499,60 @@ export const useQaStore = create<QaState>((set, get) => ({
       createdAt: userTime,
       updatedAt: userTime,
     };
-    if (get().activeConversationId === conversationId) {
-      set(state => ({ messages: [...state.messages, userMessage], error: null }));
+    let newConversationPersisted = false;
+    try {
+      if (isNewConversation) {
+        await repository.saveChatConversation(conversation);
+        newConversationPersisted = true;
+        assertGenerationActive(conversationId, token);
+      }
+      await repository.saveChatMessage(userMessage);
+      assertGenerationActive(conversationId, token);
+
+      if (isNewConversation) {
+        const shouldActivate = selectionEpoch === selectionAtStart && get().activeConversationId === null;
+        if (shouldActivate) {
+          selectionEpoch += 1;
+          persistActiveConversationId(conversationId);
+        }
+        set(state => ({
+          conversations: sortConversations([
+            conversation,
+            ...state.conversations.filter(item => item.id !== conversationId),
+          ]),
+          ...(shouldActivate ? {
+            activeConversationId: conversationId,
+            messages: [userMessage],
+            selectedCitation: null,
+          } : {}),
+          initialized: true,
+          error: null,
+        }));
+      } else if (get().activeConversationId === conversationId) {
+        set(state => ({ messages: [...state.messages, userMessage], error: null }));
+      }
+
+      await generateAnswer({
+        conversationId,
+        userMessage,
+        token,
+        config: input.config,
+        answerer: input.answerer,
+      });
+    } catch (error) {
+      if (error instanceof GenerationCancelledError) return;
+      if (isNewConversation && newConversationPersisted) {
+        await repository.deleteChatConversation(conversationId).catch(() => undefined);
+      }
+      set({ error: `保存问题失败：${errorMessage(error)}` });
+    } finally {
+      releaseGeneration(conversationId, token);
     }
-    await saveChatMessage(userMessage);
-    await generateAnswer({
-      conversationId,
-      userMessage,
-      config: input.config,
-      answerer: input.answerer,
-    });
   },
 
   retryMessage: async (messageId, config, answerer) => {
     const assistant = get().messages.find(item => item.id === messageId);
-    if (!assistant) throw new Error('找不到需要重试的回答');
+    if (!assistant) throw new Error('重试消息已不存在');
     await retryStoredMessage(assistant, config, answerer);
   },
 
