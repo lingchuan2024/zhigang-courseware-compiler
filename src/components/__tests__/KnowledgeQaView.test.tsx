@@ -186,6 +186,7 @@ describe('KnowledgeQaView chat interface', () => {
     act(() => drawer.querySelector<HTMLButtonElement>('button[aria-label="关闭引用详情"]')!.click());
     expect(container!.querySelector('[data-testid="citation-drawer"]')).toBeNull();
     expect(container!.querySelector('[data-testid="qa-two-column-layout"]')).not.toBeNull();
+    await waitFor(() => expect(document.activeElement).toBe(container!.querySelector('button[data-card-id="card-1"]')));
   });
 
   it('starts a fresh welcome state and switches between two isolated conversations', async () => {
@@ -383,6 +384,7 @@ describe('KnowledgeQaView chat interface', () => {
     expect(dialog.getAttribute('role')).toBe('dialog');
     expect(dialog.getAttribute('aria-modal')).toBe('true');
     expect(container!.querySelector('[data-testid="qa-two-column-layout"]')?.getAttribute('aria-hidden')).toBe('true');
+    const background = container!.querySelector<HTMLElement>('[data-testid="qa-two-column-layout"]')!;
     const close = dialog.querySelector<HTMLButtonElement>('button[aria-label="关闭引用详情"]')!;
     const openDocumentButton = Array.from(dialog.querySelectorAll<HTMLButtonElement>('button'))
       .find(button => button.textContent === '打开对应课件')!;
@@ -392,10 +394,56 @@ describe('KnowledgeQaView chat interface', () => {
     expect(document.activeElement).toBe(openDocumentButton);
     act(() => openDocumentButton.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })));
     expect(document.activeElement).toBe(close);
+    const closeOrder: string[] = [];
+    const removeAttribute = background.removeAttribute.bind(background);
+    vi.spyOn(background, 'removeAttribute').mockImplementation(name => {
+      if (name === 'inert' || name === 'aria-hidden') closeOrder.push(`remove:${name}`);
+      removeAttribute(name);
+    });
+    const focusTrigger = trigger.focus.bind(trigger);
+    vi.spyOn(trigger, 'focus').mockImplementation(options => {
+      closeOrder.push('focus:trigger');
+      focusTrigger(options);
+    });
     act(() => close.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })));
 
     expect(container!.querySelector('[data-testid="citation-drawer"]')).toBeNull();
-    expect(document.activeElement).toBe(trigger);
+    await waitFor(() => expect(document.activeElement).toBe(trigger));
+    expect(closeOrder.indexOf('remove:inert')).toBeGreaterThanOrEqual(0);
+    expect(closeOrder.indexOf('remove:aria-hidden')).toBeGreaterThanOrEqual(0);
+    expect(closeOrder.indexOf('remove:inert')).toBeLessThan(closeOrder.indexOf('focus:trigger'));
+    expect(closeOrder.indexOf('remove:aria-hidden')).toBeLessThan(closeOrder.indexOf('focus:trigger'));
+  });
+
+  it('keeps the draft and skips reload when the active conversation is clicked again', async () => {
+    await renderQa(async () => answer('已回答'));
+    await sendQuestion('已有聊天');
+    const activeId = useQaStore.getState().activeConversationId!;
+    const originalSelect = useQaStore.getState().selectConversation;
+    const selectConversation = vi.fn(originalSelect);
+    act(() => useQaStore.setState({ selectConversation }));
+    const textarea = setTextarea('正在编辑的草稿');
+
+    act(() => container!.querySelector<HTMLButtonElement>(`[data-conversation-id="${activeId}"]`)!.click());
+
+    expect(selectConversation).not.toHaveBeenCalled();
+    expect(textarea.value).toBe('正在编辑的草稿');
+    expect(useQaStore.getState().activeConversationId).toBe(activeId);
+  });
+
+  it('loads retrieval records on mount and citation open, but not when the drawer closes', async () => {
+    const listRecords = vi.spyOn(repository, 'listRetrievalRecords');
+    await renderQa(async (_config, _question, hits) => answer('带引用的回答', [hits[0].record.cardId]));
+    await sendQuestion('GLM 是什么？');
+    act(() => container!.querySelector<HTMLButtonElement>('button[data-card-id="card-1"]')!.click());
+    await waitFor(() => expect(container!.textContent).not.toContain('正在核对最新知识卡片'));
+    const callsAfterOpen = listRecords.mock.calls.length;
+
+    act(() => container!.querySelector<HTMLButtonElement>('button[aria-label="关闭引用详情"]')!.click());
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 0)); });
+
+    expect(listRecords).toHaveBeenCalled();
+    expect(listRecords).toHaveBeenCalledTimes(callsAfterOpen);
   });
 
   it('uses a definite dynamic viewport height so the timeline owns scrolling', async () => {

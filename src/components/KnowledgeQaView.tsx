@@ -86,8 +86,8 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
   const backgroundRef = useRef<HTMLDivElement | null>(null);
   const nearBottomRef = useRef(true);
   const draftRevisionRef = useRef(0);
+  const recordsLoadedOnMountRef = useRef(false);
   const citationTriggerRef = useRef<HTMLButtonElement | null>(null);
-  const citationWasOpenRef = useRef(false);
 
   useEffect(() => {
     if (!initialized) void initialize();
@@ -97,6 +97,8 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     ? `${selectedCitation.cardId}:${selectedCitation.documentId}`
     : '__library__';
   useEffect(() => {
+    if (!selectedCitation && recordsLoadedOnMountRef.current) return;
+    recordsLoadedOnMountRef.current = true;
     let active = true;
     setRecordsStatus('loading');
     setRecordsError(null);
@@ -115,18 +117,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
         setRecordsValidatedFor(selectedCitationKey);
       });
     return () => { active = false; };
-  }, [selectedCitationKey]);
-
-  useEffect(() => {
-    if (selectedCitation) {
-      citationWasOpenRef.current = true;
-      return;
-    }
-    if (!citationWasOpenRef.current) return;
-    citationWasOpenRef.current = false;
-    const trigger = citationTriggerRef.current;
-    if (trigger?.isConnected) trigger.focus();
-  }, [selectedCitation]);
+  }, [selectedCitation, selectedCitationKey]);
 
   useEffect(() => {
     const background = backgroundRef.current;
@@ -147,7 +138,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
 
   const lastMessage = orderedMessages[orderedMessages.length - 1];
   const lastMessageScrollKey = lastMessage
-    ? `${lastMessage.id}:${lastMessage.status}:${lastMessage.updatedAt}:${lastMessage.content}`
+    ? `${lastMessage.id}:${lastMessage.status}:${lastMessage.updatedAt}`
     : `empty:${activeConversationId ?? 'draft'}`;
   useLayoutEffect(() => {
     const timeline = timelineRef.current;
@@ -171,14 +162,10 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     setActionError(null);
     try {
       await sendQuestion({ config: modelConfig, question, answerer });
-      setDraft(currentDraft => {
-        if (
-          draftRevisionRef.current !== submittedRevision
-          || currentDraft !== submittedDraft
-        ) return currentDraft;
+      if (draftRevisionRef.current === submittedRevision) {
         draftRevisionRef.current += 1;
-        return '';
-      });
+        setDraft(currentDraft => currentDraft === submittedDraft ? '' : currentDraft);
+      }
     } catch (caught) {
       reportActionError(caught);
     }
@@ -187,6 +174,22 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
   const clearDraftForNavigation = () => {
     draftRevisionRef.current += 1;
     setDraft('');
+  };
+
+  const closeCitationDrawer = () => {
+    const background = backgroundRef.current;
+    background?.removeAttribute('inert');
+    background?.removeAttribute('aria-hidden');
+    const trigger = citationTriggerRef.current;
+    closeCitation();
+    const restoreFocus = () => {
+      if (trigger?.isConnected) trigger.focus();
+    };
+    if (typeof globalThis.requestAnimationFrame === 'function') {
+      globalThis.requestAnimationFrame(restoreFocus);
+    } else {
+      globalThis.setTimeout(restoreFocus, 0);
+    }
   };
 
   const saveRename = async (id: string) => {
@@ -298,6 +301,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                               type="button"
                               data-conversation-id={conversation.id}
                               onClick={() => {
+                                if (active) return;
                                 nearBottomRef.current = true;
                                 clearDraftForNavigation();
                                 void selectConversation(conversation.id).catch(reportActionError);
@@ -501,7 +505,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
           record={citationRecordsStatus === 'ready' ? exactRecord : null}
           recordsStatus={citationRecordsStatus}
           recordsError={recordsError}
-          onClose={closeCitation}
+          onClose={closeCitationDrawer}
           onOpenDocument={() => { void openDocument(selectedCitation.documentId); }}
         />
       )}
