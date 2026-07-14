@@ -5,15 +5,31 @@ import type {
   LibraryDocument,
   RetrievalRecord,
 } from '../types';
+import type { KnowledgeCardSearchHit } from './card-retrieval';
 
 function codePoints(value: string): string[] {
   return Array.from(value);
 }
 
+interface GraphemeSegmenter {
+  segment(value: string): Iterable<{ segment: string }>;
+}
+
+type GraphemeSegmenterConstructor = new (
+  locales?: string | string[],
+  options?: { granularity: 'grapheme' },
+) => GraphemeSegmenter;
+
+function graphemes(value: string): string[] {
+  const Segmenter = (Intl as typeof Intl & { Segmenter?: GraphemeSegmenterConstructor }).Segmenter;
+  if (!Segmenter) return codePoints(value);
+  return Array.from(new Segmenter(undefined, { granularity: 'grapheme' }).segment(value), item => item.segment);
+}
+
 export function createConversationTitle(question: string, maxLength = 24): string {
   const normalized = question.trim().replace(/\s+/g, ' ') || '新聊天';
   const limit = Math.max(0, Math.floor(maxLength));
-  return codePoints(normalized).slice(0, limit).join('');
+  return graphemes(normalized).slice(0, limit).join('');
 }
 
 export function buildContextualRetrievalQuery(
@@ -46,9 +62,12 @@ export function selectChatContext(
     const remainingCharacters = maxCharacters - usedCharacters;
     if (characters.length > remainingCharacters) {
       if (selected.length === 0) {
+        const retainedContent = remainingCharacters > 1
+          ? characters.slice(-(remainingCharacters - 1)).join('')
+          : '';
         selected.push({
           role: history[index].role,
-          content: characters.slice(-remainingCharacters).join(''),
+          content: `…${retainedContent}`,
         });
       }
       break;
@@ -62,11 +81,14 @@ export function selectChatContext(
 
 export function createCitationSnapshots(
   cardIds: string[],
-  records: RetrievalRecord[],
+  hits: KnowledgeCardSearchHit[],
   courses: LibraryCourse[],
   documents: LibraryDocument[],
 ): ChatCitationSnapshot[] {
-  const recordsByCardId = new Map(records.map(record => [record.cardId, record]));
+  const recordsByCardId = new Map<string, RetrievalRecord>();
+  hits.forEach(hit => {
+    if (!recordsByCardId.has(hit.record.cardId)) recordsByCardId.set(hit.record.cardId, hit.record);
+  });
   const coursesById = new Map(courses.map(course => [course.id, course]));
   const documentsById = new Map(documents.map(document => [document.id, document]));
   const seen = new Set<string>();

@@ -5,6 +5,7 @@ import type {
   LibraryDocument,
   RetrievalRecord,
 } from '../../types';
+import type { KnowledgeCardSearchHit } from '../card-retrieval';
 import {
   buildContextualRetrievalQuery,
   createCitationSnapshots,
@@ -32,6 +33,10 @@ function record(cardId: string, courseId: string, documentId: string): Retrieval
     sourceRanges: [],
     version: 1,
   };
+}
+
+function hit(item: RetrievalRecord): KnowledgeCardSearchHit {
+  return { record: item, score: 1, matchedTerms: [] };
 }
 
 describe('QA conversation context', () => {
@@ -83,11 +88,11 @@ describe('QA conversation context', () => {
     expect(selectChatContext(history, { maxMessages: 12, maxCharacters: 0 })).toEqual([]);
   });
 
-  it('retains the rightmost characters of one oversized newest message', () => {
+  it('marks truncation while retaining the rightmost characters of one oversized newest message', () => {
     const history = [turn('assistant', 'older'), turn('user', '  123456789  ')];
 
     expect(selectChatContext(history, { maxMessages: 12, maxCharacters: 4 })).toEqual([
-      turn('user', '6789'),
+      turn('user', '…789'),
     ]);
   });
 
@@ -99,6 +104,10 @@ describe('QA conversation context', () => {
     const title = createConversationTitle(longTitle);
     expect(Array.from(title)).toHaveLength(24);
     expect(title).toBe(`${'问'.repeat(23)}😀`);
+  });
+
+  it('does not split a grapheme cluster when truncating a title', () => {
+    expect(createConversationTitle('A👨‍👩‍👧‍👦B', 2)).toBe('A👨‍👩‍👧‍👦');
   });
 
   it('creates ordered independent citation snapshots with deduplication and stable fallbacks', () => {
@@ -116,7 +125,7 @@ describe('QA conversation context', () => {
 
     const snapshots = createCitationSnapshots(
       ['card-2', 'unknown-card', 'card-1', 'card-2'],
-      records,
+      records.map(hit),
       courses,
       documents,
     );
@@ -140,5 +149,40 @@ describe('QA conversation context', () => {
     expect(snapshots[1].content).toBe('正文 card-1');
     expect(snapshots[1].courseName).toBe('机器学习');
     expect(snapshots[1].documentTitle).toBe('第一讲');
+  });
+
+  it('uses the first exact selected hit when one card has records from multiple documents', () => {
+    const firstDocumentRecord = {
+      ...record('shared-card', 'course-1', 'doc-selected'),
+      sourceExcerpt: '选中课件的原文',
+    };
+    const otherDocumentRecord = {
+      ...record('shared-card', 'course-1', 'doc-other'),
+      sourceExcerpt: '索引中另一课件的原文',
+    };
+    const documents: LibraryDocument[] = [
+      {
+        id: 'doc-selected', courseId: 'course-1', title: '实际命中的课件', fileName: 'selected.pdf',
+        fileType: 'pdf', pageCount: 1, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 1,
+      },
+      {
+        id: 'doc-other', courseId: 'course-1', title: '同卡片的另一课件', fileName: 'other.pdf',
+        fileType: 'pdf', pageCount: 1, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 1,
+      },
+    ];
+
+    const snapshots = createCitationSnapshots(
+      ['shared-card'],
+      [hit(firstDocumentRecord), hit(otherDocumentRecord)],
+      [{ id: 'course-1', name: '统计学', documentIds: documents.map(item => item.id), createdAt: 1, updatedAt: 1 }],
+      documents,
+    );
+
+    expect(snapshots).toEqual([expect.objectContaining({
+      cardId: 'shared-card',
+      documentId: 'doc-selected',
+      documentTitle: '实际命中的课件',
+      sourceExcerpt: '选中课件的原文',
+    })]);
   });
 });

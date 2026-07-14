@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { KnowledgeCard } from '../../types';
-import { buildRetrievalRecords, searchKnowledgeCards } from '../card-retrieval';
+import {
+  buildRetrievalRecords,
+  searchKnowledgeCards,
+  searchKnowledgeCardsWithContext,
+} from '../card-retrieval';
 
 function card(id: string, courseId: string, title: string, detail: string): KnowledgeCard {
   return {
@@ -59,5 +63,36 @@ describe('knowledge card retrieval', () => {
     expect(record.content).toContain('自然参数');
     expect(record.content).toContain('伯努利分布');
     expect(record.sourceExcerpt).toContain('课件原文');
+  });
+
+  it('ranks every current Bayes hit above stale GLM and Poisson history hits', () => {
+    const records = [
+      ...buildRetrievalRecords([card('card-bayes', 'course-bayes', 'Bayes 定理', 'Bayes 后验概率')], 'doc-bayes'),
+      ...buildRetrievalRecords([card('card-glm', 'course-glm', 'GLM', 'GLM 广义线性模型')], 'doc-glm'),
+      ...buildRetrievalRecords([card('card-poisson', 'course-poisson', 'Poisson', 'Poisson 分布')], 'doc-poisson'),
+      ...buildRetrievalRecords([card('card-shared', 'course-bayes', 'Bayes 公式', 'Bayes 当前来源')], 'doc-current-shared'),
+      ...buildRetrievalRecords([card('card-shared', 'course-glm', 'GLM 旧内容', 'GLM 历史来源')], 'doc-history-shared'),
+    ];
+    const currentHits = searchKnowledgeCards('Bayes', records, { limit: 5 });
+    const hits = searchKnowledgeCardsWithContext(
+      'Bayes',
+      [
+        { role: 'user', content: 'GLM' },
+        { role: 'assistant', content: 'Poisson 是下一步指令' },
+        { role: 'user', content: 'Poisson' },
+      ],
+      records,
+      { limit: 5 },
+    );
+
+    expect(hits.slice(0, currentHits.length).map(hit => hit.record.cardId)).toEqual(
+      currentHits.map(hit => hit.record.cardId),
+    );
+    expect(hits.map(hit => hit.record.cardId)).toContain('card-glm');
+    expect(hits.map(hit => hit.record.cardId)).toContain('card-poisson');
+    expect(hits.find(hit => hit.record.cardId === 'card-shared')?.record.documentId).toBe('doc-current-shared');
+    const historyOnlyHits = hits.slice(currentHits.length);
+    expect(historyOnlyHits).toHaveLength(2);
+    expect(historyOnlyHits.every(hit => hit.score < Math.min(...currentHits.map(current => current.score)))).toBe(true);
   });
 });
