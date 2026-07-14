@@ -20,6 +20,8 @@ function MarkdownKnowledgeCardsView() {
   const topicSyntheses = useStore(state => state.topicSyntheses);
   const courseMasterNote = useStore(state => state.courseMasterNote);
   const learningPath = useStore(state => state.courseLearningPath);
+  const job = useStore(state => state.job);
+  const regenerateKnowledgeCards = useStore(state => state.regenerateKnowledgeCards);
   const navigateToStage = useStore(state => state.navigateToStage);
   const [activeCardId, setActiveCardId] = useState<string | null>(cards[0]?.id ?? null);
 
@@ -42,11 +44,23 @@ function MarkdownKnowledgeCardsView() {
   const cardMarkdown = activeCard ? [
     activeCard.conciseSummary ? `> ${activeCard.conciseSummary}` : '',
     activeCard.detailedNote,
+    activeCard.keyPoints?.length
+      ? `## 关键要点\n\n${activeCard.keyPoints.map(item => `- ${item}`).join('\n')}`
+      : '',
+    activeCard.applicableConditions?.length
+      ? `## 成立条件与适用边界\n\n${activeCard.applicableConditions.map(item => `- ${item}`).join('\n')}`
+      : '',
+    activeCard.examples?.length
+      ? `## 示例\n\n${activeCard.examples.map(item => `- ${item}`).join('\n')}`
+      : '',
     activeCard.formulas?.length
       ? `## 公式\n\n${activeCard.formulas.map(formula => `$$\n${formula.formula}\n$$\n\n${formula.description}`).join('\n\n')}`
       : '',
     activeCard.misconceptions?.length
       ? `## 易错点\n\n${activeCard.misconceptions.map(item => `- ${item}`).join('\n')}`
+      : '',
+    activeCard.selfCheckQuestions?.length
+      ? `## 理解检查\n\n${activeCard.selfCheckQuestions.map((item, index) => `${index + 1}. ${item}`).join('\n')}`
       : '',
   ].filter(Boolean).join('\n\n') : '';
   const hasCompleteNoteData = Boolean(
@@ -77,12 +91,22 @@ function MarkdownKnowledgeCardsView() {
           <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="返回知识结构">←</button>
           <div>
             <h1 className="font-song text-xl font-bold text-[#173f35]">知识卡片</h1>
-            <p className="mt-0.5 text-xs text-stone-500">{cards.length} 张卡片 · 按一级知识分组 · 每张卡片关联课件原文</p>
+            <p className="mt-0.5 text-xs text-stone-500">{cards.length} 张 AI 深化卡片 · 按二级知识网顺序组织 · 每张卡片关联课件原文</p>
           </div>
         </div>
-        <button type="button" onClick={() => navigateToStage('notes')} className="rounded-lg bg-[#c84b31] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#ae3f2a]">
-          生成完整笔记 →
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => void regenerateKnowledgeCards()}
+            disabled={job === 'enriching-knowledge-cards'}
+            className="rounded-lg border border-[#173f35]/25 bg-white px-4 py-2 text-sm font-medium text-[#173f35] hover:bg-[#edf4ef] disabled:cursor-wait disabled:opacity-50"
+          >
+            {job === 'enriching-knowledge-cards' ? '正在深化…' : '重新深化卡片'}
+          </button>
+          <button type="button" onClick={() => navigateToStage('notes')} disabled={job === 'enriching-knowledge-cards'} className="rounded-lg bg-[#c84b31] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#ae3f2a] disabled:opacity-50">
+            生成完整笔记 →
+          </button>
+        </div>
       </header>
 
       <div className="flex min-h-0 flex-1">

@@ -34,4 +34,27 @@ describe('knowledge card RAG', () => {
     expect(result.mode).toBe('general');
     expect(result.sections).toEqual([{ source: 'general', content: '这是模型的通用回答。', cardIds: [] }]);
   });
+
+  it('sends source excerpts and graph-expanded cards as grounded context', async () => {
+    const requests: RagRequest[] = [];
+    const groundedRecord = {
+      ...record,
+      sourceExcerpt: '课件原文指出 GLM 包含随机成分、系统成分和连接函数。',
+      relatedTopicIds: ['topic-2'],
+    };
+    const completer: RagCompleter = async request => {
+      requests.push(request);
+      return { cardAnswer: 'GLM 包含三个组成部分。', citations: ['card-1'], generalSupplement: '' };
+    };
+
+    await answerWithKnowledgeCards(
+      config,
+      'GLM 有哪些组成？',
+      [{ record: groundedRecord, score: 8, matchedTerms: ['glm'], origin: 'graph' }],
+      completer,
+    );
+
+    expect(requests[0].user).toContain(groundedRecord.sourceExcerpt);
+    expect(requests[0].user).toContain('graph');
+  });
 });

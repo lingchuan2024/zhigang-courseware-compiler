@@ -31,4 +31,33 @@ describe('knowledge card retrieval', () => {
     const hits = searchKnowledgeCards('最大似然', records, { courseIds: ['course-b'] });
     expect(hits.map(hit => hit.record.cardId)).toEqual(['card-b']);
   });
+
+  it('expands a lexical hit to cards in directly related topics', () => {
+    const primary = card('card-glm', 'course-ml', 'GLM 公式', '广义线性模型的三个组成部分');
+    primary.topicId = 'topic-glm';
+    primary.relatedTopicIds = ['topic-link'];
+    const neighbor = card('card-link', 'course-ml', '连接函数选择', '把均值参数映射到线性预测子');
+    neighbor.topicId = 'topic-link';
+    const records = buildRetrievalRecords([primary, neighbor], 'lecture-1');
+
+    const hits = searchKnowledgeCards('GLM 的组成是什么', records);
+
+    expect(hits.map(hit => hit.record.cardId)).toEqual(['card-glm', 'card-link']);
+    expect(hits[1].origin).toBe('graph');
+  });
+
+  it('indexes structured card details and source excerpts', () => {
+    const enriched = card('card-rich', 'course-ml', '指数分布族', '统一表示多种概率分布');
+    enriched.keyPoints = ['自然参数', '充分统计量'];
+    enriched.applicableConditions = ['分布可写成指数族标准形式'];
+    enriched.examples = ['伯努利分布'];
+    enriched.selfCheckQuestions = ['如何判断一个分布属于指数族？'];
+    enriched.sourceExcerpt = '课件原文：指数族可以写成 h(x)exp(ηT(x)-A(η))。';
+
+    const [record] = buildRetrievalRecords([enriched], 'lecture-1');
+
+    expect(record.content).toContain('自然参数');
+    expect(record.content).toContain('伯努利分布');
+    expect(record.sourceExcerpt).toContain('课件原文');
+  });
 });

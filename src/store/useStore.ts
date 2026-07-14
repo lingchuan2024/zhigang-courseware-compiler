@@ -32,6 +32,7 @@ import { createExampleCourseV2 } from '../lib/examples';
 import { exportToMarkdownV2 } from '../lib/notes-v2';
 import { runFullPipeline } from '../lib/knowledge-pipeline';
 import { runKnowledgePipeline } from '../lib/knowledge-pipeline-v2';
+import { enrichKnowledgeCards } from '../lib/card-enrichment';
 import { regenerateChapterNote, runMasterNoteGeneration } from '../lib/master-note-generator';
 import { assembleCourseMasterNote, isCompletedMasterNote } from '../lib/course-master-note';
 import { createSourceDocument } from '../lib/markdown-parser';
@@ -177,6 +178,7 @@ interface AppState extends ProjectState {
   setSourceDocuments: (docs: SourceDocument[]) => void;
   loadMarkdownDocument: (markdown: string, title: string) => void;
   startKnowledgePipeline: () => Promise<void>;
+  regenerateKnowledgeCards: () => Promise<void>;
   startMasterNoteGeneration: () => Promise<void>;
   retryChapterNote: (chapterId: string) => Promise<void>;
   resetKnowledgeBase: () => void;
@@ -891,6 +893,77 @@ export const useStore = create<AppState>((set, get) => ({
           get().pipelineProgress,
           msg,
           'unknown',
+        ),
+      });
+      saveState(get());
+    }
+  },
+
+  regenerateKnowledgeCards: async () => {
+    const state = get();
+    if (!state.modelConfig?.apiKey || state.knowledgeCards.length === 0) return;
+
+    set({
+      job: 'enriching-knowledge-cards',
+      jobStatus: 'running',
+      knowledgeCards: state.knowledgeCards.map(card => ({ ...card, status: 'generating' as const })),
+      pipelineProgress: {
+        operation: 'extract-structure',
+        status: 'running',
+        steps: [{ id: 'card-enrichment', label: '深化知识卡片', status: 'running' }],
+        currentItem: 0,
+        totalItems: state.knowledgeCards.length,
+        message: '正在根据二级知识网和课件原文深化知识卡片',
+        estimatedProgress: 5,
+        isEstimated: false,
+      },
+    });
+
+    try {
+      const result = await enrichKnowledgeCards(
+        state.modelConfig,
+        state.knowledgeCards,
+        state.knowledgeTopics,
+        state.teachingBlocks,
+        state.teachingRelations,
+        state.sourceDocuments.flatMap(document => document.blocks),
+        (current, total) => set({
+          pipelineProgress: {
+            ...get().pipelineProgress,
+            currentItem: current,
+            totalItems: total,
+            currentItemTitle: state.knowledgeCards[current - 1]?.title ?? `卡片 ${current}/${total}`,
+            message: `已深化 ${current}/${total} 张知识卡片`,
+            estimatedProgress: Math.max(5, Math.round(current / Math.max(1, total) * 95)),
+          },
+        }),
+      );
+      const allFailed = result.cards.length > 0 && result.failedCardIds.length === result.cards.length;
+      set({
+        knowledgeCards: result.cards,
+        topicSyntheses: [],
+        chapterPlan: [],
+        chapterNotes: [],
+        courseMasterNote: null,
+        knowledgeBaseVersions: {
+          ...get().knowledgeBaseVersions,
+          cards: get().knowledgeBaseVersions.cards + 1,
+        },
+        job: null,
+        jobStatus: allFailed ? 'failed' : 'completed',
+        pipelineProgress: allFailed
+          ? failProgress(get().pipelineProgress, '所有知识卡片深化均失败，已保留基础卡片')
+          : completeProgress(get().pipelineProgress),
+      });
+      saveState(get());
+    } catch (error) {
+      set({
+        knowledgeCards: state.knowledgeCards,
+        job: null,
+        jobStatus: 'failed',
+        pipelineProgress: failProgress(
+          get().pipelineProgress,
+          error instanceof Error ? error.message : String(error),
         ),
       });
       saveState(get());

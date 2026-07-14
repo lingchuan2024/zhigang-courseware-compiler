@@ -11,6 +11,7 @@ export type BackgroundJob =
   | 'repairing-topics'
   | 'extracting-relations'
   | 'building-internal-structure'
+  | 'enriching-knowledge-cards'
   | 'generating-topic-notes'
   | 'generating-topic-syntheses'
   | 'planning-chapters'
@@ -263,6 +264,10 @@ export interface RetrievalRecord {
   content: string;
   keywords: string[];
   aliases: string[];
+  /** 直接来自课件的短原文，供回答时核对卡片派生内容。 */
+  sourceExcerpt?: string;
+  prerequisiteTopicIds?: string[];
+  relatedTopicIds?: string[];
   sourceRanges: SourceRange[];
   version: number;
 }
@@ -1218,6 +1223,14 @@ export interface KnowledgeCard {
 
   conciseSummary: string;
   detailedNote: string;
+
+  /** AI 深化后的结构化学习信息。 */
+  keyPoints?: string[];
+  applicableConditions?: string[];
+  examples?: string[];
+  selfCheckQuestions?: string[];
+  /** 直接从当前卡片引用范围截取的 MinerU 原文。 */
+  sourceExcerpt?: string;
 
   sourceRanges: SourceRange[];
 

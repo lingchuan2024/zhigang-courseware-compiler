@@ -4,6 +4,7 @@ export interface KnowledgeCardSearchHit {
   record: RetrievalRecord;
   score: number;
   matchedTerms: string[];
+  origin?: 'lexical' | 'graph';
 }
 
 function normalize(value: string): string {
@@ -30,6 +31,16 @@ export function buildRetrievalRecords(
   return cards.flatMap(card => {
     const documentIds = [...new Set(card.sourceRanges.map(range => range.documentId).filter(Boolean))];
     const targets = documentIds.length > 0 ? documentIds : [fallbackDocumentId];
+    const content = [
+      card.conciseSummary,
+      card.detailedNote,
+      card.keyPoints?.length ? `关键要点：${card.keyPoints.join('；')}` : '',
+      card.applicableConditions?.length ? `适用条件：${card.applicableConditions.join('；')}` : '',
+      card.examples?.length ? `示例：${card.examples.join('；')}` : '',
+      card.misconceptions?.length ? `易错点：${card.misconceptions.join('；')}` : '',
+      card.selfCheckQuestions?.length ? `自检问题：${card.selfCheckQuestions.join('；')}` : '',
+      card.formulas?.length ? `公式：${card.formulas.map(formula => formula.formula).join('；')}` : '',
+    ].filter(Boolean).filter((item, index, values) => values.indexOf(item) === index).join('\n\n');
     return targets.map(documentId => ({
       id: `retrieval-${documentId}-${card.id}`,
       cardId: card.id,
@@ -38,9 +49,12 @@ export function buildRetrievalRecords(
       topicId: card.topicId,
       teachingBlockId: card.teachingBlockId,
       title: card.title,
-      content: [card.conciseSummary, card.detailedNote].filter(Boolean).join('\n\n'),
+      content,
       keywords: card.keywords,
       aliases: [...card.aliases, card.topicName],
+      sourceExcerpt: card.sourceExcerpt,
+      prerequisiteTopicIds: card.prerequisiteTopicIds,
+      relatedTopicIds: card.relatedTopicIds,
       sourceRanges: card.sourceRanges.filter(range => range.documentId === documentId),
       version: card.cardVersion ?? 1,
     }));
@@ -89,12 +103,40 @@ export function searchKnowledgeCards(
     if (documentIds && !documentIds.has(record.documentId)) return;
     const scored = scoreRecord(terms, record);
     if (scored.score <= 0) return;
-    const hit = { record, ...scored };
+    const hit: KnowledgeCardSearchHit = { record, ...scored, origin: 'lexical' };
     const current = bestByCard.get(record.cardId);
     if (!current || hit.score > current.score) bestByCard.set(record.cardId, hit);
   });
 
-  return [...bestByCard.values()]
+  const lexicalHits = [...bestByCard.values()]
     .sort((a, b) => b.score - a.score || a.record.cardId.localeCompare(b.record.cardId))
+    .slice(0, options.limit ?? 8);
+
+  const expanded = new Map(lexicalHits.map(hit => [hit.record.cardId, hit]));
+  for (const hit of lexicalHits) {
+    const neighborTopicIds = new Set([
+      hit.record.topicId,
+      ...(hit.record.prerequisiteTopicIds ?? []),
+      ...(hit.record.relatedTopicIds ?? []),
+    ]);
+    if (neighborTopicIds.size === 0) continue;
+    records.forEach(record => {
+      if (
+        record.courseId !== hit.record.courseId ||
+        (documentIds && !documentIds.has(record.documentId)) ||
+        !neighborTopicIds.has(record.topicId) ||
+        expanded.has(record.cardId)
+      ) return;
+      expanded.set(record.cardId, {
+        record,
+        score: Math.max(0.5, hit.score * 0.35),
+        matchedTerms: ['知识网一跳关联'],
+        origin: 'graph',
+      });
+    });
+  }
+
+  return [...expanded.values()]
+    .sort((a, b) => b.score - a.score || (a.origin === 'lexical' ? -1 : 1) || a.record.cardId.localeCompare(b.record.cardId))
     .slice(0, options.limit ?? 8);
 }

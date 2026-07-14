@@ -37,6 +37,7 @@ import { extractTeachingRelationGraph, extractTopicRelationGraph } from './knowl
 import { extractTeachingStructureForAllTopics } from './teaching-structure';
 import { generateCourseLearningPath, generateNarrativePaths } from './learning-order';
 import { generateCards } from './card-generator';
+import { enrichKnowledgeCards } from './card-enrichment';
 import { validateKnowledgeStructure, ValidationReport } from './knowledge-validation';
 import { generateId } from './utils';
 import { ExtractionError } from './extraction-errors';
@@ -280,7 +281,20 @@ export async function runKnowledgePipeline(
   const formulaCards: FormulaCard[] = [];
 
   try {
-    knowledgeCards = generateCards(topics, teachingBlocks, allBlocks, topicRelations, narrativePaths);
+    const baseCards = generateCards(topics, teachingBlocks, allBlocks, topicRelations, narrativePaths);
+    const enriched = await enrichKnowledgeCards(
+      config,
+      baseCards,
+      topics,
+      teachingBlocks,
+      teachingRelations,
+      allBlocks,
+      options.onNoteProgress,
+    );
+    knowledgeCards = enriched.cards;
+    if (enriched.failedCardIds.length > 0) {
+      warnings.push(`${enriched.failedCardIds.length} 张知识卡片深化失败，已保留基础卡片`);
+    }
     versions.cards++;
     warnings.push(`生成了 ${knowledgeCards.length} 张知识卡片`);
   } catch (e) {

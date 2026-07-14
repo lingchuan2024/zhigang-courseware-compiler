@@ -80,6 +80,9 @@ export async function answerWithKnowledgeCards(
         cardId: hit.record.cardId,
         title: hit.record.title,
         content: hit.record.content,
+        retrievalOrigin: hit.origin ?? 'lexical',
+        sourceExcerpt: hit.record.sourceExcerpt ?? '',
+        sourceRanges: hit.record.sourceRanges,
       }))),
     ].join('\n\n'),
   }));

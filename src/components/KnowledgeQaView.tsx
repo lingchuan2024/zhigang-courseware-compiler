@@ -61,14 +61,17 @@ export function KnowledgeQaView({ onOpenSettings, answerer = answerWithKnowledge
     setError(null);
     setSubmittedQuestion(trimmed);
     try {
-      const hits = searchKnowledgeCards(trimmed, records, {
+      // 每次提问前读取一次最新索引，避免问答页常驻时漏掉刚生成的卡片。
+      const latestRecords = await listRetrievalRecords();
+      setRecords(latestRecords);
+      const hits = searchKnowledgeCards(trimmed, latestRecords, {
         courseIds: courseId === 'all' ? undefined : [courseId],
         limit: 8,
       });
       const nextAnswer = await answerer(modelConfig, trimmed, hits);
       setAnswer(nextAnswer);
       const firstCardId = nextAnswer.sections.flatMap(section => section.cardIds)[0];
-      setSelectedRecord(firstCardId ? recordByCardId.get(firstCardId) ?? null : null);
+      setSelectedRecord(firstCardId ? latestRecords.find(record => record.cardId === firstCardId) ?? null : null);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : String(submitError));
     } finally {
@@ -101,7 +104,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer = answerWithKnowledge
         <div className="border-b border-[#ddd3c5] bg-[#faf7f0]/70 px-7 py-6">
           <p className="font-mono text-[10px] tracking-[0.22em] text-cinnabar">KNOWLEDGE CARD RAG</p>
           <h1 className="mt-2 font-song text-3xl font-bold text-ink">全库知识问答</h1>
-          <p className="mt-2 text-sm text-stone-500">优先检索所有课件中的知识卡片；未命中时由模型直接回答并明确标记。</p>
+          <p className="mt-2 text-sm text-stone-500">先按标题、别名和正文召回卡片，再沿知识网扩展一跳；未命中时由模型直接回答并明确标记。</p>
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-8 md:px-10">
@@ -168,6 +171,12 @@ export function KnowledgeQaView({ onOpenSettings, answerer = answerWithKnowledge
             <p className="text-xs text-stone-400">{courseById.get(selectedRecord.courseId)?.name ?? '课程'} · {documentById.get(selectedRecord.documentId)?.title ?? '课件'}</p>
             <h3 className="mt-3 font-song text-xl font-bold text-ink">{selectedRecord.title}</h3>
             <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-stone-600">{selectedRecord.content}</p>
+            {selectedRecord.sourceExcerpt && (
+              <div className="mt-5 border-t border-[#e4dccf] pt-4">
+                <p className="text-[11px] font-semibold tracking-wide text-stone-400">课件原文摘要</p>
+                <p className="mt-2 whitespace-pre-wrap text-xs leading-6 text-stone-500">{selectedRecord.sourceExcerpt}</p>
+              </div>
+            )}
             <button type="button" onClick={() => void openDocument(selectedRecord.documentId)} className="mt-5 w-full rounded-xl border border-ink/20 px-4 py-2.5 text-sm text-ink hover:bg-ink hover:text-white">打开对应课件</button>
           </div>
         ) : (

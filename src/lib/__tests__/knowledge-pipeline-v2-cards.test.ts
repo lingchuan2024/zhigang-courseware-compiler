@@ -3,6 +3,11 @@ import type { ModelConfig } from '../../types';
 
 const mocks = vi.hoisted(() => ({
   generateAllNotes: vi.fn(),
+  callChatCompletion: vi.fn(),
+}));
+
+vi.mock('../model-v2', () => ({
+  callChatCompletion: mocks.callChatCompletion,
 }));
 
 vi.mock('../topic-extraction-v2', () => ({
@@ -90,6 +95,19 @@ describe('knowledge pipeline V2 card boundary', () => {
   beforeEach(() => {
     mocks.generateAllNotes.mockReset();
     mocks.generateAllNotes.mockResolvedValue([{ topicId: 'topic-1', markdown: '# 不应生成', sectionBindings: [], glossaryUpdates: [], formulaUpdates: [], version: 1 }]);
+    mocks.callChatCompletion.mockReset();
+    mocks.callChatCompletion.mockResolvedValue({
+      data: {
+        conciseSummary: 'GLM 用随机成分、系统成分和连接函数统一描述一类模型。',
+        detailedNote: '## 核心解释\n\nGLM 将分布假设、线性预测子和连接函数组合为统一建模框架。\n\n## 理解检查\n\n说明三部分各自的作用。',
+        keyPoints: ['随机成分', '系统成分', '连接函数'],
+        applicableConditions: ['响应变量属于指数分布族'],
+        examples: ['逻辑回归是二项分布与 logit 连接的组合'],
+        misconceptions: ['GLM 不等于普通线性回归'],
+        selfCheckQuestions: ['GLM 的三部分分别是什么？'],
+      },
+      usage: {},
+    });
   });
 
   it('finishes structure extraction after cards without generating notes', async () => {
@@ -104,6 +122,10 @@ describe('knowledge pipeline V2 card boundary', () => {
 
     expect(result.status).toBe('ready');
     expect(result.knowledgeCards).toHaveLength(1);
+    expect(result.knowledgeCards[0].detailedNote).toContain('## 核心解释');
+    expect(result.knowledgeCards[0].keyPoints).toEqual(['随机成分', '系统成分', '连接函数']);
+    expect(result.knowledgeCards[0].status).toBe('completed');
+    expect(mocks.callChatCompletion).toHaveBeenCalledOnce();
     expect(result.topicNotes).toEqual([]);
     expect(statuses).toContain('card-generation');
     expect(statuses).not.toContain('note-generation');

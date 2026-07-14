@@ -41,6 +41,8 @@ beforeEach(() => {
       {
         id: 'card-1', courseId: 'course-1', topicId: 'topic-1', topicName: '广义线性模型', teachingBlockId: 'tb-1', teachingType: 'formula-system',
         title: 'GLM 公式', conciseSummary: '公式摘要', detailedNote: '公式详细说明', sourceRanges: [{ documentId: 'doc-1', startBlockId: 'b2', endBlockId: 'b2' }],
+        keyPoints: ['随机成分', '系统成分', '连接函数'], applicableConditions: ['响应变量属于指数分布族'],
+        examples: ['逻辑回归'], selfCheckQuestions: ['GLM 的三部分是什么？'],
         keywords: ['GLM'], aliases: [], prerequisiteTopicIds: [], relatedTopicIds: [], confidence: 0.9, reviewStatus: 'generated', status: 'completed',
         sourceVersion: 1, cardVersion: 1,
       },
@@ -69,6 +71,9 @@ describe('KnowledgeCardsView', () => {
 
     expect(container.textContent).toContain('广义线性模型');
     expect(container.textContent).toContain('GLM 公式');
+    expect(container.textContent).toContain('关键要点');
+    expect(container.textContent).toContain('随机成分');
+    expect(container.textContent).toContain('理解检查');
     const second = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('广义线性族'))!;
     act(() => second.click());
 
@@ -82,6 +87,8 @@ describe('KnowledgeCardsView', () => {
     const root = createRoot(container);
     roots.push(root);
     act(() => root.render(createElement(KnowledgeCardsView)));
+
+    expect(container.textContent).toContain('重新深化卡片');
 
     const next = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('生成完整笔记'))!;
     act(() => next.click());
