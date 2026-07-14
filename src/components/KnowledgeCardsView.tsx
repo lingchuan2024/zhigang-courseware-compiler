@@ -113,14 +113,14 @@ function MarkdownKnowledgeCardsView() {
 
   if (cards.length === 0) {
     return (
-      <div className="grid h-screen flex-1 place-items-center bg-[#f5f1e8] px-8 text-center">
-        <div className="max-w-md rounded-2xl border border-stone-200 bg-white p-8 shadow-sm">
-          <h1 className="font-song text-2xl font-bold text-[#173f35]">暂无知识卡片</h1>
-          <p className="mt-3 text-sm leading-6 text-stone-500">请先完成知识结构提取，系统会为每个二级知识节点生成可追溯的知识卡片。</p>
+      <div className="grid h-screen flex-1 place-items-center bg-space-950 px-8 text-center">
+        <div className="max-w-md rounded-2xl border border-space-border bg-space-850/90 p-8 shadow-nebula-panel backdrop-blur-xl">
+          <h1 className="font-song text-2xl font-bold text-space-text">暂无知识卡片</h1>
+          <p className="mt-3 text-sm leading-6 text-space-muted">请先完成知识结构提取，系统会为每个二级知识节点生成可追溯的知识卡片。</p>
           <div className="mt-6 flex flex-wrap justify-center gap-2">
-            <button type="button" onClick={() => navigateToStage('structure')} className="rounded-lg border border-[#173f35] px-4 py-2 text-sm text-[#173f35]">返回知识结构</button>
+            <button type="button" onClick={() => navigateToStage('structure')} className="btn-outline">返回知识结构</button>
             {hasCompleteNoteData && (
-              <button type="button" onClick={() => navigateToStage('notes')} className="rounded-lg bg-[#173f35] px-4 py-2 text-sm text-white">查看已有完整笔记</button>
+              <button type="button" onClick={() => navigateToStage('notes')} className="btn-primary">查看已有完整笔记</button>
             )}
           </div>
         </div>
@@ -129,13 +129,13 @@ function MarkdownKnowledgeCardsView() {
   }
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#f5f1e8]">
-      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-stone-200 bg-[#fffdfa] px-5">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950 text-space-text">
+      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="返回知识结构">←</button>
+          <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识结构">←</button>
           <div>
-            <h1 className="font-song text-xl font-bold text-[#173f35]">知识卡片</h1>
-            <p className="mt-0.5 text-xs text-stone-500">{cards.length} 张 AI 深化卡片 · 按二级知识网顺序组织 · 每张卡片关联课件原文</p>
+            <h1 className="font-song text-xl font-bold text-space-text">知识卡片</h1>
+            <p className="mt-0.5 text-xs text-space-muted">{cards.length} 张 AI 深化卡片 · 按二级知识网顺序组织 · 每张卡片关联课件原文</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -143,19 +143,19 @@ function MarkdownKnowledgeCardsView() {
             type="button"
             onClick={() => void regenerateKnowledgeCards()}
             disabled={job === 'enriching-knowledge-cards'}
-            className="rounded-lg border border-[#173f35]/25 bg-white px-4 py-2 text-sm font-medium text-[#173f35] hover:bg-[#edf4ef] disabled:cursor-wait disabled:opacity-50"
+            className="btn-outline disabled:cursor-wait disabled:opacity-50"
           >
             {job === 'enriching-knowledge-cards' ? '正在深化…' : '重新深化卡片'}
           </button>
-          <button type="button" onClick={() => navigateToStage('notes')} disabled={job === 'enriching-knowledge-cards'} className="rounded-lg bg-[#c84b31] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#ae3f2a] disabled:opacity-50">
+          <button type="button" onClick={() => navigateToStage('notes')} disabled={job === 'enriching-knowledge-cards'} className="btn-primary disabled:opacity-50">
             生成完整笔记 →
           </button>
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-stone-200 bg-[#fffdfa] p-3">
-          <p className="px-3 pb-3 pt-1 text-[11px] font-semibold tracking-[0.16em] text-stone-400">按一级知识组织</p>
+        <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900 p-3">
+          <p className="px-3 pb-3 pt-1 text-[11px] font-semibold tracking-[0.16em] text-space-faint">按一级知识组织</p>
           <div className="space-y-4">
             {orderedTopics.map((topic, topicIndex) => {
               const topicCards = cards.filter(card => card.topicId === topic.id);
@@ -163,8 +163,8 @@ function MarkdownKnowledgeCardsView() {
               return (
                 <section key={topic.id}>
                   <div className="mb-1 flex items-center gap-2 px-3 py-1.5">
-                    <span className="grid h-5 w-5 place-items-center rounded-full bg-[#173f35] text-[10px] font-bold text-white">{topicIndex + 1}</span>
-                    <h2 className="line-clamp-2 text-xs font-bold text-[#285c50]">{topic.name}</h2>
+                    <span className="grid h-5 w-5 place-items-center rounded-full bg-celadon/15 text-[10px] font-bold text-celadon ring-1 ring-celadon/25">{topicIndex + 1}</span>
+                    <h2 className="line-clamp-2 text-xs font-bold text-space-text">{topic.name}</h2>
                   </div>
                   <div className="space-y-1">
                     {topicCards.map((card, cardIndex) => {
@@ -174,13 +174,13 @@ function MarkdownKnowledgeCardsView() {
                           key={card.id}
                           type="button"
                           onClick={() => setActiveCardId(card.id)}
-                          className={`w-full rounded-xl px-3 py-2.5 text-left transition ${active ? 'bg-[#173f35] text-white shadow-sm' : 'text-stone-700 hover:bg-[#edf4ef]'}`}
+                          className={`w-full rounded-xl px-3 py-2.5 text-left transition ${active ? 'bg-celadon/12 text-space-text ring-1 ring-celadon/25' : 'text-space-muted hover:bg-space-750 hover:text-space-text'}`}
                         >
                           <div className="flex gap-2.5">
-                            <span className={`mt-0.5 text-[10px] font-bold ${active ? 'text-[#f4d8a8]' : 'text-[#4d7c6d]'}`}>{topicIndex + 1}.{cardIndex + 1}</span>
+                            <span className={`mt-0.5 text-[10px] font-bold ${active ? 'text-celadon' : 'text-space-faint'}`}>{topicIndex + 1}.{cardIndex + 1}</span>
                             <div className="min-w-0">
                               <p className="line-clamp-2 text-sm font-medium leading-5">{card.title}</p>
-                              <p className={`mt-1 text-[10px] ${active ? 'text-white/55' : 'text-stone-400'}`}>{card.teachingType}</p>
+                              <p className={`mt-1 text-[10px] ${active ? 'text-space-muted' : 'text-space-faint'}`}>{card.teachingType}</p>
                             </div>
                           </div>
                         </button>
@@ -196,43 +196,43 @@ function MarkdownKnowledgeCardsView() {
         <main className="min-w-0 flex-1 overflow-y-auto px-8 py-8">
           {activeCard && (
             <article className="mx-auto max-w-3xl">
-              <div className="mb-6 flex items-start justify-between gap-4 border-b border-stone-200 pb-5">
+              <div className="mb-6 flex items-start justify-between gap-4 border-b border-space-border pb-5">
                 <div>
                   <div className="mb-2 flex flex-wrap gap-2 text-[11px]">
-                    <span className="rounded-full bg-[#dfece5] px-2.5 py-1 text-[#35695b]">{activeCard.teachingType}</span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-stone-500 ring-1 ring-stone-200">{CARD_STATUS_LABELS[activeCard.status ?? 'completed']}</span>
-                    <span className="rounded-full bg-white px-2.5 py-1 text-stone-500 ring-1 ring-stone-200">置信度 {Math.round(activeCard.confidence * 100)}%</span>
+                    <span className="rounded-full bg-celadon/10 px-2.5 py-1 text-celadon ring-1 ring-celadon/20">{activeCard.teachingType}</span>
+                    <span className="rounded-full bg-space-750 px-2.5 py-1 text-space-muted ring-1 ring-space-border">{CARD_STATUS_LABELS[activeCard.status ?? 'completed']}</span>
+                    <span className="rounded-full bg-space-750 px-2.5 py-1 text-space-muted ring-1 ring-space-border">置信度 {Math.round(activeCard.confidence * 100)}%</span>
                   </div>
-                  <h2 className="font-song text-3xl font-bold leading-tight text-[#173f35]">{activeCard.title}</h2>
-                  <p className="mt-2 text-sm text-stone-500">所属一级知识：{activeCard.topicName}</p>
+                  <h2 className="font-song text-3xl font-bold leading-tight text-space-text">{activeCard.title}</h2>
+                  <p className="mt-2 text-sm text-space-muted">所属一级知识：{activeCard.topicName}</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-stone-200 bg-[#fffdfa] px-8 py-7 shadow-[0_8px_30px_rgba(23,63,53,.05)]">
+              <div className="rounded-2xl border border-space-border bg-space-850 px-8 py-7 shadow-nebula-panel">
                 <MarkdownRenderer content={cardMarkdown} className="text-[15px] leading-8" />
               </div>
               {activeCard.keywords.length > 0 && (
                 <div className="mt-5 flex flex-wrap gap-2">
-                  {activeCard.keywords.map(keyword => <span key={keyword} className="rounded-full bg-white px-3 py-1 text-xs text-stone-500 ring-1 ring-stone-200">#{keyword}</span>)}
+                  {activeCard.keywords.map(keyword => <span key={keyword} className="rounded-full bg-space-750 px-3 py-1 text-xs text-space-muted ring-1 ring-space-border">#{keyword}</span>)}
                 </div>
               )}
             </article>
           )}
         </main>
 
-        <aside className="w-80 flex-shrink-0 overflow-y-auto border-l border-stone-200 bg-[#fffdfa] p-4">
+        <aside className="w-80 flex-shrink-0 overflow-y-auto border-l border-space-border bg-space-900 p-4">
           <div className="mb-4">
-            <h2 className="text-sm font-bold text-[#173f35]">对应课件原文</h2>
-            <p className="mt-1 text-xs text-stone-400">仅显示这张卡片直接引用的 MinerU 内容</p>
+            <h2 className="text-sm font-bold text-space-text">对应课件原文</h2>
+            <p className="mt-1 text-xs text-space-faint">仅显示这张卡片直接引用的 MinerU 内容</p>
           </div>
           <div className="space-y-3">
             {sources.length > 0 ? sources.map((source, index) => (
-              <section key={`${source.range.startBlockId}-${index}`} className="rounded-xl border border-stone-200 bg-white p-4">
-                <p className="mb-3 truncate text-[10px] font-medium text-stone-400">{source.documentTitle}{source.headingPath.length ? ` · ${source.headingPath.join(' / ')}` : ''}</p>
+              <section key={`${source.range.startBlockId}-${index}`} className="rounded-xl border border-space-border bg-space-850 p-4">
+                <p className="mb-3 truncate text-[10px] font-medium text-space-faint">{source.documentTitle}{source.headingPath.length ? ` · ${source.headingPath.join(' / ')}` : ''}</p>
                 {source.missingReason
                   ? <p className="text-xs text-red-600">{source.missingReason}</p>
                   : <MarkdownRenderer content={source.markdown} className="text-sm leading-7" />}
               </section>
-            )) : <p className="rounded-xl border border-dashed border-stone-300 p-4 text-xs leading-6 text-stone-400">该知识卡片没有可定位的原文范围。</p>}
+            )) : <p className="rounded-xl border border-dashed border-space-border p-4 text-xs leading-6 text-space-faint">该知识卡片没有可定位的原文范围。</p>}
           </div>
         </aside>
       </div>
@@ -255,31 +255,31 @@ function LegacyKnowledgeCardsView() {
     || '该知识卡片暂无正文。';
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-[#f5f1e8]">
-      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-stone-200 bg-[#fffdfa] px-5">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950 text-space-text">
+      <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-stone-500 hover:bg-stone-100" aria-label="返回知识结构">←</button>
+          <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识结构">←</button>
           <div>
-            <h1 className="font-song text-xl font-bold text-[#173f35]">知识卡片</h1>
-            <p className="mt-0.5 text-xs text-stone-500">兼容现有课程 · 每个核心知识对应一张可追溯卡片</p>
+            <h1 className="font-song text-xl font-bold text-space-text">知识卡片</h1>
+            <p className="mt-0.5 text-xs text-space-muted">兼容现有课程 · 每个核心知识对应一张可追溯卡片</p>
           </div>
         </div>
-        <button type="button" onClick={() => navigateToStage('notes')} className="rounded-lg bg-[#c84b31] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#ae3f2a]">查看完整笔记 →</button>
+        <button type="button" onClick={() => navigateToStage('notes')} className="btn-primary">查看完整笔记 →</button>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-stone-200 bg-[#fffdfa] p-3">
-          <p className="px-3 pb-3 pt-1 text-[11px] font-semibold tracking-[0.16em] text-stone-400">核心知识卡片</p>
+        <aside className="w-72 flex-shrink-0 overflow-y-auto border-r border-space-border bg-space-900 p-3">
+          <p className="px-3 pb-3 pt-1 text-[11px] font-semibold tracking-[0.16em] text-space-faint">核心知识卡片</p>
           <nav className="space-y-1">
             {packages.map((item, index) => {
               const active = item.id === activePackage?.id;
               return (
-                <button key={item.id} type="button" onClick={() => setActivePackageId(item.id)} className={`w-full rounded-xl px-3 py-3 text-left transition ${active ? 'bg-[#173f35] text-white shadow-sm' : 'text-stone-700 hover:bg-[#edf4ef]'}`}>
+                <button key={item.id} type="button" onClick={() => setActivePackageId(item.id)} className={`w-full rounded-xl px-3 py-3 text-left transition ${active ? 'bg-celadon/12 text-space-text ring-1 ring-celadon/25' : 'text-space-muted hover:bg-space-750 hover:text-space-text'}`}>
                   <div className="flex gap-3">
-                    <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-[#f4d8a8] text-[#173f35]' : 'bg-[#dfece5] text-[#35695b]'}`}>{index + 1}</span>
+                    <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-celadon text-space-950' : 'bg-space-750 text-space-muted'}`}>{index + 1}</span>
                     <div className="min-w-0">
                       <p className="line-clamp-2 text-sm font-medium leading-5">{item.topic.title}</p>
-                      <p className={`mt-1 text-[11px] ${active ? 'text-white/60' : 'text-stone-400'}`}>{item.topic.type} · {item.source.evidenceIds.length} 处原文</p>
+                      <p className={`mt-1 text-[11px] ${active ? 'text-space-muted' : 'text-space-faint'}`}>{item.topic.type} · {item.source.evidenceIds.length} 处原文</p>
                     </div>
                   </div>
                 </button>
@@ -291,31 +291,31 @@ function LegacyKnowledgeCardsView() {
         <main className="min-w-0 flex-1 overflow-y-auto px-8 py-8">
           {activePackage && (
             <article className="mx-auto max-w-3xl">
-              <div className="mb-6 border-b border-stone-200 pb-5">
+              <div className="mb-6 border-b border-space-border pb-5">
                 <div className="mb-2 flex flex-wrap gap-2 text-[11px]">
-                  <span className="rounded-full bg-[#dfece5] px-2.5 py-1 text-[#35695b]">{activePackage.topic.type}</span>
-                  <span className="rounded-full bg-white px-2.5 py-1 text-stone-500 ring-1 ring-stone-200">{activePackage.note ? '已有笔记' : '原文卡片'}</span>
+                  <span className="rounded-full bg-celadon/10 px-2.5 py-1 text-celadon ring-1 ring-celadon/20">{activePackage.topic.type}</span>
+                  <span className="rounded-full bg-space-750 px-2.5 py-1 text-space-muted ring-1 ring-space-border">{activePackage.note ? '已有笔记' : '原文卡片'}</span>
                 </div>
-                <h2 className="font-song text-3xl font-bold leading-tight text-[#173f35]">{activePackage.topic.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-stone-500">{activePackage.topic.learningGoal}</p>
+                <h2 className="font-song text-3xl font-bold leading-tight text-space-text">{activePackage.topic.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-space-muted">{activePackage.topic.learningGoal}</p>
               </div>
-              <div className="rounded-2xl border border-stone-200 bg-[#fffdfa] px-8 py-7 shadow-[0_8px_30px_rgba(23,63,53,.05)]">
+              <div className="rounded-2xl border border-space-border bg-space-850 px-8 py-7 shadow-nebula-panel">
                 <MarkdownRenderer content={content} className="text-[15px] leading-8" />
               </div>
             </article>
           )}
         </main>
 
-        <aside className="w-80 flex-shrink-0 overflow-y-auto border-l border-stone-200 bg-[#fffdfa] p-4">
-          <h2 className="text-sm font-bold text-[#173f35]">对应课件原文</h2>
-          <p className="mt-1 text-xs text-stone-400">兼容课程中的 EvidenceAtom 原始证据</p>
+        <aside className="w-80 flex-shrink-0 overflow-y-auto border-l border-space-border bg-space-900 p-4">
+          <h2 className="text-sm font-bold text-space-text">对应课件原文</h2>
+          <p className="mt-1 text-xs text-space-faint">兼容课程中的 EvidenceAtom 原始证据</p>
           <div className="mt-4 space-y-3">
             {activeEvidence.length > 0 ? activeEvidence.map(item => (
-              <section key={item.id} className="rounded-xl border border-stone-200 bg-white p-4">
-                <p className="mb-2 text-[10px] font-medium text-stone-400">第 {item.pageNumber} 页 · {item.type}</p>
+              <section key={item.id} className="rounded-xl border border-space-border bg-space-850 p-4">
+                <p className="mb-2 text-[10px] font-medium text-space-faint">第 {item.pageNumber} 页 · {item.type}</p>
                 <MarkdownRenderer content={item.content} className="text-sm leading-7" />
               </section>
-            )) : <p className="rounded-xl border border-dashed border-stone-300 p-4 text-xs leading-6 text-stone-400">该卡片没有可定位的原文。</p>}
+            )) : <p className="rounded-xl border border-dashed border-space-border p-4 text-xs leading-6 text-space-faint">该卡片没有可定位的原文。</p>}
           </div>
         </aside>
       </div>

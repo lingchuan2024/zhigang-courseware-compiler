@@ -51,11 +51,11 @@ const PageCard = memo(function PageCard({
       className={`w-full text-left rounded-lg border transition-all overflow-hidden ${
         isActive
           ? 'border-celadon ring-1 ring-celadon/30 bg-celadon/5'
-          : 'border-stone-200 hover:border-stone-300 hover:bg-stone-50'
+          : 'border-space-border hover:border-space-border-strong hover:bg-space-850'
       }`}
     >
       {/* Thumbnail */}
-      <div className="relative aspect-[3/4] bg-stone-100 overflow-hidden">
+      <div className="relative aspect-[3/4] overflow-hidden bg-space-800">
         {showThumbnail && page.preview ? (
           <img
             src={page.preview}
@@ -66,14 +66,14 @@ const PageCard = memo(function PageCard({
         ) : showThumbnail && !page.preview ? (
           <div className="w-full h-full flex items-center justify-center">
             {isEmpty ? (
-              <span className="text-xs text-stone-400">空白页</span>
+              <span className="text-xs text-space-muted">空白页</span>
             ) : (
-              <span className="text-xs text-stone-400">文本页</span>
+              <span className="text-xs text-space-muted">文本页</span>
             )}
           </div>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <div className="w-4 h-4 border-2 border-stone-200 border-t-stone-400 rounded-full animate-spin" />
+            <div className="h-4 w-4 animate-spin rounded-full border-2 border-space-border border-t-space-muted" />
           </div>
         )}
 
@@ -119,7 +119,7 @@ export function PageNavigator({
   if (filteredPages.length === 0) {
     return (
       <div className="h-full flex items-center justify-center p-4">
-        <p className="text-xs text-stone-400 text-center">
+        <p className="text-center text-xs text-space-muted">
           {showWarningOnly ? '没有问题页面' : '无页面'}
         </p>
       </div>

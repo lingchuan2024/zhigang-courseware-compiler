@@ -76,11 +76,11 @@ export function EvidenceInspector({
   };
 
   return (
-    <div className="h-full flex flex-col bg-white border-l border-stone-200">
+    <div className="flex h-full flex-col border-l border-space-border bg-space-900">
       {/* Summary bar */}
-      <div className="px-3 py-2 border-b border-stone-200 flex-shrink-0">
+      <div className="flex-shrink-0 border-b border-space-border px-3 py-2">
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-sm font-semibold text-stone-700 font-ui">
+          <h3 className="font-ui text-sm font-semibold text-space-text">
             证据检查器
           </h3>
           <button
@@ -92,9 +92,9 @@ export function EvidenceInspector({
           </button>
         </div>
         {currentPage && (
-          <div className="text-xs text-stone-500 space-y-0.5">
+          <div className="space-y-0.5 text-xs text-space-muted">
             <p>
-              本页 <span className="font-medium text-stone-700">{pageEvidences.length}</span> 条证据
+              本页 <span className="font-medium text-ink-light">{pageEvidences.length}</span> 条证据
               {typeSummary.lowConfidenceCount > 0 && (
                 <span className="text-amber-600"> · {typeSummary.lowConfidenceCount} 条低置信度</span>
               )}
@@ -119,13 +119,13 @@ export function EvidenceInspector({
 
       {/* Type filter */}
       {pageEvidences.length > 0 && (
-        <div className="px-3 py-2 border-b border-stone-100 flex items-center gap-1 overflow-x-auto flex-shrink-0">
+        <div className="flex flex-shrink-0 items-center gap-1 overflow-x-auto border-b border-space-border px-3 py-2">
           <button
             onClick={() => setTypeFilter('all')}
             className={`text-xs px-2 py-1 rounded font-medium whitespace-nowrap transition-colors ${
               typeFilter === 'all'
-                ? 'bg-stone-700 text-white'
-                : 'text-stone-500 hover:bg-stone-100'
+                ? 'bg-celadon/15 text-celadon-light'
+                : 'text-space-muted hover:bg-space-750'
             }`}
           >
             全部 ({pageEvidences.length})
@@ -139,7 +139,7 @@ export function EvidenceInspector({
                 className={`text-xs px-2 py-1 rounded font-medium whitespace-nowrap transition-colors ${
                   typeFilter === t
                     ? `${EVIDENCE_TYPE_LABELS[t].bgColor} ${EVIDENCE_TYPE_LABELS[t].color} ring-1 ring-current`
-                    : 'text-stone-500 hover:bg-stone-100'
+                    : 'text-space-muted hover:bg-space-750'
                 }`}
               >
                 {EVIDENCE_TYPE_LABELS[t].label}
@@ -152,13 +152,13 @@ export function EvidenceInspector({
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {filteredEvidences.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-sm text-stone-400">
+            <p className="text-sm text-space-muted">
               {pageEvidences.length === 0
                 ? '本页暂无证据'
                 : '没有匹配筛选条件的证据'}
             </p>
             {pageEvidences.length === 0 && currentPage && (
-              <p className="text-xs text-stone-400 mt-2">
+              <p className="mt-2 text-xs text-space-muted">
                 可编辑页面文本后重新生成
               </p>
             )}

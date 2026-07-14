@@ -68,11 +68,11 @@ export function UploadView() {
   }, [handleCoursewareFile]);
 
   return (
-    <div className="flex-1 flex items-center justify-center p-8 overflow-y-auto">
+    <div className="flex-1 overflow-y-auto bg-space-950 p-8 flex items-center justify-center">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <h2 className="font-song text-3xl font-bold text-ink mb-3">上传课件</h2>
-          <p className="text-charcoal/60">
+          <p className="text-space-muted">
             上传 PDF/PPTX 后先预览课件，再通过 MinerU 转换为 Markdown
           </p>
         </div>
@@ -82,7 +82,7 @@ export function UploadView() {
           className={`card border-2 border-dashed transition-colors cursor-pointer ${
             isDragging
               ? 'border-cinnabar bg-cinnabar/5'
-              : 'border-paper-dark hover:border-celadon hover:bg-celadon/5'
+              : 'border-space-border-strong hover:border-celadon hover:bg-celadon/5'
           }`}
           onDrop={handleDrop}
           onDragOver={e => { e.preventDefault(); setIsDragging(true); }}
@@ -103,7 +103,7 @@ export function UploadView() {
           <div className="py-12 text-center">
             {isProcessing ? (
               <div>
-                <div className="w-16 h-16 mx-auto mb-4 border-4 border-paper-dark border-t-celadon rounded-full animate-spin"></div>
+                <div className="mx-auto mb-4 h-16 w-16 animate-spin rounded-full border-4 border-space-border border-t-celadon"></div>
                 <p className="font-song text-lg text-ink mb-2">正在准备课件预览...</p>
                 {progress.total > 0 && (
                   <p className="font-mono text-sm text-ink-light">
@@ -113,7 +113,7 @@ export function UploadView() {
               </div>
             ) : (
               <>
-                <div className="w-16 h-16 mx-auto mb-4 bg-paper-dark/50 rounded flex items-center justify-center">
+                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded border border-space-border bg-space-800">
                   <svg className="w-8 h-8 text-ink-light" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
@@ -121,7 +121,7 @@ export function UploadView() {
                 <p className="font-song text-lg text-ink mb-2">
                   拖拽 PDF 或 PPTX 文件到此处，或点击选择文件
                 </p>
-                <p className="text-sm text-charcoal/50">
+                <p className="text-sm text-space-muted">
                   支持 PDF 与 PPTX，最大 20MB
                 </p>
               </>
@@ -137,16 +137,16 @@ export function UploadView() {
 
         {/* 示例课程按钮 */}
         <div className="mt-8 text-center">
-          <p className="text-charcoal/50 text-sm mb-3">或者</p>
+          <p className="mb-3 text-sm text-space-muted">或者</p>
           <button onClick={loadExample} className="btn-outline">
             体验示例课程
           </button>
         </div>
 
         {/* 说明 */}
-        <div className="mt-8 p-4 bg-paper-dark/30 rounded">
+        <div className="mt-8 rounded border border-space-border bg-space-850 p-4">
           <h3 className="font-song text-sm font-bold text-ink mb-2">关于知识编译过程</h3>
-          <ul className="text-sm text-charcoal/70 space-y-1">
+          <ul className="space-y-1 text-sm text-ink-light">
             <li>1. 将 Markdown 标准化为结构块和章节大纲</li>
             <li>2. 按内容窗口识别候选知识点</li>
             <li>3. 全局合并消歧，生成知识结构</li>

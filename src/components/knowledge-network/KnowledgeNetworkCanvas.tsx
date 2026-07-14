@@ -46,15 +46,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function nodePalette(node: KnowledgeNetworkNode, selected: boolean): { fill: string; stroke: string; accent: string } {
-  if (selected) return { fill: '#173f35', stroke: '#c84b31', accent: '#f4d8a8' };
-  if (node.kind === 'topic' && node.importance === 'core') return { fill: '#173f35', stroke: '#74a899', accent: '#f4d8a8' };
-  if (node.kind === 'topic') return { fill: '#28594d', stroke: '#8fb5a9', accent: '#f1cf95' };
+  if (selected) return { fill: '#102238', stroke: '#78cde3', accent: '#ed8880' };
+  if (node.kind === 'topic' && node.importance === 'core') return { fill: '#0d2132', stroke: '#4fa7bd', accent: '#ffbd72' };
+  if (node.kind === 'topic') return { fill: '#0a1a2a', stroke: '#31536d', accent: '#78cde3' };
   if (node.kind === 'teaching') {
-    if (['formula', 'derivation', 'proof'].includes(node.category)) return { fill: '#f5f8fb', stroke: '#7894ad', accent: '#315f86' };
-    if (['example', 'application', 'visualization'].includes(node.category)) return { fill: '#fbf7ed', stroke: '#b49a62', accent: '#7b632d' };
-    if (['limitation', 'misconception', 'condition'].includes(node.category)) return { fill: '#fbf3f1', stroke: '#bd7a70', accent: '#8f4036' };
+    if (['formula', 'derivation', 'proof'].includes(node.category)) return { fill: '#0b1727', stroke: '#587ba1', accent: '#8fb9e8' };
+    if (['example', 'application', 'visualization'].includes(node.category)) return { fill: '#18160f', stroke: '#8f7542', accent: '#e2ba65' };
+    if (['limitation', 'misconception', 'condition'].includes(node.category)) return { fill: '#1d1117', stroke: '#8f5559', accent: '#ed8880' };
   }
-  return { fill: '#fffefa', stroke: '#a8b7ad', accent: '#35695b' };
+  return { fill: '#0a1625', stroke: '#31536d', accent: '#78cde3' };
 }
 
 function titleLines(label: string): string[] {
@@ -158,15 +158,15 @@ export function KnowledgeNetworkCanvas({
 
   return (
     <div
-      className="relative h-full min-h-0 overflow-hidden bg-[#f5f1e8]"
+      className="relative h-full min-h-0 overflow-hidden bg-space-950"
       data-testid="knowledge-network-canvas"
       style={{
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(23,63,53,.10) 1px, transparent 0)',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(120,205,227,.09) 1px, transparent 0)',
         backgroundSize: '22px 22px',
       }}
     >
       {model.nodes.length === 0 ? (
-        <div className="absolute inset-0 grid place-items-center text-sm text-stone-500">当前层没有可展示的知识节点</div>
+        <div className="absolute inset-0 grid place-items-center text-sm text-space-muted">当前层没有可展示的知识节点</div>
       ) : (
         <svg
           className="w-full h-full select-none"
@@ -196,7 +196,7 @@ export function KnowledgeNetworkCanvas({
               <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
             </marker>
             <filter id="selected-node-glow" x="-30%" y="-40%" width="160%" height="180%">
-              <feDropShadow dx="0" dy="3" stdDeviation="5" floodColor="#173f35" floodOpacity="0.22" />
+              <feDropShadow dx="0" dy="3" stdDeviation="7" floodColor="#78cde3" floodOpacity="0.24" />
             </filter>
           </defs>
 
@@ -208,9 +208,9 @@ export function KnowledgeNetworkCanvas({
                 width={expandedGroupBounds.width}
                 height={expandedGroupBounds.height}
                 rx="28"
-                fill="#e4efe9"
-                fillOpacity="0.9"
-                stroke="#72a596"
+                fill="#07101d"
+                fillOpacity="0.94"
+                stroke="#31536d"
                 strokeWidth="1.8"
                 strokeDasharray="7 5"
               />
@@ -235,8 +235,8 @@ export function KnowledgeNetworkCanvas({
                   cx={expandedGroupBounds.x + 23}
                   cy={expandedGroupBounds.y + 24}
                   r="14"
-                  fill="#fffdfa"
-                  stroke="#72a596"
+                  fill="#102238"
+                  stroke="#78cde3"
                   strokeWidth="1.5"
                 />
                 <text
@@ -245,7 +245,7 @@ export function KnowledgeNetworkCanvas({
                   textAnchor="middle"
                   fontSize="17"
                   fontWeight="700"
-                  fill="#285c50"
+                  fill="#edf7fc"
                 >×</text>
               </g>
               <text
@@ -253,7 +253,7 @@ export function KnowledgeNetworkCanvas({
                 y={expandedGroupBounds.y + 29}
                 fontSize="12"
                 fontWeight="700"
-                fill="#285c50"
+                fill="#b1c3d1"
               >{model.expandedGroup.label}</text>
             </g>
           )}
@@ -261,17 +261,17 @@ export function KnowledgeNetworkCanvas({
           {filteredEdges.map(edge => {
             const path = layout.edgePaths.get(edge.id);
             if (!path) return null;
-            const connected = !selectedId || edge.sourceId === selectedId || edge.targetId === selectedId;
+            const connected = Boolean(selectedId) && (edge.sourceId === selectedId || edge.targetId === selectedId);
             const color = EDGE_COLORS[edge.type] ?? '#7b807c';
             const source = layout.positions.get(edge.sourceId);
             const target = layout.positions.get(edge.targetId);
             const labelX = source && target ? (source.x + source.width / 2 + target.x + target.width / 2) / 2 : 0;
             const labelY = source && target ? (source.y + source.height / 2 + target.y + target.height / 2) / 2 - 7 : 0;
             return (
-              <g key={edge.id} opacity={connected ? 0.88 : 0.14} data-edge={edge.id}>
+              <g key={edge.id} opacity={selectedId ? (connected ? 0.9 : 0.08) : 0.2} data-edge={edge.id}>
                 <path d={path} fill="none" stroke={color} strokeWidth={connected && selectedId ? 2.4 : 1.6} markerEnd="url(#network-arrow)" />
-                {(connected && (selectedId || viewBox.width < layout.bounds.width * 1.15)) && (
-                  <text x={labelX} y={labelY} textAnchor="middle" fontSize="10" fill={color} paintOrder="stroke" stroke="#f5f1e8" strokeWidth="4">
+                {connected && selectedId && (
+                  <text x={labelX} y={labelY} textAnchor="middle" fontSize="10" fill={color} paintOrder="stroke" stroke="#010207" strokeWidth="4">
                     {edge.label}
                   </text>
                 )}
@@ -323,14 +323,14 @@ export function KnowledgeNetworkCanvas({
                 {node.sequence !== undefined && (
                   <g aria-label={`遍历顺序 ${node.sequenceLabel ?? node.sequence}`}>
                     <circle cx="22" cy="21" r={node.sequenceLabel ? 13 : 11} fill={node.kind === 'topic' || selected ? '#f4d8a8' : palette.accent} opacity={selected ? 1 : 0.92} />
-                    <text x="22" y="25" textAnchor="middle" fontSize={node.sequenceLabel ? 9 : 10} fontWeight="800" fill={node.kind === 'topic' || selected ? '#173f35' : '#fff'}>{node.sequenceLabel ?? node.sequence}</text>
+                    <text x="22" y="25" textAnchor="middle" fontSize={node.sequenceLabel ? 9 : 10} fontWeight="800" fill="#07101d">{node.sequenceLabel ?? node.sequence}</text>
                   </g>
                 )}
-                <text x={node.sequence !== undefined ? 43 : 17} y="25" fontSize="13" fontWeight="700" fill={selected || node.kind === 'topic' ? '#fff7e8' : '#202824'}>
+                <text x={node.sequence !== undefined ? 43 : 17} y="25" fontSize="13" fontWeight="700" fill="#edf7fc">
                   {lines[0]}
                 </text>
-                {lines[1] && <text x="17" y="43" fontSize="12" fontWeight="600" fill={selected || node.kind === 'topic' ? '#fff7e8' : '#39423d'}>{lines[1]}</text>}
-                <text x="17" y={position.height - 13} fontSize="10" fill={selected || node.kind === 'topic' ? '#d8e8df' : palette.accent}>
+                {lines[1] && <text x="17" y="43" fontSize="12" fontWeight="600" fill="#b1c3d1">{lines[1]}</text>}
+                <text x="17" y={position.height - 13} fontSize="10" fill={selected || node.kind === 'topic' ? '#8ea6b7' : palette.accent}>
                   {CATEGORY_LABELS[node.category] ?? node.category} · {node.sourceRanges.length} 处原文
                 </text>
                 {node.kind === 'topic' && node.importance === 'core' && (
@@ -342,21 +342,21 @@ export function KnowledgeNetworkCanvas({
         </svg>
       )}
 
-      <div className="absolute top-3 right-3 flex items-center gap-1 rounded-xl border border-stone-200 bg-white/90 p-1 shadow-sm backdrop-blur">
-        <button type="button" className="w-8 h-8 rounded-lg text-stone-600 hover:bg-stone-100" onClick={() => zoom(0.82)} aria-label="放大知识网">＋</button>
-        <button type="button" className="w-8 h-8 rounded-lg text-stone-600 hover:bg-stone-100" onClick={() => zoom(1.22)} aria-label="缩小知识网">－</button>
-        <button type="button" className="h-8 px-2 rounded-lg text-xs text-stone-600 hover:bg-stone-100" onClick={resetView} aria-label="适应画布">适应</button>
+      <div className="absolute right-3 top-3 flex items-center gap-1 rounded-xl border border-space-border bg-space-850/90 p-1 shadow-sm backdrop-blur">
+        <button type="button" className="h-8 w-8 rounded-lg text-ink-light hover:bg-space-750" onClick={() => zoom(0.82)} aria-label="放大知识网">＋</button>
+        <button type="button" className="h-8 w-8 rounded-lg text-ink-light hover:bg-space-750" onClick={() => zoom(1.22)} aria-label="缩小知识网">－</button>
+        <button type="button" className="h-8 rounded-lg px-2 text-xs text-ink-light hover:bg-space-750" onClick={resetView} aria-label="适应画布">适应</button>
       </div>
 
       {filteredEdges.length === 0 && model.nodes.length > 0 && (
-        <div className="absolute top-3 left-3 rounded-lg border border-amber-200 bg-amber-50/95 px-3 py-2 text-xs text-amber-800 shadow-sm">
+        <div className="absolute left-3 top-3 rounded-lg border border-amber-400/30 bg-space-850/95 px-3 py-2 text-xs text-amber-300 shadow-sm">
           当前仅提取到内容节点，尚无可显示的关系
         </div>
       )}
 
       {relationLegend.length > 0 && (
-        <div className="absolute bottom-3 left-3 max-w-[70%] rounded-xl border border-stone-200 bg-white/92 px-3 py-2 shadow-sm backdrop-blur">
-          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-stone-600">
+        <div className="absolute bottom-3 left-3 max-w-[70%] rounded-xl border border-space-border bg-space-850/92 px-3 py-2 shadow-sm backdrop-blur">
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-[11px] text-space-muted">
             {relationLegend.map(([type, label]) => (
               <span key={type} className="inline-flex items-center gap-1.5">
                 <span className="inline-block h-0.5 w-5 rounded" style={{ backgroundColor: EDGE_COLORS[type] ?? '#7b807c' }} />

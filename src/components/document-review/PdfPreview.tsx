@@ -113,7 +113,7 @@ export const PdfPreview = forwardRef<PagePreviewHandle, PdfPreviewProps>(
       <div
         ref={containerRef}
         data-testid="continuous-pdf-viewer"
-        className="flex-1 overflow-auto bg-stone-100 scroll-smooth overscroll-contain"
+        className="flex-1 overflow-auto bg-space-900 scroll-smooth overscroll-contain"
         aria-label="PDF 连续预览"
       >
         <div className="min-h-full py-6 sm:py-8 space-y-6 sm:space-y-8">
@@ -233,7 +233,7 @@ function PdfCanvasPage({
         style={{ width: `${targetCssWidth}px`, maxWidth: 'calc(100% - 1rem)' }}
       >
         <div
-          className="relative bg-white shadow-[0_8px_28px_rgba(28,25,23,0.14)] ring-1 ring-stone-200/80 overflow-hidden"
+          className="relative overflow-hidden bg-white shadow-[0_18px_48px_rgba(0,0,0,.42)] ring-1 ring-space-border-strong/70"
           style={{ aspectRatio }}
         >
           <canvas ref={canvasRef} className="block max-w-full h-auto bg-white" />
@@ -245,7 +245,7 @@ function PdfCanvasPage({
           )}
         </div>
         <div className="flex justify-center pt-3">
-          <span className="rounded-full bg-white/90 px-3 py-1 text-xs text-stone-500 shadow-sm ring-1 ring-stone-200 font-mono">
+          <span className="rounded-full border border-space-border bg-space-850/95 px-3 py-1 font-mono text-xs text-space-muted shadow-sm">
             第 {pageNumber} 页
           </span>
         </div>
@@ -264,11 +264,11 @@ function PreviewMessage({
   loading?: boolean;
 }) {
   return (
-    <div className="mx-auto mt-20 max-w-sm text-center text-stone-500">
+    <div className="mx-auto mt-20 max-w-sm text-center text-space-muted">
       {loading && (
-        <div className="w-8 h-8 mx-auto mb-4 border-3 border-stone-200 border-t-celadon rounded-full animate-spin" />
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-3 border-space-border border-t-celadon" />
       )}
-      <p className="font-medium text-stone-700 font-ui">{title}</p>
+      <p className="font-ui font-medium text-space-text">{title}</p>
       <p className="text-sm mt-2 leading-6 font-ui">{description}</p>
     </div>
   );

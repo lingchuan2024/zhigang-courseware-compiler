@@ -20,12 +20,12 @@ interface KnowledgeStructureViewProps {
 
 function NetworkEmptyState({ onBack }: { onBack: () => void }) {
   return (
-    <div className="absolute inset-0 z-10 grid place-items-center bg-[#f5f1e8]/88 px-8 text-center backdrop-blur-sm">
-      <div className="max-w-sm rounded-2xl border border-stone-200 bg-white p-7 shadow-sm">
-        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-[#edf4ef] text-xl text-[#35695b]">网</div>
-        <h3 className="font-song text-xl font-bold text-[#173f35]">该知识暂无内部结构</h3>
-        <p className="mt-2 text-sm leading-6 text-stone-500">当前核心知识没有可展示的第二层节点。收起后可以继续查看其他节点。</p>
-        <button type="button" onClick={onBack} className="mt-5 rounded-lg bg-[#173f35] px-4 py-2 text-sm font-medium text-white hover:bg-[#235549]">收起内部网</button>
+    <div className="absolute inset-0 z-10 grid place-items-center bg-space-950/80 px-8 text-center backdrop-blur-sm">
+      <div className="max-w-sm rounded-2xl border border-space-border bg-space-850 p-7 shadow-2xl">
+        <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-celadon/10 text-xl text-celadon-light">网</div>
+        <h3 className="font-song text-xl font-bold text-space-text">该知识暂无内部结构</h3>
+        <p className="mt-2 text-sm leading-6 text-space-muted">当前核心知识没有可展示的第二层节点。收起后可以继续查看其他节点。</p>
+        <button type="button" onClick={onBack} className="btn-primary mt-5">收起内部网</button>
       </div>
     </div>
   );
@@ -163,9 +163,9 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
 
   if (courseNetwork.nodes.length === 0) {
     return (
-      <div className="flex-1 grid place-items-center bg-[#f5f1e8]">
+      <div className="grid flex-1 place-items-center bg-space-950">
         <div className="text-center">
-          <p className="mb-4 text-stone-500">暂无知识结构数据</p>
+          <p className="mb-4 text-space-muted">暂无知识结构数据</p>
           <button className="btn-primary" onClick={() => navigateToStage('mineru')}>返回 MinerU 解析</button>
         </div>
       </div>
@@ -173,23 +173,23 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   }
 
   return (
-    <div className="flex-1 flex h-screen min-w-0 flex-col overflow-hidden bg-[#f5f1e8]">
-      <header className="flex h-[72px] flex-shrink-0 items-center justify-between gap-4 border-b border-stone-200 bg-[#fffdfa] px-5">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950">
+      <header className="flex h-[72px] flex-shrink-0 items-center justify-between gap-4 border-b border-space-border bg-space-900 px-5">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={() => navigateToStage('mineru')} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-[#173f35]" aria-label="返回 MinerU 解析">←</button>
+          <button type="button" onClick={() => navigateToStage('mineru')} className="grid h-9 w-9 flex-shrink-0 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-white" aria-label="返回 MinerU 解析">←</button>
           <div className="min-w-0">
             <div className="flex items-center gap-2 text-sm">
-              <span className="font-song font-bold text-[#173f35]">课程知识网</span>
+              <span className="font-song font-bold text-space-text">课程知识网</span>
               {expandedTopicId && selectedTopicLabel && (
                 <>
-                  <span className="text-stone-300">/</span>
-                  <span className="max-w-48 truncate font-song font-bold text-[#173f35]">{selectedTopicLabel}</span>
-                  <span className="text-stone-300">/</span>
-                  <span className="text-stone-500">二级知识网</span>
+                  <span className="text-space-border-strong">/</span>
+                  <span className="max-w-48 truncate font-song font-bold text-space-text">{selectedTopicLabel}</span>
+                  <span className="text-space-border-strong">/</span>
+                  <span className="text-space-muted">二级知识网</span>
                 </>
               )}
             </div>
-            <p className="mt-1 text-xs text-stone-500">
+            <p className="mt-1 text-xs text-space-muted">
               {courseNetwork.nodes.length} 个核心知识 · {courseNetwork.edges.length} 个课程关系
               {expandedTopicId && ` · ${teachingNetwork.nodes.length} 个二级节点`}
             </p>
@@ -198,19 +198,19 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
 
         <div className="flex min-w-0 flex-1 items-center justify-center gap-2">
           <div className="relative w-full max-w-xs">
-            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-stone-400">⌕</span>
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-space-muted">⌕</span>
             <input
               value={search}
               onChange={event => setSearch(event.target.value)}
               placeholder={expandedTopicId ? '搜索二级知识' : '搜索课程知识'}
-              className="h-9 w-full rounded-xl border border-stone-200 bg-white pl-8 pr-3 text-sm text-stone-700 outline-none transition focus:border-[#6f998b] focus:ring-2 focus:ring-[#6f998b]/15"
+              className="h-9 w-full rounded-xl border border-space-border bg-space-850 pl-8 pr-3 text-sm text-space-text outline-none transition placeholder:text-space-muted/60 focus:border-celadon/60 focus:ring-2 focus:ring-celadon/10"
               aria-label="搜索知识节点"
             />
           </div>
           <select
             value={relationType}
             onChange={event => setRelationType(event.target.value)}
-            className="h-9 max-w-36 rounded-xl border border-stone-200 bg-white px-3 text-xs text-stone-600 outline-none focus:border-[#6f998b]"
+            className="h-9 max-w-36 rounded-xl border border-space-border bg-space-850 px-3 text-xs text-ink-light outline-none focus:border-celadon/60"
             aria-label="筛选关系类型"
           >
             <option value="all">全部关系</option>
@@ -220,12 +220,12 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
 
         <div className="flex flex-shrink-0 items-center gap-2">
           {currentNetwork.warnings.length > 0 && (
-            <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs text-amber-700" title={currentNetwork.warnings.join('\n')}>{currentNetwork.warnings.length} 条数据警告</span>
+            <span className="rounded-full bg-amber-400/10 px-2.5 py-1 text-xs text-amber-300" title={currentNetwork.warnings.join('\n')}>{currentNetwork.warnings.length} 条数据警告</span>
           )}
           {!sourcePanelOpen && (
-            <button type="button" onClick={() => setSourcePanelOpen(true)} className="rounded-lg border border-stone-200 px-3 py-2 text-xs text-stone-600 hover:bg-stone-50">显示原文</button>
+            <button type="button" onClick={() => setSourcePanelOpen(true)} className="rounded-lg border border-space-border px-3 py-2 text-xs text-ink-light hover:bg-space-750">显示原文</button>
           )}
-          <button type="button" onClick={() => navigateToStage('cards')} className="rounded-lg bg-[#c84b31] px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-[#ae3f2a]">查看知识卡片</button>
+          <button type="button" onClick={() => navigateToStage('cards')} className="btn-primary">查看知识卡片</button>
         </div>
       </header>
 
@@ -236,9 +236,9 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
               type="button"
               aria-label="关闭二级知识网"
               onClick={collapseTeachingNetwork}
-              className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-[#9cb8ae] bg-[#fffdfa]/95 px-3 py-2 text-sm font-medium text-[#285c50] shadow-sm backdrop-blur hover:bg-white"
+              className="absolute left-4 top-4 z-20 flex items-center gap-2 rounded-xl border border-celadon/35 bg-space-850/95 px-3 py-2 text-sm font-medium text-celadon-light shadow-sm backdrop-blur hover:bg-space-750"
             >
-              <span className="grid h-6 w-6 place-items-center rounded-full bg-[#e4efe9] text-lg leading-none">×</span>
+              <span className="grid h-6 w-6 place-items-center rounded-full bg-celadon/10 text-lg leading-none">×</span>
               <span className="max-w-52 truncate">{selectedTopicLabel}</span>
             </button>
           )}

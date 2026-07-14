@@ -104,8 +104,8 @@ export function DocumentReviewWorkspace() {
   // Markdown 预览模式
   if (isMarkdown || hasSourceDocs) {
     return (
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-3 border-b border-stone-200 bg-white flex-shrink-0">
+      <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950">
+        <div className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900 px-6 py-3">
           <div className="flex items-center gap-3">
             <button
               className="text-sm text-charcoal/60 hover:text-ink"
@@ -144,11 +144,11 @@ export function DocumentReviewWorkspace() {
 
         {isConfirming && (
           <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl p-6 shadow-xl flex items-center gap-4">
-              <div className="w-6 h-6 border-3 border-stone-200 border-t-celadon rounded-full animate-spin" />
+            <div className="flex items-center gap-4 rounded-xl border border-space-border bg-space-850 p-6 shadow-xl">
+              <div className="h-6 w-6 animate-spin rounded-full border-3 border-space-border border-t-celadon" />
               <div>
-                <p className="text-stone-800 font-medium font-ui">正在提取知识结构...</p>
-                <p className="text-xs text-stone-500 mt-1">AI 正在分析 Markdown 内容，请稍候</p>
+                <p className="font-ui font-medium text-space-text">正在提取知识结构...</p>
+                <p className="mt-1 text-xs text-space-muted">AI 正在分析 Markdown 内容，请稍候</p>
               </div>
             </div>
           </div>
@@ -158,7 +158,7 @@ export function DocumentReviewWorkspace() {
   }
 
   return (
-    <div className="flex-1 flex flex-col h-screen overflow-hidden">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950">
       <ReviewToolbar
         fileName={document.fileName || document.title}
         totalPages={totalPages}
@@ -191,7 +191,7 @@ export function DocumentReviewWorkspace() {
 
       <div className="flex-1 flex overflow-hidden">
         {!isPptx && (
-          <aside className="hidden lg:block w-[148px] xl:w-[168px] flex-shrink-0 border-r border-stone-200 bg-white overflow-hidden">
+          <aside className="hidden w-[148px] flex-shrink-0 overflow-hidden border-r border-space-border bg-space-900 lg:block xl:w-[168px]">
             <PageNavigator
             pages={displayPages}
               currentPage={currentPage}
@@ -235,11 +235,11 @@ export function DocumentReviewWorkspace() {
 
       {isConfirming && (
         <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 shadow-xl flex items-center gap-4">
-            <div className="w-6 h-6 border-3 border-stone-200 border-t-celadon rounded-full animate-spin" />
+          <div className="flex items-center gap-4 rounded-xl border border-space-border bg-space-850 p-6 shadow-xl">
+            <div className="h-6 w-6 animate-spin rounded-full border-3 border-space-border border-t-celadon" />
             <div>
-              <p className="text-stone-800 font-medium font-ui">正在进入 MinerU 解析...</p>
-              <p className="text-xs text-stone-500 mt-1">下一步将把原始课件转换为 Markdown</p>
+              <p className="font-ui font-medium text-space-text">正在进入 MinerU 解析...</p>
+              <p className="mt-1 text-xs text-space-muted">下一步将把原始课件转换为 Markdown</p>
             </div>
           </div>
         </div>

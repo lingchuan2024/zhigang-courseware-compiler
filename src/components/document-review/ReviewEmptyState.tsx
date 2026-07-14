@@ -6,11 +6,11 @@ interface ReviewEmptyStateProps {
 
 export function ReviewEmptyState({ title, description, icon = 'empty' }: ReviewEmptyStateProps) {
   return (
-    <div className="flex-1 flex flex-col items-center justify-center h-full p-8">
+    <div className="flex h-full flex-1 flex-col items-center justify-center bg-space-950 p-8">
       <div className="text-center max-w-sm">
-        <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center rounded-full bg-stone-100">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-space-border bg-space-850">
           {icon === 'upload' && (
-            <svg className="w-8 h-8 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-8 w-8 text-space-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
             </svg>
           )}
@@ -20,13 +20,13 @@ export function ReviewEmptyState({ title, description, icon = 'empty' }: ReviewE
             </svg>
           )}
           {icon === 'empty' && (
-            <svg className="w-8 h-8 text-stone-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="h-8 w-8 text-space-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
           )}
         </div>
-        <h3 className="font-song text-base font-bold text-stone-700 mb-2">{title}</h3>
-        <p className="text-sm text-stone-500 leading-relaxed">{description}</p>
+        <h3 className="mb-2 font-song text-base font-bold text-space-text">{title}</h3>
+        <p className="text-sm leading-relaxed text-space-muted">{description}</p>
       </div>
     </div>
   );

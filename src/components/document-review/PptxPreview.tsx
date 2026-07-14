@@ -147,7 +147,7 @@ export const PptxPreview = forwardRef<PagePreviewHandle, PptxPreviewProps>(
       <div
         ref={containerRef}
         data-testid="continuous-pptx-viewer"
-        className="flex-1 overflow-auto bg-stone-100 scroll-smooth overscroll-contain"
+        className="flex-1 overflow-auto bg-space-900 scroll-smooth overscroll-contain"
         aria-label="PPTX 连续预览"
       >
         <div className="min-h-full py-6 sm:py-8">
@@ -178,11 +178,11 @@ function PreviewMessage({
   loading?: boolean;
 }) {
   return (
-    <div className="mx-auto mt-20 max-w-sm text-center text-stone-500">
+    <div className="mx-auto mt-20 max-w-sm text-center text-space-muted">
       {loading && (
-        <div className="w-8 h-8 mx-auto mb-4 border-3 border-stone-200 border-t-celadon rounded-full animate-spin" />
+        <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-3 border-space-border border-t-celadon" />
       )}
-      <p className="font-medium text-stone-700 font-ui">{title}</p>
+      <p className="font-ui font-medium text-space-text">{title}</p>
       <p className="text-sm mt-2 leading-6 font-ui">{description}</p>
     </div>
   );

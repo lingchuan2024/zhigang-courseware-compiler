@@ -81,8 +81,8 @@ export const PagePreview = forwardRef<PagePreviewHandle, PagePreviewProps>(
 
     if (pages.length === 0) {
       return (
-        <div className="flex-1 flex items-center justify-center bg-stone-100">
-          <p className="text-stone-400 text-sm">暂无可预览页面</p>
+        <div className="flex flex-1 items-center justify-center bg-space-900">
+          <p className="text-sm text-space-muted">暂无可预览页面</p>
         </div>
       );
     }
@@ -93,7 +93,7 @@ export const PagePreview = forwardRef<PagePreviewHandle, PagePreviewProps>(
       <div
         ref={containerRef}
         data-testid="continuous-page-viewer"
-        className="flex-1 overflow-auto bg-stone-100 scroll-smooth overscroll-contain"
+        className="flex-1 overflow-auto bg-space-900 scroll-smooth overscroll-contain"
         aria-label="课件连续预览"
       >
         <div className="min-h-full py-6 sm:py-8 space-y-6 sm:space-y-8">
@@ -114,7 +114,7 @@ export const PagePreview = forwardRef<PagePreviewHandle, PagePreviewProps>(
                     maxWidth: scale === 1 ? 'calc(100% - 1rem)' : undefined,
                   }}
                 >
-                  <div className="bg-white shadow-[0_8px_28px_rgba(28,25,23,0.14)] ring-1 ring-stone-200/80 overflow-hidden">
+                  <div className="overflow-hidden bg-white shadow-[0_18px_48px_rgba(0,0,0,.42)] ring-1 ring-space-border-strong/70">
                     {state === 'ready' && page.preview && (
                       <img
                         src={page.preview}
@@ -160,7 +160,7 @@ export const PagePreview = forwardRef<PagePreviewHandle, PagePreviewProps>(
                   </div>
 
                   <div className="flex justify-center pt-3">
-                    <span className="rounded-full bg-white/90 px-3 py-1 text-xs text-stone-500 shadow-sm ring-1 ring-stone-200 font-mono">
+                    <span className="rounded-full border border-space-border bg-space-850/95 px-3 py-1 font-mono text-xs text-space-muted shadow-sm">
                       第 {page.pageNumber} 页
                     </span>
                   </div>

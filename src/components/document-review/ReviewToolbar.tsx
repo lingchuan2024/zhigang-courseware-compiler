@@ -30,13 +30,13 @@ export function ReviewToolbar({
   hasModel,
 }: ReviewToolbarProps) {
   return (
-    <header className="bg-white border-b border-stone-200 flex-shrink-0 z-10">
+    <header className="z-10 flex-shrink-0 border-b border-space-border bg-space-900">
       {/* Row 1: Title and actions */}
       <div className="px-4 py-2 flex items-center justify-between">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onBack}
-            className="p-1.5 hover:bg-stone-100 rounded text-stone-500 flex-shrink-0"
+            className="flex-shrink-0 rounded p-1.5 text-space-muted hover:bg-space-750 hover:text-white"
             aria-label="返回"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -44,10 +44,10 @@ export function ReviewToolbar({
             </svg>
           </button>
           <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-stone-800 truncate font-ui">
+            <h2 className="truncate font-ui text-sm font-semibold text-space-text">
               {fileName}
             </h2>
-            <p className="text-xs text-stone-500 font-ui">
+            <p className="font-ui text-xs text-space-muted">
               {totalPages} 页 · 第 {currentPage} 页
             </p>
           </div>
@@ -59,7 +59,7 @@ export function ReviewToolbar({
           )}
           <button
             onClick={onConfirm}
-            className="px-4 py-1.5 bg-celadon text-white rounded-lg text-sm font-medium hover:bg-celadon/90 transition-colors disabled:opacity-50 font-ui"
+            className="btn-primary px-4 py-1.5"
           >
             进入 MinerU 解析
           </button>
@@ -67,16 +67,16 @@ export function ReviewToolbar({
       </div>
 
       {/* Row 2: Toolbar */}
-      <div className="px-4 py-1.5 border-t border-stone-100 flex items-center gap-2 overflow-x-auto">
+      <div className="flex items-center gap-2 overflow-x-auto border-t border-space-border px-4 py-1.5">
         {/* Page navigation */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={onPrevPage}
             disabled={currentPage <= 1}
-            className="p-1 rounded hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="rounded p-1 hover:bg-space-750 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="上一页"
           >
-            <svg className="w-4 h-4 text-stone-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4 text-ink-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M15 18l-6-6 6-6" />
             </svg>
           </button>
@@ -89,49 +89,49 @@ export function ReviewToolbar({
               const page = parseInt(e.target.value, 10);
               if (page >= 1 && page <= totalPages) onPageChange(page);
             }}
-            className="w-12 h-8 text-center text-sm border border-stone-200 rounded font-mono focus:outline-none focus:border-celadon"
+            className="h-8 w-12 rounded border border-space-border bg-space-850 text-center font-mono text-sm text-space-text focus:border-celadon focus:outline-none"
           />
-          <span className="text-xs text-stone-400 font-mono">/ {totalPages}</span>
+          <span className="font-mono text-xs text-space-muted">/ {totalPages}</span>
           <button
             onClick={onNextPage}
             disabled={currentPage >= totalPages}
-            className="p-1 rounded hover:bg-stone-100 disabled:opacity-30 disabled:cursor-not-allowed"
+            className="rounded p-1 hover:bg-space-750 disabled:cursor-not-allowed disabled:opacity-30"
             aria-label="下一页"
           >
-            <svg className="w-4 h-4 text-stone-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4 text-ink-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M9 18l6-6-6-6" />
             </svg>
           </button>
         </div>
 
-        <div className="w-px h-5 bg-stone-200 flex-shrink-0" />
+        <div className="h-5 w-px flex-shrink-0 bg-space-border" />
 
         {/* Zoom controls */}
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={onZoomOut}
-            className="p-1 rounded hover:bg-stone-100"
+            className="rounded p-1 hover:bg-space-750"
             aria-label="缩小"
           >
-            <svg className="w-4 h-4 text-stone-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4 text-ink-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M20 12H4" />
             </svg>
           </button>
-          <span className="text-xs text-stone-500 font-mono w-10 text-center">
+          <span className="w-10 text-center font-mono text-xs text-space-muted">
             {Math.round(scale * 100)}%
           </span>
           <button
             onClick={onZoomIn}
-            className="p-1 rounded hover:bg-stone-100"
+            className="rounded p-1 hover:bg-space-750"
             aria-label="放大"
           >
-            <svg className="w-4 h-4 text-stone-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <svg className="h-4 w-4 text-ink-light" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M12 4v16m8-8H4" />
             </svg>
           </button>
           <button
             onClick={onFitWidth}
-            className="p-1 rounded hover:bg-stone-100 text-xs text-stone-600 px-2"
+            className="rounded px-2 py-1 text-xs text-ink-light hover:bg-space-750"
             aria-label="适合宽度"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
