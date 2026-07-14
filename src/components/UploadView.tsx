@@ -4,10 +4,12 @@ import { validateFile, parsePdf, PPTX_MIME_TYPE } from '../lib/pdf';
 import { parsePptxBuffer } from '../lib/pptx';
 import { saveDocumentSource } from '../lib/document-source';
 import { generateId } from '../lib/utils';
+import { useLibraryStore } from '../store/useLibraryStore';
 
 export function UploadView() {
   const setDocument = useStore(s => s.setDocument);
   const loadExample = useStore(s => s.loadExampleCourse);
+  const activeCourseId = useLibraryStore(s => s.activeCourseId);
   const [isDragging, setIsDragging] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
@@ -43,6 +45,7 @@ export function UploadView() {
       await saveDocumentSource(docId, source);
       setDocument({
         id: docId,
+        courseId: activeCourseId ?? undefined,
         title: file.name.replace(/\.(pdf|pptx)$/i, ''),
         fileName: file.name,
         fileType: isPptx ? 'pptx' as const : 'pdf' as const,
@@ -55,7 +58,7 @@ export function UploadView() {
     } finally {
       setIsProcessing(false);
     }
-  }, [setDocument]);
+  }, [activeCourseId, setDocument]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();

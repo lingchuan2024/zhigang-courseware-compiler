@@ -5,12 +5,17 @@ import {
   STAGE_LABELS,
 } from '../lib/workflow-navigation';
 import type { ProductStage } from '../types';
+import { useLibraryStore } from '../store/useLibraryStore';
 
 interface SidebarProps {
   onOpenSettings: () => void;
 }
 
 export function Sidebar({ onOpenSettings }: SidebarProps) {
+  const navigateLibrary = useLibraryStore(state => state.navigate);
+  const refreshLibrary = useLibraryStore(state => state.refresh);
+  const activeCourseId = useLibraryStore(state => state.activeCourseId);
+  const activeCourse = useLibraryStore(state => state.courses.find(course => course.id === activeCourseId));
   const stage = useStore(s => s.stage);
   const jobStatus = useStore(s => s.jobStatus);
   const reset = useStore(s => s.reset);
@@ -91,8 +96,11 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     <aside className="w-56 md:w-64 bg-ink text-paper flex flex-col h-screen flex-shrink-0 transition-transform duration-300 -translate-x-full md:translate-x-0">
       {/* Logo */}
       <div className="px-6 py-5 border-b border-ink-light/30">
+        <button type="button" onClick={() => navigateLibrary('home')} className="text-left">
         <h1 className="font-song text-2xl font-bold tracking-wider">知纲</h1>
         <p className="text-paper/50 text-xs mt-1 font-mono">课件编译器 v0.1</p>
+        </button>
+        {activeCourse && <p className="mt-3 truncate text-xs text-celadon-light/70">{activeCourse.name}</p>}
       </div>
 
       {/* 流程导航 */}
@@ -232,6 +240,13 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
 
       {/* 底部操作 */}
       <div className="px-4 py-4 border-t border-ink-light/30 space-y-1">
+        <button
+          type="button"
+          onClick={() => { void refreshLibrary(); navigateLibrary('library'); }}
+          className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-ui text-paper/70 hover:text-white hover:bg-ink-light/20 rounded-lg transition-colors"
+        >
+          <span aria-hidden="true">▦</span><span>返回课件库</span>
+        </button>
         <button
           onClick={onOpenSettings}
           className="flex items-center gap-2 w-full text-left px-3 py-2 text-sm font-ui text-paper/70 hover:text-white hover:bg-ink-light/20 rounded-lg transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-light/30"

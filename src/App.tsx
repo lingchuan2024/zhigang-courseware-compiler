@@ -8,23 +8,52 @@ import { NotesView } from './components/NotesView';
 import { SettingsModal } from './components/SettingsModal';
 import { MinerUParseView } from './components/MinerUParseView';
 import { KnowledgeCardsView } from './components/KnowledgeCardsView';
+import { HomeView } from './components/HomeView';
+import { LibraryView } from './components/LibraryView';
+import { AppShell } from './components/AppShell';
+import { useLibraryStore } from './store/useLibraryStore';
 
 function App() {
   const stage = useStore(s => s.stage);
   const initializeFromStorage = useStore(s => s.initializeFromStorage);
+  const screen = useLibraryStore(s => s.screen);
+  const initializeLibrary = useLibraryStore(s => s.initialize);
+  const libraryInitialized = useLibraryStore(s => s.initialized);
+  const navigateLibrary = useLibraryStore(s => s.navigate);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
     initializeFromStorage();
-    setInitialized(true);
-  }, [initializeFromStorage]);
+    void initializeLibrary().finally(() => setInitialized(true));
+  }, [initializeFromStorage, initializeLibrary]);
 
-  if (!initialized) {
+  if (!initialized || !libraryInitialized) {
     return (
       <div className="min-h-screen bg-paper flex items-center justify-center">
         <div className="w-8 h-8 border-4 border-paper-dark border-t-celadon rounded-full animate-spin"></div>
       </div>
+    );
+  }
+
+  if (screen === 'home') {
+    return (
+      <>
+        <HomeView onOpenSettings={() => setSettingsOpen(true)} />
+        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      </>
+    );
+  }
+
+  if (screen === 'library') return <LibraryView />;
+
+  if (screen === 'qa') {
+    return (
+      <AppShell onHome={() => navigateLibrary('home')} action={<button type="button" onClick={() => navigateLibrary('library')} className="text-sm text-ink/70">课件库</button>}>
+        <div className="grid min-h-[calc(100vh-4rem)] place-items-center px-6 text-center">
+          <div><p className="font-song text-3xl font-bold text-ink">全库知识问答</p><p className="mt-3 text-stone-500">正在建立知识卡片索引。</p></div>
+        </div>
+      </AppShell>
     );
   }
 
