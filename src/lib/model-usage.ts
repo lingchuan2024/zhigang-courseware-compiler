@@ -7,7 +7,10 @@ export type ModelTaskType =
   | 'internal-structure'
   | 'note-generation'
   | 'note-repair'
-  | 'topic-merge';
+  | 'topic-merge'
+  | 'topic-candidate-extraction'
+  | 'topic-granularity-judgment'
+  | 'topic-quality-repair';
 
 export interface ModelUsage {
   promptTokens: number | undefined;

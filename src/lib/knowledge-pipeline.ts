@@ -6,12 +6,13 @@ import {
   RecommendedLearningPath,
   ModelConfig,
   StructureExtractionStatus,
+  TopicQualityReport,
 } from '../types';
 import { createKnowledgePackage, updatePackageInternalStructure } from './knowledge-package';
 import { extractTopicContent } from './model-v2';
 import { createInternalStructure } from './internal-structure';
 import { deriveLearningPath as deriveLearningPathFromGraph } from './learning-path';
-import { extractTopicsWithBatching, type BatchExtractionOptions } from './ai-extraction-batching';
+import { extractTopicsWithBatching, type BatchExtractionOptions, type ExtractionCheckpoint } from './ai-extraction-batching';
 
 // ========== Pipeline Result Types ==========
 
@@ -24,11 +25,22 @@ export interface PipelineResult {
   source: 'ai' | 'ai-fallback' | 'failed';
   status: StructureExtractionStatus;
   errors: string[];
+  qualityReport: TopicQualityReport | null;
+  /** 检查点数据，用于从失败阶段恢复 */
+  checkpoint?: ExtractionCheckpoint;
+  /** 失败时的详细阶段信息 */
+  failedStage?: string;
+  failedWindowIndex?: number;
 }
 
 export interface PipelineOptions {
   onStatusChange?: (status: StructureExtractionStatus) => void;
   onWindowProgress?: (current: number, total: number) => void;
+  onQualityReport?: (report: TopicQualityReport, round: number) => void;
+  /** 课件总页数（用于质量检测） */
+  totalPages?: number;
+  /** 从检查点恢复 */
+  checkpoint?: ExtractionCheckpoint;
 }
 
 // ========== Layer 1: Macro Knowledge Graph (AI-only) ==========
@@ -51,10 +63,17 @@ export async function buildMacroKnowledgeGraph(
   source: 'ai' | 'ai-fallback' | 'failed';
   status: StructureExtractionStatus;
   errors: string[];
+  qualityReport: TopicQualityReport | null;
+  checkpoint?: ExtractionCheckpoint;
+  failedStage?: string;
+  failedWindowIndex?: number;
 }> {
   const batchOptions: BatchExtractionOptions = {
     onStatusChange: options.onStatusChange,
     onWindowProgress: options.onWindowProgress,
+    onQualityReport: options.onQualityReport,
+    totalPages: options.totalPages,
+    checkpoint: options.checkpoint,
   };
 
   const result = await extractTopicsWithBatching(modelConfig, evidences, batchOptions);
@@ -66,6 +85,10 @@ export async function buildMacroKnowledgeGraph(
     source: result.source,
     status: result.status,
     errors: result.errors,
+    qualityReport: result.qualityReport,
+    checkpoint: result.checkpoint,
+    failedStage: result.failedStage,
+    failedWindowIndex: result.failedWindowIndex,
   };
 }
 
@@ -215,6 +238,10 @@ export async function runFullPipeline(
       source: 'failed',
       status: 'model-required',
       errors: macroResult.errors,
+      qualityReport: macroResult.qualityReport,
+      checkpoint: macroResult.checkpoint,
+      failedStage: macroResult.failedStage,
+      failedWindowIndex: macroResult.failedWindowIndex,
     };
   }
 
@@ -228,6 +255,10 @@ export async function runFullPipeline(
       source: 'failed',
       status: 'failed',
       errors: [...macroResult.errors, 'AI主题提取失败'],
+      qualityReport: macroResult.qualityReport,
+      checkpoint: macroResult.checkpoint,
+      failedStage: macroResult.failedStage,
+      failedWindowIndex: macroResult.failedWindowIndex,
     };
   }
 
@@ -256,5 +287,7 @@ export async function runFullPipeline(
     source: macroResult.source,
     status: 'ready',
     errors: [...errors, ...macroResult.errors],
+    qualityReport: macroResult.qualityReport,
+    checkpoint: macroResult.checkpoint,
   };
 }

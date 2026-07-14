@@ -1,28 +1,38 @@
-import { EvidenceAtom, CourseTopic, MacroKnowledgeRelation, ModelConfig, StructureExtractionStatus } from '../types';
+import { EvidenceAtom, CourseTopic, MacroKnowledgeRelation, ModelConfig, StructureExtractionStatus, TopicQualityReport } from '../types';
 import {
-  extractTopics,
-  extractTopicsWithFeedback,
+  extractTopicCandidates,
+  judgeTopicGranularity,
+  repairTopicsWithQuality,
   extractRelations,
   type TopicExtractionResult,
-  type RawTopicExtractionResult,
+  type CandidateExtractionResult,
 } from './model-v2';
+import { ExtractionError } from './extraction-errors';
 import {
   validateTopicExtraction,
   type ValidationResult,
 } from './topic-extraction-validation';
+import {
+  checkTopicQuality,
+  buildQualityRepairFeedback,
+  type QualityCheckOptions,
+} from './topic-quality';
 import {
   topologicalSort,
   applyRecommendedOrder,
 } from './knowledge-graph';
 import { generateId } from './utils';
 
-// ========== 带修复重试的主题提取 ==========
+// ========== 两阶段 AI 提取 + 质量门 ==========
 
-const MAX_REPAIR_RETRIES = 2;
+const MAX_QUALITY_REPAIR_ROUNDS = 2;
 
 export interface TopicExtractionWithRepairOptions {
   onStatusChange?: (status: StructureExtractionStatus) => void;
   onValidationResult?: (validation: ValidationResult, attempt: number) => void;
+  onQualityReport?: (report: TopicQualityReport, round: number) => void;
+  /** 课件总页数（用于质量检测） */
+  totalPages?: number;
 }
 
 export interface TopicExtractionWithRepairResult {
@@ -32,20 +42,22 @@ export interface TopicExtractionWithRepairResult {
   source: 'ai' | 'ai-fallback' | 'failed';
   status: StructureExtractionStatus;
   validation: ValidationResult | null;
+  qualityReport: TopicQualityReport | null;
   attempts: number;
   rawResult: TopicExtractionResult | null;
   errors: string[];
 }
 
 /**
- * 带校验和修复重试的 AI 主题提取。
+ * 两阶段 AI 提取 + 一阶段 AI 修复。
  *
  * 流程：
- * 1. 调用 extractTopics（初始提取）
- * 2. 校验结果
- * 3. 如果校验失败，将错误反馈给AI，请求修复
- * 4. 最多重试 MAX_REPAIR_RETRIES 次
- * 5. 如果最终仍失败，返回 failed 状态
+ * 1. 第一阶段：分批生成候选知识点（extractTopicCandidates）
+ * 2. 第二阶段：全局合并与粒度判定（judgeTopicGranularity）
+ * 3. 第三阶段：质量检测与 AI 修复（checkTopicQuality + repairTopicsWithQuality）
+ *    - 最多修复两轮
+ *    - 两轮后仍不合格时进入明确失败状态，展示质量诊断
+ *    - 不能降级成一个"课程内容"节点
  *
  * 不使用本地回退。没有模型时返回 model-required。
  */
@@ -66,99 +78,223 @@ export async function extractTopicsWithRepair(
       source: 'failed',
       status: 'model-required',
       validation: null,
+      qualityReport: null,
       attempts: 0,
       rawResult: null,
       errors: ['未配置AI模型'],
     };
   }
 
+  const totalPages = options.totalPages || 0;
+
+  // ========== 第一阶段：候选知识点提取 ==========
   options.onStatusChange?.('extracting-topics');
 
-  let currentResult: TopicExtractionResult | null = null;
-  let currentValidation: ValidationResult | null = null;
-  let lastRawResult: RawTopicExtractionResult | null = null;
+  // model-v2 不再吞掉异常 — 网络/HTTP/JSON 等错误会以 ExtractionError 抛出。
+  // 这里捕获后转成 failed 状态，保持 extractTopicsWithRepair 的旧接口契约
+  // （返回结果对象而非抛出），同时把结构化错误信息透出到 errors 中。
+  let candidateResult: CandidateExtractionResult;
+  try {
+    candidateResult = await extractTopicCandidates(config, evidences);
+  } catch (e) {
+    const detail = e instanceof ExtractionError
+      ? e.toUserMessage()
+      : e instanceof Error ? e.message : String(e);
+    errors.push(`第一阶段候选知识点提取失败：未返回有效候选（${detail}）`);
+    return {
+      topics: [],
+      relations: [],
+      warnings: [...warnings],
+      source: 'failed',
+      status: 'failed',
+      validation: null,
+      qualityReport: null,
+      attempts: 1,
+      rawResult: null,
+      errors,
+    };
+  }
 
-  for (let attempt = 0; attempt <= MAX_REPAIR_RETRIES; attempt++) {
-    try {
-      if (attempt === 0) {
-        // 初始提取
-        currentResult = await extractTopics(config, evidences);
-      } else {
-        // 修复重试
-        options.onStatusChange?.('repairing-topics');
-        const feedback = currentValidation?.repairFeedback || '上一次提取结果存在问题';
-        currentResult = await extractTopicsWithFeedback(
+  if (!candidateResult.usedModel || candidateResult.candidates.length === 0) {
+    errors.push('第一阶段候选知识点提取失败：未返回有效候选');
+    return {
+      topics: [],
+      relations: [],
+      warnings: [...warnings, ...candidateResult.warnings],
+      source: 'failed',
+      status: 'failed',
+      validation: null,
+      qualityReport: null,
+      attempts: 1,
+      rawResult: null,
+      errors,
+    };
+  }
+
+  warnings.push(...candidateResult.warnings);
+  warnings.push(`第一阶段提取了 ${candidateResult.candidates.length} 个候选知识点`);
+
+  // ========== 第二阶段：全局合并与粒度判定 ==========
+  options.onStatusChange?.('repairing-topics');
+
+  let currentResult: TopicExtractionResult;
+  try {
+    currentResult = await judgeTopicGranularity(
+      config,
+      candidateResult.candidates,
+      evidences
+    );
+  } catch (e) {
+    const detail = e instanceof ExtractionError
+      ? e.toUserMessage()
+      : e instanceof Error ? e.message : String(e);
+    errors.push(`第二阶段全局合并失败：未返回有效知识点（${detail}）`);
+    return {
+      topics: [],
+      relations: [],
+      warnings: [...warnings],
+      source: 'failed',
+      status: 'failed',
+      validation: null,
+      qualityReport: null,
+      attempts: 2,
+      rawResult: null,
+      errors,
+    };
+  }
+
+  if (!currentResult.usedModel || currentResult.topics.length === 0) {
+    errors.push('第二阶段全局合并失败：未返回有效知识点');
+    return {
+      topics: [],
+      relations: [],
+      warnings: [...warnings, ...currentResult.warnings],
+      source: 'failed',
+      status: 'failed',
+      validation: null,
+      qualityReport: null,
+      attempts: 2,
+      rawResult: currentResult,
+      errors,
+    };
+  }
+
+  warnings.push(...currentResult.warnings);
+  warnings.push(`第二阶段全局整理后得到 ${currentResult.topics.length} 个知识点`);
+
+  // ========== 第三阶段：质量检测与 AI 修复 ==========
+  let currentValidation: ValidationResult | null = null;
+  let currentQualityReport: TopicQualityReport | null = null;
+
+  for (let round = 0; round <= MAX_QUALITY_REPAIR_ROUNDS; round++) {
+    options.onStatusChange?.('quality-checking');
+
+    // 基础校验
+    currentValidation = validateTopicExtraction(currentResult, evidences);
+    options.onValidationResult?.(currentValidation, round + 1);
+
+    // 质量检测
+    const qualityOpts: QualityCheckOptions = { totalPages };
+    currentQualityReport = checkTopicQuality(currentResult.topics, evidences, qualityOpts);
+    options.onQualityReport?.(currentQualityReport, round + 1);
+
+    // 如果基础校验通过且质量检测无 error，进入关系提取
+    if (currentValidation.valid && !currentQualityReport.needsRepair) {
+      warnings.push(...currentValidation.warnings.map(w => w.message));
+
+      // 提取关系
+      options.onStatusChange?.('extracting-relations');
+      let relations: MacroKnowledgeRelation[] = [];
+      let relationSource: 'ai' | 'ai-fallback' = 'ai-fallback';
+
+      try {
+        const { relations: aiRelations, usedModel: relUsedModel } =
+          await extractRelations(config, currentResult.topics, evidences);
+
+        if (relUsedModel) {
+          relations = aiRelations;
+          relationSource = 'ai';
+        } else {
+          relations = generateBasicRelations(currentResult.topics);
+          warnings.push('AI关系提取未使用模型，已生成基础连续关系');
+        }
+      } catch (e) {
+        relations = generateBasicRelations(currentResult.topics);
+        warnings.push('AI关系提取失败，已回退到基础连续关系');
+      }
+
+      // 拓扑排序
+      const topoResult = topologicalSort(currentResult.topics, relations);
+      const orderedTopics = applyRecommendedOrder(currentResult.topics, topoResult);
+      warnings.push(...topoResult.warnings);
+
+      return {
+        topics: orderedTopics,
+        relations,
+        warnings,
+        source: relationSource,
+        status: 'ready',
+        validation: currentValidation,
+        qualityReport: currentQualityReport,
+        attempts: round + 1,
+        rawResult: currentResult,
+        errors: [],
+      };
+    }
+
+    // 校验或质量检测失败
+    if (currentValidation.errors.length > 0) {
+      errors.push(`第${round + 1}次校验失败：${currentValidation.errors.map(e => e.message).join('; ')}`);
+    }
+    if (currentQualityReport.needsRepair) {
+      const errorIssues = currentQualityReport.issues.filter(i => i.severity === 'error');
+      errors.push(`第${round + 1}次质量检测发现 ${errorIssues.length} 个错误`);
+    }
+    warnings.push(...currentValidation.warnings.map(w => w.message));
+
+    // 如果还有修复机会
+    if (round < MAX_QUALITY_REPAIR_ROUNDS) {
+      options.onStatusChange?.('quality-repairing');
+
+      // 构建修复反馈
+      const qualityFeedback = buildQualityRepairFeedback(
+        currentResult.topics,
+        evidences,
+        currentQualityReport
+      );
+
+      // 合并基础校验反馈和质量修复反馈
+      const fullFeedback = currentValidation.repairFeedback
+        ? `${currentValidation.repairFeedback}\n\n${qualityFeedback}`
+        : qualityFeedback;
+
+      try {
+        const repairResult = await repairTopicsWithQuality(
           config,
           evidences,
-          feedback,
-          lastRawResult
+          currentResult.topics,
+          fullFeedback
         );
-      }
 
-      if (!currentResult.usedModel || currentResult.topics.length === 0) {
-        errors.push(`第${attempt + 1}次提取未返回有效结果`);
-        continue;
-      }
-
-      lastRawResult = currentResult.raw;
-
-      // 校验
-      currentValidation = validateTopicExtraction(currentResult, evidences);
-      options.onValidationResult?.(currentValidation, attempt + 1);
-
-      if (currentValidation.valid) {
-        // 校验通过
-        warnings.push(...currentValidation.warnings.map(w => w.message));
-
-        // 提取关系
-        options.onStatusChange?.('extracting-relations');
-        let relations: MacroKnowledgeRelation[] = [];
-        let relationSource: 'ai' | 'ai-fallback' = 'ai-fallback';
-
-        try {
-          const { relations: aiRelations, usedModel: relUsedModel } =
-            await extractRelations(config, currentResult.topics, evidences);
-
-          if (relUsedModel) {
-            relations = aiRelations;
-            relationSource = 'ai';
-          } else {
-            relations = generateBasicRelations(currentResult.topics);
-            warnings.push('AI关系提取未使用模型，已生成基础连续关系');
-          }
-        } catch (e) {
-          relations = generateBasicRelations(currentResult.topics);
-          warnings.push('AI关系提取失败，已回退到基础连续关系');
+        if (repairResult.usedModel && repairResult.topics.length > 0) {
+          currentResult = repairResult;
+          warnings.push(...repairResult.warnings);
+          warnings.push(`第${round + 1}轮修复后得到 ${repairResult.topics.length} 个知识点`);
+        } else {
+          errors.push(`第${round + 1}轮修复未返回有效结果`);
+          // 修复失败，继续用之前的结果
         }
-
-        // 拓扑排序
-        const topoResult = topologicalSort(currentResult.topics, relations);
-        const orderedTopics = applyRecommendedOrder(currentResult.topics, topoResult);
-        warnings.push(...topoResult.warnings);
-
-        return {
-          topics: orderedTopics,
-          relations,
-          warnings,
-          source: relationSource,
-          status: 'ready',
-          validation: currentValidation,
-          attempts: attempt + 1,
-          rawResult: currentResult,
-          errors: [],
-        };
-      } else {
-        // 校验失败
-        errors.push(`第${attempt + 1}次提取校验失败：${currentValidation.errors.map(e => e.message).join('; ')}`);
-        warnings.push(...currentValidation.warnings.map(w => w.message));
+      } catch (e) {
+        const errorMsg = e instanceof Error ? e.message : String(e);
+        errors.push(`第${round + 1}轮修复异常：${errorMsg}`);
       }
-    } catch (e) {
-      const errorMsg = e instanceof Error ? e.message : String(e);
-      errors.push(`第${attempt + 1}次提取异常：${errorMsg}`);
     }
   }
 
-  // 所有重试都失败
+  // 所有修复轮次都用完，仍然不合格
+  // 进入明确失败状态，展示质量诊断，不降级为"课程内容"
+  errors.push('两轮质量修复后仍不合格，进入失败状态。不会降级为泛化节点。');
+
   return {
     topics: [],
     relations: [],
@@ -166,7 +302,8 @@ export async function extractTopicsWithRepair(
     source: 'failed',
     status: 'failed',
     validation: currentValidation,
-    attempts: MAX_REPAIR_RETRIES + 1,
+    qualityReport: currentQualityReport,
+    attempts: MAX_QUALITY_REPAIR_ROUNDS + 1,
     rawResult: currentResult,
     errors,
   };

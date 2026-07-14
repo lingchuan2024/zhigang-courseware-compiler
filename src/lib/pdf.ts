@@ -2,14 +2,23 @@ import { CoursePage, SourceTextItem, SourceTextBlock } from '../types';
 
 // 文件验证
 export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
-export const ALLOWED_TYPES = ['application/pdf'];
+export const PPTX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+export const ALLOWED_TYPES = ['application/pdf', PPTX_MIME_TYPE];
 
 export function validateFile(file: File): { valid: boolean; error?: string } {
   if (!file) {
     return { valid: false, error: '未选择文件' };
   }
-  if (!ALLOWED_TYPES.includes(file.type) && !file.name.toLowerCase().endsWith('.pdf')) {
-    return { valid: false, error: '只支持PDF文件' };
+  const extension = file.name.toLowerCase();
+  if (extension.endsWith('.ppt')) {
+    return { valid: false, error: '暂不支持旧版 PPT，请另存为 PPTX 后上传' };
+  }
+  if (
+    !ALLOWED_TYPES.includes(file.type)
+    && !extension.endsWith('.pdf')
+    && !extension.endsWith('.pptx')
+  ) {
+    return { valid: false, error: '只支持 PDF 或 PPTX 文件' };
   }
   if (file.size > MAX_FILE_SIZE) {
     return { valid: false, error: `文件大小不能超过${MAX_FILE_SIZE / 1024 / 1024}MB` };
@@ -29,6 +38,12 @@ async function loadPdfJs(): Promise<typeof import('pdfjs-dist')> {
   pdfjs.GlobalWorkerOptions.workerSrc = worker.default;
   pdfjsLib = pdfjs;
   return pdfjs;
+}
+
+/** Load the original PDF for high-resolution, on-demand page rendering. */
+export async function loadPdfDocument(buffer: ArrayBuffer) {
+  const pdfjs = await loadPdfJs();
+  return pdfjs.getDocument({ data: buffer }).promise;
 }
 
 // ========== 机械属性提取 ==========

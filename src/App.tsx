@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useStore } from './store/useStore';
 import { Sidebar } from './components/Sidebar';
 import { UploadView } from './components/UploadView';
-import { ParseReviewView } from './components/ParseReviewView';
-import { StructureReviewView } from './components/StructureReviewView';
-import { GeneratingView } from './components/GeneratingView';
+import { DocumentReviewWorkspace } from './components/document-review/DocumentReviewWorkspace';
+import { KnowledgeStructureView } from './components/KnowledgeStructureView';
 import { NotesView } from './components/NotesView';
 import { SettingsModal } from './components/SettingsModal';
+import { MinerUParseView } from './components/MinerUParseView';
+import { KnowledgeCardsView } from './components/KnowledgeCardsView';
 
 function App() {
   const stage = useStore(s => s.stage);
@@ -31,14 +32,16 @@ function App() {
     switch (stage) {
       case 'upload':
         return <UploadView />;
-      case 'parse-review':
-        return <ParseReviewView />;
-      case 'structure-review':
-        return <StructureReviewView />;
-      case 'generating':
-        return <GeneratingView />;
+      case 'document':
+        return <DocumentReviewWorkspace />;
+      case 'mineru':
+        return <MinerUParseView onOpenSettings={() => setSettingsOpen(true)} />;
+      case 'structure':
+        return <KnowledgeStructureView onOpenSettings={() => setSettingsOpen(true)} />;
+      case 'cards':
+        return <KnowledgeCardsView />;
       case 'notes':
-        return <NotesView />;
+        return <NotesView onOpenSettings={() => setSettingsOpen(true)} />;
       default:
         return <UploadView />;
     }
@@ -57,6 +60,7 @@ function App() {
             }
           }}
           className="bg-ink text-white p-2 rounded shadow-lg"
+          aria-label="打开菜单"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />

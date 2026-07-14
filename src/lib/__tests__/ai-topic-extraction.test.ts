@@ -42,7 +42,24 @@ function makeResponse(body: unknown, ok = true, status = 200) {
   };
 }
 
-/** Build a valid topic extraction response. */
+/** Build a valid candidate extraction response for Stage 1 (extractTopicCandidates). */
+function candidateResponse(titles: string[], evIdGroups: string[][]) {
+  return {
+    candidates: titles.map((title, idx) => ({
+      temporaryId: `c${idx + 1}`,
+      title,
+      aliases: [] as string[],
+      learningObjective: `掌握${title}`,
+      evidenceIds: evIdGroups[idx],
+      prerequisiteHints: [] as string[],
+      internalItemHints: [] as string[],
+      confidence: 0.9,
+    })),
+    warnings: [] as string[],
+  };
+}
+
+/** Build a valid topic extraction response for Stage 2 (judgeTopicGranularity) or repair. */
 function topicResponse(titles: string[], evIdGroups: string[][]) {
   return {
     topics: titles.map((title, idx) => ({
@@ -82,7 +99,7 @@ function relationResponse(
   };
 }
 
-/** A topic extraction response with a generic title (fails validation). */
+/** A topic extraction response with a generic title (fails quality check). */
 function genericTopicResponse() {
   return {
     topics: [
@@ -102,6 +119,10 @@ function genericTopicResponse() {
     warnings: [] as string[],
   };
 }
+
+/** Standard 3-topic valid response data (6 evidences, 2 per topic, each < 35% coverage). */
+const VALID_TITLES = ['梯度下降', '反向传播', '损失函数'];
+const VALID_EV_GROUPS = [['ev1', 'ev2'], ['ev3', 'ev4'], ['ev5', 'ev6']];
 
 // ========== Mock Setup ==========
 
@@ -135,7 +156,7 @@ describe('extractTopicsWithRepair', () => {
 
   describe('no model config', () => {
     it('returns model-required when config is null', async () => {
-      const result = await extractTopicsWithRepair(null, makeEvidences(4));
+      const result = await extractTopicsWithRepair(null, makeEvidences(6));
 
       expect(result.status).toBe('model-required');
       expect(result.source).toBe('failed');
@@ -149,7 +170,7 @@ describe('extractTopicsWithRepair', () => {
     it('returns model-required when config has empty apiKey', async () => {
       const result = await extractTopicsWithRepair(
         { endpoint: 'https://api.example.com', model: 'test', apiKey: '' },
-        makeEvidences(4)
+        makeEvidences(6)
       );
 
       expect(result.status).toBe('model-required');
@@ -164,9 +185,13 @@ describe('extractTopicsWithRepair', () => {
 
   describe('with model and mocked fetch', () => {
     it('extracts topics successfully on first attempt', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
+      // Stage 1: extractTopicCandidates
+      // Stage 2: judgeTopicGranularity
+      // Stage 3: quality check passes → extractRelations
       mockSequence([
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -175,17 +200,18 @@ describe('extractTopicsWithRepair', () => {
       expect(result.status).toBe('ready');
       expect(result.source).toBe('ai');
       expect(result.attempts).toBe(1);
-      expect(result.topics.length).toBe(2);
+      expect(result.topics.length).toBe(3);
       expect(result.topics.some(t => t.title === '梯度下降')).toBe(true);
       expect(result.topics.some(t => t.title === '反向传播')).toBe(true);
       expect(result.relations.length).toBeGreaterThanOrEqual(1);
-      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock).toHaveBeenCalledTimes(3);
     });
 
     it('does not generate generic "课程内容" topic', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -197,9 +223,10 @@ describe('extractTopicsWithRepair', () => {
     });
 
     it('returns AI relations with correct topic IDs', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播', 'hard_prerequisite')),
       ]);
 
@@ -217,9 +244,10 @@ describe('extractTopicsWithRepair', () => {
     });
 
     it('falls back to basic relations when AI returns no relations', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody({ relations: [] }),
       ]);
 
@@ -228,7 +256,7 @@ describe('extractTopicsWithRepair', () => {
       expect(result.status).toBe('ready');
       // With no AI relations, basic relations are generated
       expect(result.source).toBe('ai-fallback');
-      expect(result.relations.length).toBe(1); // 2 topics → 1 basic relation
+      expect(result.relations.length).toBe(2); // 3 topics → 2 basic relations
       expect(result.relations[0].type).toBe('recommended_before');
     });
   });
@@ -237,11 +265,15 @@ describe('extractTopicsWithRepair', () => {
 
   describe('repair retry', () => {
     it('triggers repair retry when validation fails with generic title', async () => {
-      const evidences = makeEvidences(4);
-
+      const evidences = makeEvidences(6);
+      // Stage 1: candidates (valid)
+      // Stage 2: judgeTopicGranularity → generic title (fails quality)
+      // Repair: valid topics (passes quality)
+      // Relations
       mockSequence([
-        chatBody(genericTopicResponse()), // attempt 0: fails validation (generic title)
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])), // attempt 1: valid
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(genericTopicResponse()),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -249,17 +281,18 @@ describe('extractTopicsWithRepair', () => {
 
       expect(result.status).toBe('ready');
       expect(result.attempts).toBe(2);
-      expect(result.topics.length).toBe(2);
+      expect(result.topics.length).toBe(3);
       expect(result.topics.some(t => t.title === '课程内容')).toBe(false);
       expect(result.validation?.valid).toBe(true);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4);
     });
 
     it('invokes onValidationResult callback on each attempt', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(genericTopicResponse()),
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -277,10 +310,11 @@ describe('extractTopicsWithRepair', () => {
     });
 
     it('uses repair feedback from validation in the retry', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(genericTopicResponse()),
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -297,8 +331,14 @@ describe('extractTopicsWithRepair', () => {
 
   describe('max retries', () => {
     it('exhausts 3 total attempts (max retries = 2) when all fail', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
+      // Stage 1: valid candidates
+      // Stage 2: generic → fails quality
+      // Repair 0: generic → still fails
+      // Repair 1: generic → still fails
+      // Round 2: quality check fails, no more repair → failed
       mockSequence([
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(genericTopicResponse()),
         chatBody(genericTopicResponse()),
         chatBody(genericTopicResponse()),
@@ -308,16 +348,16 @@ describe('extractTopicsWithRepair', () => {
 
       expect(result.status).toBe('failed');
       expect(result.source).toBe('failed');
-      expect(result.attempts).toBe(3); // MAX_REPAIR_RETRIES + 1
+      expect(result.attempts).toBe(3); // MAX_QUALITY_REPAIR_ROUNDS + 1
       expect(result.topics).toEqual([]);
       expect(result.relations).toEqual([]);
-      expect(fetchMock).toHaveBeenCalledTimes(3);
+      expect(fetchMock).toHaveBeenCalledTimes(4); // 1 candidate + 1 granularity + 2 repairs
     });
 
     it('does not exceed 3 attempts even with more failures', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
-        chatBody(genericTopicResponse()),
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(genericTopicResponse()),
         chatBody(genericTopicResponse()),
         chatBody(genericTopicResponse()),
@@ -327,12 +367,13 @@ describe('extractTopicsWithRepair', () => {
       const result = await extractTopicsWithRepair(modelConfig, evidences);
 
       expect(result.attempts).toBe(3);
-      expect(fetchMock).toHaveBeenCalledTimes(3); // never more than 3
+      expect(fetchMock).toHaveBeenCalledTimes(4); // never more than 4
     });
 
     it('records errors for all failed attempts', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(genericTopicResponse()),
         chatBody(genericTopicResponse()),
         chatBody(genericTopicResponse()),
@@ -340,10 +381,10 @@ describe('extractTopicsWithRepair', () => {
 
       const result = await extractTopicsWithRepair(modelConfig, evidences);
 
-      expect(result.errors.length).toBe(3);
-      expect(result.errors[0]).toContain('第1次');
-      expect(result.errors[1]).toContain('第2次');
-      expect(result.errors[2]).toContain('第3次');
+      // Errors should mention all 3 rounds
+      expect(result.errors.some(e => e.includes('第1次'))).toBe(true);
+      expect(result.errors.some(e => e.includes('第2次'))).toBe(true);
+      expect(result.errors.some(e => e.includes('第3次'))).toBe(true);
     });
   });
 
@@ -351,9 +392,10 @@ describe('extractTopicsWithRepair', () => {
 
   describe('status callbacks', () => {
     it('invokes onStatusChange during successful extraction', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       mockSequence([
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -366,11 +408,12 @@ describe('extractTopicsWithRepair', () => {
       expect(statuses).toContain('extracting-relations');
     });
 
-    it('invokes repairing-topics status during repair', async () => {
-      const evidences = makeEvidences(4);
+    it('invokes quality-repairing status during repair', async () => {
+      const evidences = makeEvidences(6);
       mockSequence([
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(genericTopicResponse()),
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -379,7 +422,7 @@ describe('extractTopicsWithRepair', () => {
         onStatusChange: (s) => statuses.push(s),
       });
 
-      expect(statuses).toContain('repairing-topics');
+      expect(statuses).toContain('quality-repairing');
     });
   });
 
@@ -387,7 +430,7 @@ describe('extractTopicsWithRepair', () => {
 
   describe('error handling', () => {
     it('returns failed when fetch throws on all attempts', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       fetchMock.mockImplementation(async () => {
         throw new Error('Network error');
       });
@@ -395,41 +438,32 @@ describe('extractTopicsWithRepair', () => {
       const result = await extractTopicsWithRepair(modelConfig, evidences);
 
       expect(result.status).toBe('failed');
-      expect(result.attempts).toBe(3);
-      expect(result.errors.length).toBe(3);
-      // extractTopics catches internally → "未返回有效结果"
-      expect(result.errors.some(e => e.includes('未返回有效结果'))).toBe(true);
+      expect(result.attempts).toBe(1);
+      expect(result.errors.length).toBe(1);
+      // extractTopicCandidates catches internally → "未返回有效候选"
+      expect(result.errors.some(e => e.includes('未返回有效候选'))).toBe(true);
     });
 
     it('returns failed when fetch returns non-ok response', async () => {
-      const evidences = makeEvidences(4);
+      const evidences = makeEvidences(6);
       fetchMock.mockImplementation(async () => makeResponse({}, false, 500));
 
       const result = await extractTopicsWithRepair(modelConfig, evidences);
 
       expect(result.status).toBe('failed');
-      expect(result.attempts).toBe(3);
+      expect(result.attempts).toBe(1);
     });
 
-    it('recovers if first fetch fails but retry succeeds', async () => {
-      const evidences = makeEvidences(4);
-      let call = 0;
-      fetchMock.mockImplementation(async () => {
-        call++;
-        if (call === 1) {
-          return makeResponse({}, false, 500);
-        }
-        // Second call: valid topic extraction
-        return makeResponse(
-          chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']]))
-        );
-        // Note: relation fetch will reuse the last response since only 2 are defined
-      });
-      // Override with sequence for clarity
-      call = 0;
+    it('recovers if first quality check fails but repair succeeds', async () => {
+      const evidences = makeEvidences(6);
+      // Stage 1: valid candidates
+      // Stage 2: generic → fails quality
+      // Repair: valid → passes quality
+      // Relations
       mockSequence([
-        makeResponse({}, false, 500), // attempt 0: fetch error → extractTopics returns empty
-        chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])), // attempt 1: success
+        chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+        chatBody(genericTopicResponse()),
+        chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
         chatBody(relationResponse('梯度下降', '反向传播')),
       ]);
 
@@ -437,7 +471,7 @@ describe('extractTopicsWithRepair', () => {
 
       expect(result.status).toBe('ready');
       expect(result.attempts).toBe(2);
-      expect(result.topics.length).toBe(2);
+      expect(result.topics.length).toBe(3);
     });
   });
 });

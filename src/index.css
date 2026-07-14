@@ -2,9 +2,15 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .config-input {
+    @apply w-full px-3 py-2.5 rounded-lg border border-stone-200 bg-white text-sm text-stone-800 outline-none transition-colors focus:border-celadon focus:ring-2 focus:ring-celadon/10;
+  }
+}
+
 @layer base {
   body {
-    @apply bg-paper text-charcoal font-song;
+    @apply bg-paper text-charcoal font-ui;
   }
 
   ::-webkit-scrollbar {
@@ -23,23 +29,35 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-ink-light/60;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply bg-cinnabar text-white px-4 py-2 rounded font-mono text-sm hover:bg-cinnabar-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-ink text-white px-4 py-2 rounded-lg font-ui text-sm hover:bg-ink-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-ink-light/40;
   }
 
   .btn-secondary {
-    @apply bg-ink text-white px-4 py-2 rounded font-mono text-sm hover:bg-ink-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply bg-celadon text-white px-4 py-2 rounded-lg font-ui text-sm hover:bg-celadon-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
   }
 
   .btn-outline {
-    @apply border border-ink text-ink px-4 py-2 rounded font-mono text-sm hover:bg-ink hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+    @apply border border-ink text-ink px-4 py-2 rounded-lg font-ui text-sm hover:bg-ink hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus:ring-2 focus:ring-ink/20;
+  }
+
+  .btn-danger {
+    @apply border border-cinnabar/40 text-cinnabar px-4 py-2 rounded-lg font-ui text-sm hover:bg-cinnabar hover:text-white transition-colors;
   }
 
   .card {
-    @apply bg-white border border-paper-dark rounded p-4 shadow-sm;
+    @apply bg-white border border-paper-dark rounded-xl p-4 shadow-sm;
   }
 
   .evidence-tag {
@@ -49,4 +67,16 @@
   .page-number {
     @apply font-mono text-xs text-ink-light;
   }
+}
+
+.pptx-render-host .pptx-preview-wrapper {
+  background: transparent !important;
+  overflow: visible !important;
+}
+
+.pptx-render-host .zhigang-pptx-slide {
+  margin: 0 auto 32px !important;
+  box-shadow: 0 8px 28px rgba(28, 25, 23, 0.14);
+  outline: 1px solid rgba(214, 211, 209, 0.9);
+  scroll-margin-top: 16px;
 }

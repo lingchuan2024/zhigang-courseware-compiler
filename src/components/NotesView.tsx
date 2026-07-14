@@ -2,7 +2,10 @@ import { useState, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { getOrderedTopics } from '../lib/knowledge-graph';
 import { MarkdownWithCitations } from './MarkdownRenderer';
+import { JobProgress } from './progress/JobProgress';
+import { JobFailureState } from './progress/JobFailureState';
 import type { KnowledgePackage, CourseTopic } from '../types';
+import { MasterNoteView } from './MasterNoteView';
 
 const TYPE_LABELS: Record<string, string> = {
   concept: '概念', principle: '原理', method: '方法', formula: '公式',
@@ -244,7 +247,7 @@ function getFilteredContent(kp: KnowledgePackage, view: 'first-study' | 'review'
   return md;
 }
 
-export function NotesView() {
+function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
   const courseDoc = useStore(s => s.document);
   const topics = useStore(s => s.topics);
   const packages = useStore(s => s.knowledgePackages);
@@ -257,12 +260,60 @@ export function NotesView() {
   const regenerateNote = useStore(s => s.regenerateNoteForTopic);
   const regenerateAll = useStore(s => s.generateAllNotes);
   const reset = useStore(s => s.reset);
+  const job = useStore(s => s.job);
+  const jobStatus = useStore(s => s.jobStatus);
+  const pipelineProgress = useStore(s => s.pipelineProgress);
+  const navigateToStage = useStore(s => s.navigateToStage);
+  const staleMarker = useStore(s => s.staleMarker);
+  const modelConfig = useStore(s => s.modelConfig);
 
   const [activeTopicId, setActiveTopicId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
+  // ============== 内联生成进度状态 ==============
+
+  const isGenerating = jobStatus === 'running' && [
+    'generating-topic-notes', 'assembling-master-note'
+  ].includes(job || '');
+
+  const failedPackages = packages.filter(p => p.topic.noteStatus === 'failed');
+  const hasAnyFailures = failedPackages.length > 0;
+  const completedCount = packages.filter(p => p.note).length;
+  const hasAnyCompleted = completedCount > 0;
+  const isAllFailed = hasAnyFailures && !hasAnyCompleted && !isGenerating;
+
+  // Hooks must be called before any early returns
   const kpMap = useMemo(() => new Map(packages.map(p => [p.topic.id, p])), [packages]);
   const orderedTopics = useMemo(() => getOrderedTopics(topics, orderMode), [topics, orderMode]);
+  const citationEvidences = useMemo(() => {
+    return evidences.map(e => ({
+      id: e.id,
+      pageNumber: e.pageNumber,
+      content: e.content,
+    }));
+  }, [evidences]);
+
+  if (isGenerating) {
+    return (
+      <JobProgress
+        title="正在生成学习笔记"
+        progress={pipelineProgress}
+      />
+    );
+  }
+
+  if (isAllFailed) {
+    return (
+      <JobFailureState
+        title="笔记生成失败"
+        message={`所有 ${packages.length} 个知识点的笔记生成均失败`}
+        errors={failedPackages.map(p => `${p.topic.title}: 生成失败`)}
+        onRetry={() => regenerateAll()}
+        onBack={() => navigateToStage('structure')}
+        backLabel="返回知识结构"
+      />
+    );
+  }
 
   const activeTopic: CourseTopic | null = activeTopicId
     ? topics.find(t => t.id === activeTopicId) || orderedTopics[0] || null
@@ -275,16 +326,6 @@ export function NotesView() {
     { key: 'exam', label: '备考', desc: '公式与易错点' },
   ];
 
-  const completedCount = packages.filter(p => p.note).length;
-
-  const citationEvidences = useMemo(() => {
-    return evidences.map(e => ({
-      id: e.id,
-      pageNumber: e.pageNumber,
-      content: e.content,
-    }));
-  }, [evidences]);
-
   const content = activeKp ? getFilteredContent(activeKp, currentView) : '';
   const citations = activeKp?.note?.citations || [];
 
@@ -293,6 +334,16 @@ export function NotesView() {
       {/* 顶部栏 */}
       <header className="bg-white border-b border-stone-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-4">
+          <button
+            onClick={() => navigateToStage('structure')}
+            className="p-1.5 rounded hover:bg-stone-100 transition-colors"
+            title="返回知识结构"
+            aria-label="返回知识结构"
+          >
+            <svg className="w-5 h-5 text-stone-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
             className="p-1.5 rounded hover:bg-stone-100 transition-colors"
@@ -308,6 +359,12 @@ export function NotesView() {
               <span>{orderedTopics.length} 个知识点</span>
               <span>·</span>
               <span>{completedCount}/{packages.length} 已生成笔记</span>
+              {hasAnyFailures && (
+                <>
+                  <span>·</span>
+                  <span className="text-cinnabar">{failedPackages.length} 个失败</span>
+                </>
+              )}
               <span>·</span>
               <span className="flex items-center gap-1">
                 <span className={`w-2 h-2 rounded-full ${orderMode === 'ai-recommended' ? 'bg-cinnabar' : 'bg-stone-400'}`}></span>
@@ -318,6 +375,25 @@ export function NotesView() {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* 部分失败时提供重试 */}
+          {hasAnyFailures && (
+            <button
+              onClick={() => {
+                failedPackages.forEach(p => regenerateNote(p.topic.id));
+              }}
+              className="px-3 py-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              重试失败项 ({failedPackages.length})
+            </button>
+          )}
+          {!modelConfig?.apiKey && (
+            <button
+              onClick={onOpenSettings}
+              className="px-3 py-1.5 text-xs bg-amber-50 text-amber-700 border border-amber-300 rounded-lg hover:bg-amber-100 transition-colors"
+            >
+              配置AI模型
+            </button>
+          )}
           {/* 视图切换 */}
           <div className="flex bg-stone-100 rounded-lg p-0.5">
             {views.map(v => (
@@ -380,6 +456,24 @@ export function NotesView() {
           >重置</button>
         </div>
       </header>
+
+      {staleMarker && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2 flex items-center justify-between flex-shrink-0">
+          <span className="text-sm text-amber-700">
+            {staleMarker.reason === 'structure-edited'
+              ? '知识结构已修改，笔记需要重新生成'
+              : staleMarker.reason === 'evidence-edited'
+              ? '课件证据已修改，笔记需要重新生成'
+              : '数据已修改，笔记需要重新生成'}
+          </span>
+          <button
+            onClick={() => regenerateAll()}
+            className="text-xs text-amber-700 font-medium hover:text-amber-900 px-3 py-1 rounded hover:bg-amber-100"
+          >
+            重新生成
+          </button>
+        </div>
+      )}
 
       <div className="flex-1 flex overflow-hidden">
         {/* 左侧目录 */}
@@ -582,7 +676,7 @@ export function NotesView() {
                 <p className="text-sm text-stone-400 mt-1">
                   {packages.length === 0
                     ? '请先上传课件并生成知识结构'
-                    : '从左侧目录选择知识点，或切换到知识结构确认页'
+                    : '从左侧目录选择知识点'
                   }
                 </p>
               </div>
@@ -592,4 +686,11 @@ export function NotesView() {
       </div>
     </div>
   );
+}
+
+export function NotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
+  const usesMarkdownPipeline = useStore(state => state.sourceDocuments.length > 0 || state.knowledgeTopics.length > 0);
+  return usesMarkdownPipeline
+    ? <MasterNoteView onOpenSettings={onOpenSettings} />
+    : <LegacyNotesView onOpenSettings={onOpenSettings} />;
 }

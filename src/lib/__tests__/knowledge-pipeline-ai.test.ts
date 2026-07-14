@@ -48,7 +48,24 @@ function makeResponse(body: unknown, ok = true, status = 200) {
   };
 }
 
-/** Build a valid topic extraction response. */
+/** Build a valid candidate extraction response for Stage 1 (extractTopicCandidates). */
+function candidateResponse(titles: string[], evIdGroups: string[][]) {
+  return {
+    candidates: titles.map((title, idx) => ({
+      temporaryId: `c${idx + 1}`,
+      title,
+      aliases: [] as string[],
+      learningObjective: `掌握${title}`,
+      evidenceIds: evIdGroups[idx],
+      prerequisiteHints: [] as string[],
+      internalItemHints: [] as string[],
+      confidence: 0.9,
+    })),
+    warnings: [] as string[],
+  };
+}
+
+/** Build a valid topic extraction response for Stage 2 (judgeTopicGranularity). */
 function topicResponse(titles: string[], evIdGroups: string[][]) {
   return {
     topics: titles.map((title, idx) => ({
@@ -104,6 +121,10 @@ function contentResponse(evidenceId: string, content: string) {
   };
 }
 
+/** Standard 3-topic valid response data (6 evidences, 2 per topic, each < 35% coverage). */
+const VALID_TITLES = ['梯度下降', '反向传播', '损失函数'];
+const VALID_EV_GROUPS = [['ev1', 'ev2'], ['ev3', 'ev4'], ['ev5', 'ev6']];
+
 // ========== Mock Setup ==========
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -135,12 +156,13 @@ describe('runFullPipeline', () => {
   // ---------- No model ----------
 
   it('returns model-required when no model config is provided', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
     const result = await runFullPipeline(evidences, null);
 
     expect(result.status).toBe('model-required');
     expect(result.topics).toEqual([]);
     expect(result.packages).toEqual([]);
+    expect(result.qualityReport).toBeNull();
     // learningPath is an empty path object (not null) when no topics
     expect(result.learningPath.topicIds).toEqual([]);
     expect(result.learningPath.steps).toEqual([]);
@@ -149,7 +171,7 @@ describe('runFullPipeline', () => {
   });
 
   it('returns model-required when config has empty apiKey', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
     const result = await runFullPipeline(evidences, {
       endpoint: 'x',
       model: 'y',
@@ -157,32 +179,39 @@ describe('runFullPipeline', () => {
     });
 
     expect(result.status).toBe('model-required');
+    expect(result.qualityReport).toBeNull();
   });
 
   // ---------- With model and mocked fetch ----------
 
   it('runs successfully with model and mocked fetch', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
 
-    // Fetch sequence:
-    //   1. extractTopics (topic extraction via extractTopicsWithRepair)
-    //   2. extractRelations (relation extraction)
-    //   3. extractTopicContent for topic 0 (梯度下降)
-    //   4. extractTopicContent for topic 1 (反向传播)
+    // Fetch sequence (two-phase extraction + content):
+    //   1. extractTopicCandidates (Stage 1)
+    //   2. judgeTopicGranularity  (Stage 2)
+    //   3. extractRelations       (Stage 3, quality passed)
+    //   4. extractTopicContent for topic 0 (梯度下降)
+    //   5. extractTopicContent for topic 1 (反向传播)
+    //   6. extractTopicContent for topic 2 (损失函数)
     mockSequence([
-      chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+      chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+      chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
       chatBody(relationResponse('梯度下降', '反向传播')),
       chatBody(contentResponse('ev1', '梯度下降是一种迭代优化算法，用于最小化损失函数')),
       chatBody(contentResponse('ev3', '反向传播算法用于计算神经网络中的梯度')),
+      chatBody(contentResponse('ev5', '损失函数衡量模型预测与真实值之间的差异')),
     ]);
 
     const result = await runFullPipeline(evidences, modelConfig);
 
     expect(result.status).toBe('ready');
-    expect(result.topics.length).toBe(2);
-    expect(result.packages.length).toBe(2);
+    expect(result.topics.length).toBe(3);
+    expect(result.packages.length).toBe(3);
+    expect(result.qualityReport).not.toBeNull();
+    expect(result.qualityReport?.needsRepair).toBe(false);
     expect(result.learningPath).not.toBeNull();
-    expect(result.learningPath!.topicIds.length).toBe(2);
+    expect(result.learningPath!.topicIds.length).toBe(3);
 
     // Topics should be ordered with 梯度下降 before 反向传播 (prerequisite relation)
     const titles = result.topics.map(t => t.title);
@@ -191,21 +220,25 @@ describe('runFullPipeline', () => {
     // Packages should correspond to topics
     expect(result.packages[0].topic.id).toBe(result.topics[0].id);
     expect(result.packages[1].topic.id).toBe(result.topics[1].id);
+    expect(result.packages[2].topic.id).toBe(result.topics[2].id);
 
     // Internal structures should use AI
     expect(result.packages[0].internalStructure.source).toBe('ai');
     expect(result.packages[1].internalStructure.source).toBe('ai');
+    expect(result.packages[2].internalStructure.source).toBe('ai');
 
-    expect(fetchMock).toHaveBeenCalledTimes(4);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
   });
 
   it('does not generate "课程内容" topic', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
     mockSequence([
-      chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+      chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+      chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
       chatBody(relationResponse('梯度下降', '反向传播')),
       chatBody(contentResponse('ev1', '梯度下降定义')),
       chatBody(contentResponse('ev3', '反向传播定义')),
+      chatBody(contentResponse('ev5', '损失函数定义')),
     ]);
 
     const result = await runFullPipeline(evidences, modelConfig);
@@ -217,12 +250,14 @@ describe('runFullPipeline', () => {
   });
 
   it('invokes onStageChange callback through pipeline stages', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
     mockSequence([
-      chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+      chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+      chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
       chatBody(relationResponse('梯度下降', '反向传播')),
       chatBody(contentResponse('ev1', '梯度下降定义')),
       chatBody(contentResponse('ev3', '反向传播定义')),
+      chatBody(contentResponse('ev5', '损失函数定义')),
     ]);
 
     const stages: string[] = [];
@@ -240,20 +275,26 @@ describe('runFullPipeline', () => {
 
 describe('buildMacroKnowledgeGraph', () => {
   it('returns model-required when no model config is provided', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
     const result = await buildMacroKnowledgeGraph(evidences, null);
 
     expect(result.status).toBe('model-required');
     expect(result.source).toBe('failed');
     expect(result.topics).toEqual([]);
     expect(result.relations).toEqual([]);
+    expect(result.qualityReport).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('extracts topics and relations with model', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
+    // Fetch sequence:
+    //   1. extractTopicCandidates (Stage 1)
+    //   2. judgeTopicGranularity  (Stage 2)
+    //   3. extractRelations       (Stage 3, quality passed)
     mockSequence([
-      chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+      chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+      chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
       chatBody(relationResponse('梯度下降', '反向传播', 'hard_prerequisite')),
     ]);
 
@@ -261,9 +302,11 @@ describe('buildMacroKnowledgeGraph', () => {
 
     expect(result.status).toBe('ready');
     expect(result.source).toBe('ai');
-    expect(result.topics.length).toBe(2);
+    expect(result.topics.length).toBe(3);
     expect(result.relations.length).toBe(1);
     expect(result.relations[0].type).toBe('hard_prerequisite');
+    expect(result.qualityReport).not.toBeNull();
+    expect(result.qualityReport?.needsRepair).toBe(false);
 
     // Relation should reference actual topic IDs
     const topicIds = result.topics.map(t => t.id);
@@ -272,9 +315,10 @@ describe('buildMacroKnowledgeGraph', () => {
   });
 
   it('does not generate generic "课程内容" topic', async () => {
-    const evidences = makeEvidences(4);
+    const evidences = makeEvidences(6);
     mockSequence([
-      chatBody(topicResponse(['梯度下降', '反向传播'], [['ev1', 'ev2'], ['ev3', 'ev4']])),
+      chatBody(candidateResponse(VALID_TITLES, VALID_EV_GROUPS)),
+      chatBody(topicResponse(VALID_TITLES, VALID_EV_GROUPS)),
       chatBody(relationResponse('梯度下降', '反向传播')),
     ]);
 

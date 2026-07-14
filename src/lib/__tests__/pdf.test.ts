@@ -27,4 +27,21 @@ describe('pdf validation', () => {
     const result = validateFile(file);
     expect(result.valid).toBe(true);
   });
+
+  it('should accept OOXML PowerPoint .pptx files', () => {
+    const file = new File(
+      ['pptx-content'],
+      'lecture.pptx',
+      { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' }
+    );
+    const result = validateFile(file);
+    expect(result.valid).toBe(true);
+  });
+
+  it('should reject legacy binary .ppt files with a clear message', () => {
+    const file = new File(['ppt-content'], 'lecture.ppt', { type: 'application/vnd.ms-powerpoint' });
+    const result = validateFile(file);
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain('PPTX');
+  });
 });

@@ -4,6 +4,9 @@ import {
   KnowledgePackage,
   EvidenceAtom,
   MacroKnowledgeRelation,
+  ProductStage,
+  BackgroundJob,
+  JobStatus,
 } from '../types';
 import { convertV1ToV2 } from './notes-v2';
 import { computeContentHash } from './evidence';
@@ -25,14 +28,24 @@ export function saveState(state: Partial<ProjectState>): void {
       schemaVersion: SCHEMA_VERSION,
     };
 
-    // v2 持久化字段（不包含API Key，不包含大图片预览）
+    // v5 持久化字段（不包含API Key，不包含大图片预览）
     const persisted: (keyof ProjectState)[] = [
-      'stage', 'document', 'evidences', 'topics', 'macroRelations',
+      'stage', 'job', 'jobStatus',
+      'document', 'evidences', 'topics', 'macroRelations',
       'knowledgePackages', 'orderMode', 'currentView', 'generationMemory',
       'globalAnchors', 'occurrences', 'structureWarnings', 'structureSource',
-      'learningPath',
+      'learningPath', 'pipelineProgress',
+      'staleMarker', 'qualityReport', 'courseSections',
       // v1兼容字段
       'learningUnits', 'masterNotes',
+      // v6 新架构字段
+      'sourceDocuments', 'knowledgeTopics', 'topicRelations',
+      'teachingBlocks', 'teachingRelations', 'courseLearningPath',
+      'narrativePaths', 'knowledgeCards', 'topicNotes',
+      'topicSyntheses', 'chapterPlan', 'chapterNotes', 'courseMasterNote',
+      'glossary', 'formulaCards', 'unassignedBlocks',
+      'knowledgeBaseVersions', 'knowledgePipelineStatus',
+      'mineruParseResult',
     ];
 
     for (const key of persisted) {
@@ -48,9 +61,11 @@ export function saveState(state: Partial<ProjectState>): void {
       }
     }
 
-    // 刷新时如果停留在 generating，应恢复到 structure-review
-    if (toSave.stage === 'generating') {
-      toSave.stage = 'structure-review';
+    // v5: stage 已经是 ProductStage，不需要转换
+    // 如果 job 是 running，保存时降级为 idle（刷新后不恢复 running 状态）
+    if (toSave.jobStatus === 'running') {
+      toSave.job = null;
+      toSave.jobStatus = 'idle';
     }
 
     const serialized = JSON.stringify(toSave);
@@ -78,7 +93,7 @@ export function saveState(state: Partial<ProjectState>): void {
 
 // v1->v2迁移
 function migrateV1(oldState: Record<string, unknown>): Partial<ProjectState> {
-  const stage = (oldState.stage as ProjectState['stage']) || 'upload';
+  const stage = (oldState.stage as string) || 'upload';
   const document = oldState.document as ProjectState['document'] || null;
   const evidences = (oldState.evidences as ProjectState['evidences']) || [];
   const learningUnits = (oldState.learningUnits as ProjectState['learningUnits']) || [];
@@ -88,8 +103,15 @@ function migrateV1(oldState: Record<string, unknown>): Partial<ProjectState> {
   if (learningUnits.length > 0 && evidences.length > 0) {
     try {
       const { topics, relations, packages } = convertV1ToV2(learningUnits, masterNotes, evidences);
+      // v1 'generating' → 根据数据推导
+      let newStage: ProductStage = 'structure';
+      if (stage === 'notes') {
+        newStage = 'notes';
+      }
       return {
-        stage: stage === 'generating' ? 'structure-review' : (stage === 'notes' ? 'notes' : 'structure-review'),
+        stage: newStage,
+        job: null,
+        jobStatus: 'completed',
         document,
         evidences,
         topics,
@@ -112,7 +134,9 @@ function migrateV1(oldState: Record<string, unknown>): Partial<ProjectState> {
   }
 
   return {
-    stage: document ? 'parse-review' : 'upload',
+    stage: document ? 'document' : 'upload',
+    job: null,
+    jobStatus: document ? 'completed' : 'idle',
     document,
     evidences,
     topics: [],
@@ -190,6 +214,151 @@ function migrateV2toV3(oldState: Record<string, unknown>): Partial<ProjectState>
   return result as Partial<ProjectState>;
 }
 
+// v3→v4迁移：新增 staleMarker, qualityReport, courseSections
+function migrateV3toV4(oldState: Record<string, unknown>): Partial<ProjectState> {
+  const result = { ...oldState } as Record<string, unknown>;
+  if (result.staleMarker === undefined) result.staleMarker = null;
+  if (result.qualityReport === undefined) result.qualityReport = null;
+  if (result.courseSections === undefined) result.courseSections = [];
+  return result as Partial<ProjectState>;
+}
+
+// v4→v5迁移：旧六步 WorkflowStage → 新四步 ProductStage + BackgroundJob + JobStatus
+function migrateV4toV5(oldState: Record<string, unknown>): Partial<ProjectState> {
+  const result = { ...oldState } as Record<string, unknown>;
+
+  const oldStage = (result.stage as string) || 'upload';
+  const topics = (result.topics as Array<{ id: string }>) || [];
+  const knowledgePackages = (result.knowledgePackages as Array<{
+    topic?: { noteStatus?: string };
+    note?: unknown;
+  }>) || [];
+  const structureExtractionStatus = (result.structureExtractionStatus as string) || 'idle';
+
+  let newStage: ProductStage = 'upload';
+  let newJob: BackgroundJob = null;
+  let newJobStatus: JobStatus = 'idle';
+
+  // 旧 stage → 新 stage 映射
+  const stageMap: Record<string, { stage: ProductStage; job: BackgroundJob; jobStatus: JobStatus }> = {
+    'upload':              { stage: 'upload',    job: null,                     jobStatus: 'idle' },
+    'parse-review':        { stage: 'document',  job: null,                     jobStatus: 'completed' },
+    'extracting-structure':{ stage: 'structure', job: 'extracting-topics',      jobStatus: 'running' },
+    'structure-review':    { stage: 'structure', job: null,                     jobStatus: 'completed' },
+    'generating-notes':    { stage: 'notes',     job: 'generating-topic-notes', jobStatus: 'running' },
+    'notes':               { stage: 'notes',     job: null,                     jobStatus: 'completed' },
+  };
+
+  if (stageMap[oldStage]) {
+    const mapped = stageMap[oldStage];
+    newStage = mapped.stage;
+    newJob = mapped.job;
+    newJobStatus = mapped.jobStatus;
+  } else if (oldStage === 'generating') {
+    // 更旧的 'generating' 状态：根据数据推导
+    const isExtracting = ['extracting-topics', 'repairing-topics', 'extracting-relations',
+                          'extracting-internal-structures', 'quality-checking', 'quality-repairing']
+                          .includes(structureExtractionStatus);
+    const hasGeneratingNotes = knowledgePackages.some(kp => kp.topic?.noteStatus === 'generating');
+    const hasCompletedNotes = knowledgePackages.some(kp => kp.note !== undefined && kp.note !== null);
+
+    if (isExtracting && topics.length === 0) {
+      newStage = 'structure';
+      newJob = 'extracting-topics';
+      newJobStatus = 'running';
+    } else if (hasGeneratingNotes) {
+      newStage = 'notes';
+      newJob = 'generating-topic-notes';
+      newJobStatus = 'running';
+    } else if (hasCompletedNotes) {
+      newStage = 'notes';
+      newJob = null;
+      newJobStatus = 'completed';
+    } else if (topics.length > 0) {
+      newStage = 'structure';
+      newJob = null;
+      newJobStatus = 'completed';
+    } else {
+      newStage = 'document';
+      newJob = null;
+      newJobStatus = 'completed';
+    }
+  }
+
+  // running 状态在刷新后降级（不能恢复 running）
+  if (newJobStatus === 'running') {
+    newJob = null;
+    newJobStatus = 'idle';
+  }
+
+  result.stage = newStage;
+  result.job = newJob;
+  result.jobStatus = newJobStatus;
+
+  return result as Partial<ProjectState>;
+}
+
+// v5→v6迁移：新增 v6 新架构字段（空初始化）
+function migrateV5toV6(oldState: Record<string, unknown>): Partial<ProjectState> {
+  const result = { ...oldState } as Record<string, unknown>;
+
+  // v6 新字段默认值
+  if (!result.sourceDocuments) result.sourceDocuments = [];
+  if (!result.knowledgeTopics) result.knowledgeTopics = [];
+  if (!result.topicRelations) result.topicRelations = [];
+  if (!result.teachingBlocks) result.teachingBlocks = [];
+  if (!result.teachingRelations) result.teachingRelations = [];
+  if (result.courseLearningPath === undefined) result.courseLearningPath = null;
+  if (!result.narrativePaths) result.narrativePaths = {};
+  if (!result.knowledgeCards) result.knowledgeCards = [];
+  if (!result.topicNotes) result.topicNotes = [];
+  if (!result.glossary) result.glossary = [];
+  if (!result.formulaCards) result.formulaCards = [];
+  if (!result.unassignedBlocks) result.unassignedBlocks = [];
+  if (!result.knowledgeBaseVersions) {
+    result.knowledgeBaseVersions = {
+      source: 0, normalization: 0, topicStructure: 0,
+      teachingStructure: 0, ordering: 0, cards: 0, notes: 0, embeddings: 0,
+    };
+  }
+  if (!result.knowledgePipelineStatus) result.knowledgePipelineStatus = 'idle';
+
+  return result as Partial<ProjectState>;
+}
+
+// v6→v7迁移：增加可见的 MinerU 解析阶段。
+function migrateV6toV7(oldState: Record<string, unknown>): Partial<ProjectState> {
+  const result = { ...oldState } as Partial<ProjectState>;
+  const source = result.sourceDocuments?.[0];
+  result.mineruParseResult = source ? {
+    status: 'completed',
+    progress: 100,
+    markdown: source.markdown,
+    assets: [],
+    sourceFileName: source.title,
+    completedAt: Date.now(),
+  } : null;
+  if (source && result.stage === 'document') result.stage = 'mineru';
+  return result;
+}
+
+// v7→v8：把逐知识点笔记降级为知识卡片阶段，并初始化完整笔记管线。
+function migrateV7toV8(oldState: Record<string, unknown>): Partial<ProjectState> {
+  const result = { ...oldState } as Record<string, unknown>;
+  if (!result.topicSyntheses) result.topicSyntheses = [];
+  if (!result.chapterPlan) result.chapterPlan = [];
+  if (!result.chapterNotes) result.chapterNotes = [];
+  if (result.courseMasterNote === undefined) result.courseMasterNote = null;
+
+  const hasMarkdownArchitecture =
+    Array.isArray(result.sourceDocuments) && result.sourceDocuments.length > 0 ||
+    Array.isArray(result.knowledgeCards) && result.knowledgeCards.length > 0;
+  if (result.stage === 'notes' && hasMarkdownArchitecture && !result.courseMasterNote) {
+    result.stage = 'cards';
+  }
+  return result as Partial<ProjectState>;
+}
+
 // 从localStorage加载状态
 export function loadState(): Partial<ProjectState> | null {
   try {
@@ -204,15 +373,36 @@ export function loadState(): Partial<ProjectState> | null {
     if (version < 2) {
       result = migrateV1(parsed);
     } else if (version < 3) {
-      // v2 → v3 迁移
       result = migrateV2toV3(parsed);
+    } else if (version < 4) {
+      result = migrateV3toV4(parsed);
+    } else if (version < 5) {
+      result = migrateV4toV5(parsed);
+    } else if (version < 6) {
+      result = migrateV5toV6(parsed);
+    } else if (version < 7) {
+      result = migrateV6toV7(parsed);
     } else {
       result = parsed as Partial<ProjectState>;
     }
 
-    // 状态恢复校验
-    if (result.stage === 'generating') {
-      result.stage = 'structure-review';
+    if (version < 8) {
+      result = migrateV7toV8(result as Record<string, unknown>);
+    }
+
+    // 兜底：如果 stage 仍然是旧 WorkflowStage，强制迁移
+    const stageStr = result.stage as string;
+    if (stageStr && !['upload', 'document', 'mineru', 'structure', 'cards', 'notes'].includes(stageStr)) {
+      const v5Result = migrateV4toV5({ ...parsed, stage: stageStr });
+      result.stage = v5Result.stage;
+      result.job = v5Result.job;
+      result.jobStatus = v5Result.jobStatus;
+    }
+
+    // running 状态在刷新后不恢复
+    if (result.jobStatus === 'running') {
+      result.job = null;
+      result.jobStatus = 'idle';
     }
 
     // 默认值
@@ -230,6 +420,36 @@ export function loadState(): Partial<ProjectState> | null {
     if (!result.learningUnits) result.learningUnits = [];
     if (!result.masterNotes) result.masterNotes = [];
     if (result.learningPath === undefined) result.learningPath = null;
+    if (result.staleMarker === undefined) result.staleMarker = null;
+    if (result.qualityReport === undefined) result.qualityReport = null;
+    if (result.courseSections === undefined) result.courseSections = [];
+    if (result.job === undefined) result.job = null;
+    if (result.jobStatus === undefined) result.jobStatus = 'idle';
+    // v6 默认值
+    if (!result.sourceDocuments) result.sourceDocuments = [];
+    if (!result.knowledgeTopics) result.knowledgeTopics = [];
+    if (!result.topicRelations) result.topicRelations = [];
+    if (!result.teachingBlocks) result.teachingBlocks = [];
+    if (!result.teachingRelations) result.teachingRelations = [];
+    if (result.courseLearningPath === undefined) result.courseLearningPath = null;
+    if (!result.narrativePaths) result.narrativePaths = {};
+    if (!result.knowledgeCards) result.knowledgeCards = [];
+    if (!result.topicNotes) result.topicNotes = [];
+    if (!result.topicSyntheses) result.topicSyntheses = [];
+    if (!result.chapterPlan) result.chapterPlan = [];
+    if (!result.chapterNotes) result.chapterNotes = [];
+    if (result.courseMasterNote === undefined) result.courseMasterNote = null;
+    if (!result.glossary) result.glossary = [];
+    if (!result.formulaCards) result.formulaCards = [];
+    if (!result.unassignedBlocks) result.unassignedBlocks = [];
+    if (!result.knowledgeBaseVersions) {
+      result.knowledgeBaseVersions = {
+        source: 0, normalization: 0, topicStructure: 0,
+        teachingStructure: 0, ordering: 0, cards: 0, notes: 0, embeddings: 0,
+      };
+    }
+    if (!result.knowledgePipelineStatus) result.knowledgePipelineStatus = 'idle';
+    if (result.mineruParseResult === undefined) result.mineruParseResult = null;
 
     return result;
   } catch (error) {

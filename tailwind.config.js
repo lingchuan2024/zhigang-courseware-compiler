@@ -18,8 +18,34 @@ export default {
         charcoal: '#2c2c2c',
       },
       fontFamily: {
-        song: ['"Noto Serif SC"', '"Source Han Serif SC"', 'SimSun', 'serif'],
-        mono: ['"JetBrains Mono"', '"SF Mono"', 'Consolas', 'monospace'],
+        ui: [
+          '"Inter"',
+          '"Noto Sans SC"',
+          '"PingFang SC"',
+          '"Microsoft YaHei"',
+          'sans-serif',
+        ],
+        song: [
+          '"Noto Serif SC"',
+          '"Source Han Serif SC"',
+          'SimSun',
+          'serif',
+        ],
+        mono: [
+          '"JetBrains Mono"',
+          '"SF Mono"',
+          'Consolas',
+          'monospace',
+        ],
+      },
+      animation: {
+        'pulse-soft': 'pulse-soft 2s ease-in-out infinite',
+      },
+      keyframes: {
+        'pulse-soft': {
+          '0%, 100%': { opacity: '1' },
+          '50%': { opacity: '0.5' },
+        },
       },
     },
   },
