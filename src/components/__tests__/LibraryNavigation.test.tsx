@@ -11,6 +11,7 @@ import {
   upsertLibraryDocument,
 } from '../../lib/library-repository';
 import { useLibraryStore } from '../../store/useLibraryStore';
+import { useStore } from '../../store/useStore';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -122,6 +123,11 @@ describe('multi-course library navigation', () => {
     await act(async () => button('添加课件').click());
 
     expect(container!.querySelector('[data-astronomy-backdrop="workspace"]')).not.toBeNull();
+
+    act(() => useStore.getState().setStage('notes'));
+    await act(async () => {});
+    expect(container!.querySelector('[data-astronomy-backdrop="reading"]')).not.toBeNull();
+    act(() => useStore.setState({ stage: 'upload' }));
   });
 
   it('returns from the library to the start page', async () => {

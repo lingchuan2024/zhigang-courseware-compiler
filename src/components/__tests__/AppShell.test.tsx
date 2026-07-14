@@ -20,22 +20,32 @@ afterEach(() => {
 });
 
 describe('AppShell', () => {
-  it('renders library content above its astronomy backdrop', () => {
+  it('keeps the header and child overlays in one foreground stacking context', () => {
     act(() => root.render(createElement(
       AppShell,
       {
         onHome: vi.fn(),
         backdrop: 'library',
-        children: createElement('p', null, '课程空间'),
+        children: createElement('div', { 'data-test-overlay': true, className: 'fixed z-50' }, '课程空间'),
       },
     )));
 
+    const shell = container.firstElementChild as HTMLElement;
+    const foreground = container.querySelector<HTMLElement>('[data-app-shell-foreground]');
+    const header = container.querySelector<HTMLElement>('header');
     const content = container.querySelector<HTMLElement>('[data-app-shell-content]');
+    const overlay = container.querySelector<HTMLElement>('[data-test-overlay]');
 
     expect(container.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
     expect(content?.textContent).toContain('课程空间');
-    expect(content?.classList.contains('relative')).toBe(true);
-    expect(content?.classList.contains('z-10')).toBe(true);
+    expect(foreground?.classList.contains('relative')).toBe(true);
+    expect(foreground?.classList.contains('z-10')).toBe(true);
+    expect(foreground?.contains(header!)).toBe(true);
+    expect(foreground?.contains(content!)).toBe(true);
+    expect(foreground?.contains(overlay!)).toBe(true);
+    expect(content?.classList.contains('z-10')).toBe(false);
+    expect(shell.classList.contains('overflow-hidden')).toBe(false);
+    expect(header?.classList.contains('bg-space-900/90')).toBe(true);
   });
 
   it('keeps the brand home action when no backdrop is supplied', () => {
