@@ -47,6 +47,7 @@ export function LibraryView() {
     <AppShell
       onHome={() => navigate('home')}
       action={<button type="button" onClick={() => navigate('home')} className="text-sm text-ink/70 hover:text-ink">← 返回首页</button>}
+      backdrop="library"
     >
       <main className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-7xl md:grid-cols-[280px_1fr]">
         <aside className="border-r border-space-border bg-space-900 p-5 md:p-7">

@@ -13,6 +13,7 @@ import { LibraryView } from './components/LibraryView';
 import { AppShell } from './components/AppShell';
 import { useLibraryStore } from './store/useLibraryStore';
 import { KnowledgeQaView } from './components/KnowledgeQaView';
+import { AstronomyBackdrop } from './components/backgrounds/AstronomyBackdrop';
 
 function App() {
   const stage = useStore(s => s.stage);
@@ -51,7 +52,7 @@ function App() {
   if (screen === 'qa') {
     return (
       <>
-        <AppShell onHome={() => navigateLibrary('home')} action={<button type="button" onClick={() => navigateLibrary('library')} className="text-sm text-ink/70">课件库</button>}>
+        <AppShell backdrop="qa" onHome={() => navigateLibrary('home')} action={<button type="button" onClick={() => navigateLibrary('library')} className="text-sm text-ink/70">课件库</button>}>
           <KnowledgeQaView onOpenSettings={() => setSettingsOpen(true)} />
         </AppShell>
         <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
@@ -79,33 +80,36 @@ function App() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-paper">
-      {/* 移动端菜单按钮 */}
-      <div className="md:hidden fixed top-4 left-4 z-40">
-        <button
-          onClick={() => {
-            // 简单处理：在移动端可以展开/收起侧栏
-            const sidebar = document.querySelector('aside');
-            if (sidebar) {
-              sidebar.classList.toggle('-translate-x-full');
-            }
-          }}
-          className="bg-ink text-white p-2 rounded shadow-lg"
-          aria-label="打开菜单"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+    <div className="relative h-screen overflow-hidden bg-space-950">
+      <AstronomyBackdrop variant={stage === 'notes' ? 'reading' : 'workspace'} />
+      <div className="relative z-10 flex h-full overflow-hidden">
+        {/* 移动端菜单按钮 */}
+        <div className="md:hidden fixed top-4 left-4 z-40">
+          <button
+            onClick={() => {
+              // 简单处理：在移动端可以展开/收起侧栏
+              const sidebar = document.querySelector('aside');
+              if (sidebar) {
+                sidebar.classList.toggle('-translate-x-full');
+              }
+            }}
+            className="bg-ink text-white p-2 rounded shadow-lg"
+            aria-label="打开菜单"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+          </button>
+        </div>
+
+        <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
+
+        <main className="flex-1 flex flex-col overflow-hidden">
+          {renderStage()}
+        </main>
+
+        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
       </div>
-
-      <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
-
-      <main className="flex-1 flex flex-col overflow-hidden">
-        {renderStage()}
-      </main>
-
-      <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </div>
   );
 }

@@ -86,6 +86,7 @@ describe('multi-course library navigation', () => {
 
     await act(async () => button('进入课件库').click());
     expect(container!.textContent).toContain('课程与课件');
+    expect(container!.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
 
     const input = container!.querySelector<HTMLInputElement>('input[placeholder="例如：机器学习"]')!;
     act(() => {
@@ -98,6 +99,29 @@ describe('multi-course library navigation', () => {
 
     await act(async () => button('添加课件').click());
     expect(container!.textContent).toContain('上传课件');
+  });
+
+  it('uses distinct backgrounds for QA and the course workspace', async () => {
+    await act(async () => root!.render(createElement(App)));
+
+    act(() => useLibraryStore.getState().navigate('qa'));
+    await act(async () => {});
+    expect(container!.querySelector('[data-astronomy-backdrop="qa"]')).not.toBeNull();
+
+    act(() => useLibraryStore.getState().navigate('home'));
+    await act(async () => {});
+    await act(async () => button('进入课件库').click());
+
+    const input = container!.querySelector<HTMLInputElement>('input[placeholder="例如：机器学习"]')!;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(input, '天体物理');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => button('创建课程').click());
+    await act(async () => button('添加课件').click());
+
+    expect(container!.querySelector('[data-astronomy-backdrop="workspace"]')).not.toBeNull();
   });
 
   it('returns from the library to the start page', async () => {
