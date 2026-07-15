@@ -6,6 +6,8 @@ import { validateModelConfig } from '../lib/model';
 interface SettingsModalProps {
   isOpen: boolean;
   onClose: () => void;
+  mode?: 'default' | 'resume-mineru';
+  onSaved?: (result: { mineruConfigured: boolean }) => void;
 }
 
 const DEFAULT_MINERU: MinerUConfig = {
@@ -23,18 +25,20 @@ const DEFAULT_MODEL: ModelConfig = {
   apiKey: '',
 };
 
-export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: SettingsModalProps) {
   const storedMinerU = useStore(state => state.mineruConfig);
   const storedModel = useStore(state => state.modelConfig);
   const setMinerUConfig = useStore(state => state.setMinerUConfig);
   const setModelConfig = useStore(state => state.setModelConfig);
   const [mineru, setMineru] = useState<MinerUConfig>(DEFAULT_MINERU);
   const [model, setModel] = useState<ModelConfig>(DEFAULT_MODEL);
+  const [mineruError, setMineruError] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
     setMineru(storedMinerU ?? DEFAULT_MINERU);
     setModel(storedModel ?? DEFAULT_MODEL);
+    setMineruError('');
   }, [isOpen, storedMinerU, storedModel]);
 
   if (!isOpen) return null;
@@ -43,8 +47,16 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const mineruValid = Boolean(mineru.endpoint.trim() && mineru.apiKey.trim());
 
   const save = () => {
-    setMinerUConfig(mineru.apiKey.trim() ? { ...mineru, endpoint: mineru.endpoint.trim(), apiKey: mineru.apiKey.trim() } : null);
+    const endpoint = mineru.endpoint.trim();
+    const apiKey = mineru.apiKey.trim();
+    const nextMinerU = endpoint && apiKey ? { ...mineru, endpoint, apiKey } : null;
+    if (mode === 'resume-mineru' && !nextMinerU) {
+      setMineruError('请填写 MinerU API 地址和 Token');
+      return;
+    }
+    setMinerUConfig(nextMinerU);
     setModelConfig(model.apiKey.trim() ? { ...model, endpoint: model.endpoint.trim(), model: model.model.trim(), apiKey: model.apiKey.trim() } : null);
+    onSaved?.({ mineruConfigured: Boolean(nextMinerU) });
     onClose();
   };
 
@@ -74,10 +86,10 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
             <div className="grid sm:grid-cols-2 gap-4">
               <Field label="API 地址">
-                <input className="config-input" value={mineru.endpoint} onChange={event => setMineru({ ...mineru, endpoint: event.target.value })} placeholder="https://mineru.net/api/v4" />
+                <input className="config-input" value={mineru.endpoint} onChange={event => { setMineru({ ...mineru, endpoint: event.target.value }); setMineruError(''); }} placeholder="https://mineru.net/api/v4" />
               </Field>
               <Field label="API Token">
-                <input className="config-input" type="password" value={mineru.apiKey} onChange={event => setMineru({ ...mineru, apiKey: event.target.value })} placeholder="MinerU Token" autoComplete="off" />
+                <input className="config-input" type="password" value={mineru.apiKey} onChange={event => { setMineru({ ...mineru, apiKey: event.target.value }); setMineruError(''); }} placeholder="MinerU Token" autoComplete="off" />
               </Field>
               <Field label="解析模型">
                 <select className="config-input" value={mineru.modelVersion} onChange={event => setMineru({ ...mineru, modelVersion: event.target.value as MinerUConfig['modelVersion'] })}>
@@ -98,6 +110,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               <label className="flex items-center gap-2"><input type="checkbox" checked={mineru.enableFormula} onChange={event => setMineru({ ...mineru, enableFormula: event.target.checked })} />识别公式</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={mineru.enableTable} onChange={event => setMineru({ ...mineru, enableTable: event.target.checked })} />识别表格</label>
             </div>
+            {mineruError && (
+              <p role="alert" className="mt-3 rounded-lg border border-cinnabar/25 bg-cinnabar/10 px-3 py-2 text-sm text-cinnabar-light">{mineruError}</p>
+            )}
           </section>
 
           <section className="rounded-xl border border-space-border bg-space-900/70 p-5">
@@ -138,7 +153,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           <button className="text-sm text-cinnabar hover:underline" onClick={() => { setMinerUConfig(null); setModelConfig(null); setMineru(DEFAULT_MINERU); setModel(DEFAULT_MODEL); }}>清除全部配置</button>
           <div className="flex gap-3">
             <button className="btn-outline" onClick={onClose}>取消</button>
-            <button className="btn-primary" onClick={save}>保存配置</button>
+            <button className="btn-primary" onClick={save}>{mode === 'resume-mineru' ? '保存并开始解析' : '保存配置'}</button>
           </div>
         </footer>
       </div>
