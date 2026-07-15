@@ -18,13 +18,41 @@ import { AstronomyBackdrop } from './components/backgrounds/AstronomyBackdrop';
 function App() {
   const stage = useStore(s => s.stage);
   const startMinerUParse = useStore(s => s.startMinerUParse);
+  const courseDocument = useStore(s => s.document);
+  const mineruConfig = useStore(s => s.mineruConfig);
   const initializeFromStorage = useStore(s => s.initializeFromStorage);
   const screen = useLibraryStore(s => s.screen);
   const initializeLibrary = useLibraryStore(s => s.initialize);
   const libraryInitialized = useLibraryStore(s => s.initialized);
   const navigateLibrary = useLibraryStore(s => s.navigate);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [settingsIntent, setSettingsIntent] = useState<'default' | 'resume-mineru'>('default');
   const [initialized, setInitialized] = useState(false);
+
+  const closeSettings = () => {
+    setSettingsOpen(false);
+    setSettingsIntent('default');
+  };
+
+  const openDefaultSettings = () => {
+    setSettingsIntent('default');
+    setSettingsOpen(true);
+  };
+
+  const requestMinerUParse = async () => {
+    if (courseDocument?.fileType === 'markdown' || mineruConfig?.apiKey) {
+      await startMinerUParse();
+      return;
+    }
+    setSettingsIntent('resume-mineru');
+    setSettingsOpen(true);
+  };
+
+  const handleSettingsSaved = ({ mineruConfigured }: { mineruConfigured: boolean }) => {
+    if (settingsIntent !== 'resume-mineru' || !mineruConfigured) return;
+    setSettingsIntent('default');
+    void useStore.getState().startMinerUParse();
+  };
 
   useEffect(() => {
     initializeFromStorage();
@@ -42,8 +70,8 @@ function App() {
   if (screen === 'home') {
     return (
       <>
-        <HomeView onOpenSettings={() => setSettingsOpen(true)} />
-        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <HomeView onOpenSettings={openDefaultSettings} />
+        <SettingsModal isOpen={settingsOpen} mode={settingsIntent} onSaved={handleSettingsSaved} onClose={closeSettings} />
       </>
     );
   }
@@ -54,9 +82,9 @@ function App() {
     return (
       <>
         <AppShell backdrop="qa" onHome={() => navigateLibrary('home')} action={<button type="button" onClick={() => navigateLibrary('library')} className="text-sm text-ink/70">课件库</button>}>
-          <KnowledgeQaView onOpenSettings={() => setSettingsOpen(true)} />
+          <KnowledgeQaView onOpenSettings={openDefaultSettings} />
         </AppShell>
-        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal isOpen={settingsOpen} mode={settingsIntent} onSaved={handleSettingsSaved} onClose={closeSettings} />
       </>
     );
   }
@@ -66,15 +94,15 @@ function App() {
       case 'upload':
         return <UploadView />;
       case 'document':
-        return <DocumentReviewWorkspace onRequestMinerUParse={startMinerUParse} />;
+        return <DocumentReviewWorkspace onRequestMinerUParse={requestMinerUParse} />;
       case 'mineru':
-        return <MinerUParseView onOpenSettings={() => setSettingsOpen(true)} />;
+        return <MinerUParseView onOpenSettings={openDefaultSettings} />;
       case 'structure':
-        return <KnowledgeStructureView onOpenSettings={() => setSettingsOpen(true)} />;
+        return <KnowledgeStructureView onOpenSettings={openDefaultSettings} />;
       case 'cards':
         return <KnowledgeCardsView />;
       case 'notes':
-        return <NotesView onOpenSettings={() => setSettingsOpen(true)} />;
+        return <NotesView onOpenSettings={openDefaultSettings} />;
       default:
         return <UploadView />;
     }
@@ -103,13 +131,13 @@ function App() {
           </button>
         </div>
 
-        <Sidebar onOpenSettings={() => setSettingsOpen(true)} />
+        <Sidebar onOpenSettings={openDefaultSettings} />
 
         <main className="flex-1 flex flex-col overflow-hidden">
           {renderStage()}
         </main>
 
-        <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
+        <SettingsModal isOpen={settingsOpen} mode={settingsIntent} onSaved={handleSettingsSaved} onClose={closeSettings} />
       </div>
     </div>
   );

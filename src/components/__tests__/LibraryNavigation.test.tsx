@@ -16,6 +16,7 @@ import { useStore } from '../../store/useStore';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const storage = new Map<string, string>();
+const originalStartMinerUParse = useStore.getState().startMinerUParse;
 Object.defineProperty(globalThis, 'localStorage', {
   configurable: true,
   value: {
@@ -44,6 +45,15 @@ beforeEach(async () => {
   vi.spyOn(HTMLCanvasElement.prototype, 'getContext').mockReturnValue(null);
   vi.stubGlobal('requestAnimationFrame', vi.fn(() => 1));
   vi.stubGlobal('cancelAnimationFrame', vi.fn());
+  vi.stubGlobal('IntersectionObserver', class {
+    observe() {}
+    disconnect() {}
+    unobserve() {}
+    takeRecords() { return []; }
+    root = null;
+    rootMargin = '';
+    thresholds = [0];
+  });
 });
 
 afterEach(() => {
@@ -53,7 +63,39 @@ afterEach(() => {
   container = null;
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+  act(() => useStore.setState({ startMinerUParse: originalStartMinerUParse }));
 });
+
+async function prepareDocument(configured: boolean, startMinerUParse: () => Promise<void>) {
+  await act(async () => root!.render(createElement(App)));
+  act(() => {
+    useStore.setState({
+      stage: 'document',
+      document: {
+        id: 'doc-1',
+        courseId: 'course-1',
+        title: 'lecture',
+        fileName: 'lecture.pdf',
+        fileType: 'pdf',
+        uploadedAt: 0,
+        pages: [{ pageNumber: 1, text: 'page', preview: 'data:image/png;base64,a' }],
+      },
+      sourceDocuments: [],
+      mineruParseResult: null,
+      mineruConfig: configured ? {
+        endpoint: 'https://mineru.example.com',
+        apiKey: 'token',
+        modelVersion: 'vlm',
+        language: 'ch',
+        enableFormula: true,
+        enableTable: true,
+      } : null,
+      startMinerUParse,
+    });
+    useLibraryStore.setState({ screen: 'workspace' });
+  });
+  await act(async () => {});
+}
 
 describe('multi-course library navigation', () => {
   it('loads persisted course nebula summaries during initialization', async () => {
@@ -208,5 +250,47 @@ describe('multi-course library navigation', () => {
 
     expect((await listLibraryCourses()).map(course => course.id)).toEqual([kept.id]);
     expect((await listLibraryCourses()).some(course => course.id === removed.id)).toBe(false);
+  });
+
+  it('starts MinerU immediately when preview credentials already exist', async () => {
+    const startMinerUParse = vi.fn(async () => useStore.setState({ stage: 'mineru' }));
+    await prepareDocument(true, startMinerUParse);
+
+    await act(async () => button('进入 MinerU 解析').click());
+
+    expect(startMinerUParse).toHaveBeenCalledTimes(1);
+    expect(useStore.getState().stage).toBe('mineru');
+  });
+
+  it('opens settings and resumes once after valid MinerU configuration', async () => {
+    const startMinerUParse = vi.fn(async () => useStore.setState({ stage: 'mineru' }));
+    await prepareDocument(false, startMinerUParse);
+
+    await act(async () => button('进入 MinerU 解析').click());
+    expect(container!.textContent).toContain('保存并开始解析');
+    expect(startMinerUParse).not.toHaveBeenCalled();
+
+    const token = container!.querySelector<HTMLInputElement>('input[placeholder="MinerU Token"]')!;
+    act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(token, 'token');
+      token.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => button('保存并开始解析').click());
+
+    expect(startMinerUParse).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the pending parse when settings are cancelled', async () => {
+    const startMinerUParse = vi.fn(async () => useStore.setState({ stage: 'mineru' }));
+    await prepareDocument(false, startMinerUParse);
+
+    await act(async () => button('进入 MinerU 解析').click());
+    await act(async () => button('取消').click());
+    expect(startMinerUParse).not.toHaveBeenCalled();
+
+    await act(async () => button('服务配置').click());
+    expect(container!.textContent).toContain('保存配置');
+    expect(container!.textContent).not.toContain('保存并开始解析');
   });
 });
