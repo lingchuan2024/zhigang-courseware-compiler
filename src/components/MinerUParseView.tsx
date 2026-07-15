@@ -60,7 +60,7 @@ export function MinerUParseView({ onOpenSettings }: MinerUParseViewProps) {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-space-950/[0.76]">
+    <div className="flex min-h-0 flex-1 flex-col bg-space-950/[0.58]">
       <header className="flex h-16 flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.94] px-6 backdrop-blur-xl">
         <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => navigateToStage('document')} className="text-space-muted hover:text-ink">←</button>

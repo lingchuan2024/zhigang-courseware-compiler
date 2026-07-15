@@ -50,7 +50,7 @@ export function LibraryView() {
       backdrop="library"
     >
       <main className="mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-7xl md:grid-cols-[280px_1fr]">
-        <aside className="border-r border-space-border bg-space-900/[0.88] p-5 backdrop-blur-xl md:p-7">
+        <aside className="border-r border-space-border bg-space-900/[0.78] p-5 backdrop-blur-xl md:p-7">
           <div className="flex items-center justify-between">
             <h1 className="font-song text-2xl font-bold text-ink">课程空间</h1>
             <span className="font-mono text-xs text-space-muted">{courses.length}</span>
@@ -79,7 +79,7 @@ export function LibraryView() {
           </div>
         </aside>
 
-        <section className="bg-space-950/[0.72] p-6 backdrop-blur-[2px] md:p-10">
+        <section className="bg-space-950/[0.5] p-6 backdrop-blur-[2px] md:p-10">
           <div className="flex flex-wrap items-end justify-between gap-4 border-b border-space-border pb-6">
             <div>
               <p className="font-mono text-xs tracking-[0.2em] text-cinnabar">COURSEWARE LIBRARY</p>

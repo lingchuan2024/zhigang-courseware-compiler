@@ -93,7 +93,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   };
 
   return (
-    <aside className="flex h-screen w-56 flex-shrink-0 -translate-x-full flex-col border-r border-space-border bg-space-900/[0.92] text-space-text backdrop-blur-xl transition-transform duration-300 md:w-64 md:translate-x-0">
+    <aside className="flex h-screen w-56 flex-shrink-0 -translate-x-full flex-col border-r border-space-border bg-space-900/[0.84] text-space-text backdrop-blur-xl transition-transform duration-300 md:w-64 md:translate-x-0">
       {/* Logo */}
       <div className="border-b border-space-border px-6 py-5">
         <button type="button" onClick={() => navigateLibrary('home')} className="text-left">

@@ -54,6 +54,18 @@ function setInput(input: HTMLInputElement, value: string) {
 }
 
 describe('SettingsModal MinerU continuation', () => {
+  it('links to the official MinerU token page and describes the free quota accurately', () => {
+    const { container } = renderModal();
+    const link = Array.from(container.querySelectorAll('a'))
+      .find(anchor => anchor.textContent?.includes('免费申请 MinerU Token'));
+
+    expect(link?.getAttribute('href')).toBe('https://mineru.net/apiManage/token');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toContain('noreferrer');
+    expect(container.textContent).toContain('每日免费高优先级解析额度');
+    expect(container.textContent).toContain('具体以官网为准');
+  });
+
   it('keeps the modal open until MinerU credentials are valid', () => {
     const { container, onClose, onSaved } = renderModal();
     const save = Array.from(container.querySelectorAll('button'))

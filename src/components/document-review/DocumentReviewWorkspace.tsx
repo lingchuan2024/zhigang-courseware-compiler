@@ -109,7 +109,7 @@ export function DocumentReviewWorkspace({ onRequestMinerUParse }: DocumentReview
   // Markdown 预览模式
   if (isMarkdown || hasSourceDocs) {
     return (
-      <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.78]">
+      <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.58]">
         <div className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.94] px-6 py-3 backdrop-blur-xl">
           <div className="flex items-center gap-3">
             <button
@@ -163,7 +163,7 @@ export function DocumentReviewWorkspace({ onRequestMinerUParse }: DocumentReview
   }
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.78]">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.58]">
       <ReviewToolbar
         fileName={document.fileName || document.title}
         totalPages={totalPages}

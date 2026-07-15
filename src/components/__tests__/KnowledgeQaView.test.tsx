@@ -460,7 +460,8 @@ describe('KnowledgeQaView chat interface', () => {
 
     expect(layout.className.split(/\s+/).some(token => token.startsWith('bg-space-950'))).toBe(false);
     expect(layout.parentElement!.className.split(/\s+/).some(token => token.startsWith('bg-space-950'))).toBe(false);
-    expect(conversation.className).toContain('bg-space-950/[0.64]');
+    expect(conversation.className).toContain('bg-space-950/[0.48]');
+    expect(layout.querySelector('aside')?.className).toContain('bg-space-900/[0.8]');
   });
 
   it('falls back to the stored citation snapshot when the exact live card is unavailable', async () => {

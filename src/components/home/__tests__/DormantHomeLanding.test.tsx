@@ -65,6 +65,7 @@ describe('DormantHomeLanding', () => {
     }));
 
     expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container.querySelector('[data-home-nebula-veil]')?.className).toContain('rgba(1,2,7,.52)_86%');
     expect(container.textContent).toContain('让每一份课件，成为可探索的知识宇宙。');
     expect(container.textContent).toContain('知识结构');
     expect(container.textContent).toContain('知识卡片');

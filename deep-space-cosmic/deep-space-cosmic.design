@@ -1,0 +1,26 @@
+{
+  "data": [
+    {
+      "id": "page-index",
+      "title": "深空宇宙",
+      "type": "page",
+      "version": 1,
+      "createdAt": 1720915200000,
+      "canvasData": {
+        "x": 0,
+        "y": 0,
+        "group": 0
+      },
+      "devMetadata": {
+        "htmlSrc": "pages/index.html",
+        "interactions": []
+      }
+    }
+  ],
+  "config": {
+    "autoLayout": true,
+    "deviceType": "desktop",
+    "projectName": "深空宇宙",
+    "designLibrary": null
+  }
+}

@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html class="dark" lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>深空宇宙</title>
+    <style id="theme-vars">
+/* Deep Space Cosmic Theme — colors_and_type.css */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+:root {
+  /* ===== Primary color scale (Nebula Blue) ===== */
+  --cosmic-primary-0: #eff6ff;
+  --cosmic-primary-50: #dbeafe;
+  --cosmic-primary-100: #bfdbfe;
+  --cosmic-primary-200: #93c5fd;
+  --cosmic-primary-300: #60a5fa;
+  --cosmic-primary-400: #3b82f6;
+  --cosmic-primary-500: #2563eb;
+  --cosmic-primary-600: #1d4ed8;
+  --cosmic-primary-700: #1e40af;
+  --cosmic-primary-800: #1e3a8a;
+  --cosmic-primary-900: #172554;
+  --cosmic-primary-950: #0f1838;
+
+  /* ===== Neutral scale ===== */
+  --cosmic-neutral-0: #f8fafc;
+  --cosmic-neutral-50: #f1f5f9;
+  --cosmic-neutral-100: #e2e8f0;
+  --cosmic-neutral-200: #cbd5e1;
+  --cosmic-neutral-300: #94a3b8;
+  --cosmic-neutral-400: #64748b;
+  --cosmic-neutral-500: #475569;
+  --cosmic-neutral-600: #334155;
+  --cosmic-neutral-700: #1e293b;
+  --cosmic-neutral-800: #0f172a;
+  --cosmic-neutral-900: #050816;
+  --cosmic-neutral-950: #020617;
+
+  /* ===== Semantic aliases — Dark mode (default) ===== */
+  --cosmic-background: #020617;
+  --cosmic-foreground: #f8fafc;
+  --cosmic-card: rgba(7, 12, 28, 0.45);
+  --cosmic-card-foreground: #f8fafc;
+  --cosmic-popover: rgba(7, 12, 28, 0.8);
+  --cosmic-popover-foreground: #f8fafc;
+  --cosmic-primary: #2563eb;
+  --cosmic-primary-foreground: #f8fafc;
+  --cosmic-muted: #94a3b8;
+  --cosmic-muted-foreground: #94a3b8;
+  --cosmic-border: rgba(255, 255, 255, 0.08);
+  --cosmic-input: rgba(255, 255, 255, 0.1);
+  --cosmic-ring: #2563eb;
+
+  /* ===== Radius scale (restrained) ===== */
+  --cosmic-radius-small: 4px;
+  --cosmic-radius-medium: 8px;
+  --cosmic-radius-large: 12px;
+  --cosmic-radius-full: 9999px;
+
+  /* ===== State colors ===== */
+  --state-success: #22d3ee;
+  --state-warning: #fbbf24;
+  --state-error: #f87171;
+  --state-info: #7dd3fc;
+
+  /* ===== Typography ===== */
+  --cosmic-font-sans: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --cosmic-font-display: 'Inter', system-ui, -apple-system, sans-serif;
+  --cosmic-font-body: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* ===== Light mode overrides (not primary, but required for dual-mode) ===== */
+html.light {
+  --cosmic-background: #f8fafc;
+  --cosmic-foreground: #020617;
+  --cosmic-card: rgba(255, 255, 255, 0.6);
+  --cosmic-card-foreground: #020617;
+  --cosmic-popover: rgba(255, 255, 255, 0.9);
+  --cosmic-popover-foreground: #020617;
+  --cosmic-primary: #2563eb;
+  --cosmic-primary-foreground: #f8fafc;
+  --cosmic-muted: #94a3b8;
+  --cosmic-muted-foreground: #475569;
+  --cosmic-border: rgba(0, 0, 0, 0.08);
+  --cosmic-input: rgba(0, 0, 0, 0.1);
+  --cosmic-ring: #2563eb;
+}
+
+/* ===== Dark mode (default for cosmic theme) ===== */
+html.dark {
+  --cosmic-background: #020617;
+  --cosmic-foreground: #f8fafc;
+  --cosmic-card: rgba(7, 12, 28, 0.45);
+  --cosmic-card-foreground: #f8fafc;
+  --cosmic-popover: rgba(7, 12, 28, 0.8);
+  --cosmic-popover-foreground: #f8fafc;
+  --cosmic-primary: #2563eb;
+  --cosmic-primary-foreground: #f8fafc;
+  --cosmic-muted: #94a3b8;
+  --cosmic-muted-foreground: #94a3b8;
+  --cosmic-border: rgba(255, 255, 255, 0.08);
+  --cosmic-input: rgba(255, 255, 255, 0.1);
+  --cosmic-ring: #2563eb;
+}
+
+/* ===== Base typography ===== */
+html {
+  font-family: var(--cosmic-font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-family: var(--cosmic-font-body);
+  background: var(--cosmic-background);
+  color: var(--cosmic-foreground);
+}
+
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4.3.1/dist/index.global.js"></script>
+    <script src="https://unpkg.com/lucide@1.8.0/dist/umd/lucide.min.js"></script>
+    <style type="text/tailwindcss">
+  @theme inline {
+    --color-background: var(--cosmic-background);
+    --color-foreground: var(--cosmic-foreground);
+    --color-card: var(--cosmic-card);
+    --color-card-foreground: var(--cosmic-card-foreground);
+    --color-popover: var(--cosmic-popover);
+    --color-popover-foreground: var(--cosmic-popover-foreground);
+    --color-primary: var(--cosmic-primary);
+    --color-primary-foreground: var(--cosmic-primary-foreground);
+    --color-muted: var(--cosmic-muted);
+    --color-muted-foreground: var(--cosmic-muted-foreground);
+    --color-border: var(--cosmic-border);
+    --color-input: var(--cosmic-input);
+    --color-ring: var(--cosmic-ring);
+    --radius-sm: var(--cosmic-radius-small);
+    --radius-md: var(--cosmic-radius-medium);
+    --radius-lg: var(--cosmic-radius-large);
+  }
+  @layer base {
+    body { background: var(--cosmic-background); color: var(--cosmic-foreground); }
+    td, th { @apply break-words; word-break: break-all; word-break: auto-phrase; }
+    th { @apply whitespace-nowrap; }
+  }
+    </style>
+    <style id="semantic-token-fallback">
+      .bg-background { background-color: var(--cosmic-background); }
+      .text-background { color: var(--cosmic-background); }
+      .border-background { border-color: var(--cosmic-background); }
+      .ring-background { --tw-ring-color: var(--cosmic-background); }
+      .bg-foreground { background-color: var(--cosmic-foreground); }
+      .text-foreground { color: var(--cosmic-foreground); }
+      .border-foreground { border-color: var(--cosmic-foreground); }
+      .ring-foreground { --tw-ring-color: var(--cosmic-foreground); }
+      .bg-card { background-color: var(--cosmic-card); }
+      .text-card { color: var(--cosmic-card); }
+      .border-card { border-color: var(--cosmic-card); }
+      .ring-card { --tw-ring-color: var(--cosmic-card); }
+      .bg-card-foreground { background-color: var(--cosmic-card-foreground); }
+      .text-card-foreground { color: var(--cosmic-card-foreground); }
+      .border-card-foreground { border-color: var(--cosmic-card-foreground); }
+      .ring-card-foreground { --tw-ring-color: var(--cosmic-card-foreground); }
+      .bg-popover { background-color: var(--cosmic-popover); }
+      .text-popover { color: var(--cosmic-popover); }
+      .border-popover { border-color: var(--cosmic-popover); }
+      .ring-popover { --tw-ring-color: var(--cosmic-popover); }
+      .bg-popover-foreground { background-color: var(--cosmic-popover-foreground); }
+      .text-popover-foreground { color: var(--cosmic-popover-foreground); }
+      .border-popover-foreground { border-color: var(--cosmic-popover-foreground); }
+      .ring-popover-foreground { --tw-ring-color: var(--cosmic-popover-foreground); }
+      .bg-primary { background-color: var(--cosmic-primary); }
+      .text-primary { color: var(--cosmic-primary); }
+      .border-primary { border-color: var(--cosmic-primary); }
+      .ring-primary { --tw-ring-color: var(--cosmic-primary); }
+      .bg-primary-foreground { background-color: var(--cosmic-primary-foreground); }
+      .text-primary-foreground { color: var(--cosmic-primary-foreground); }
+      .border-primary-foreground { border-color: var(--cosmic-primary-foreground); }
+      .ring-primary-foreground { --tw-ring-color: var(--cosmic-primary-foreground); }
+      .bg-muted { background-color: var(--cosmic-muted); }
+      .text-muted { color: var(--cosmic-muted); }
+      .border-muted { border-color: var(--cosmic-muted); }
+      .ring-muted { --tw-ring-color: var(--cosmic-muted); }
+      .bg-muted-foreground { background-color: var(--cosmic-muted-foreground); }
+      .text-muted-foreground { color: var(--cosmic-muted-foreground); }
+      .border-muted-foreground { border-color: var(--cosmic-muted-foreground); }
+      .ring-muted-foreground { --tw-ring-color: var(--cosmic-muted-foreground); }
+      .bg-border { background-color: var(--cosmic-border); }
+      .text-border { color: var(--cosmic-border); }
+      .border-border { border-color: var(--cosmic-border); }
+      .ring-border { --tw-ring-color: var(--cosmic-border); }
+      .bg-input { background-color: var(--cosmic-input); }
+      .text-input { color: var(--cosmic-input); }
+      .border-input { border-color: var(--cosmic-input); }
+      .ring-input { --tw-ring-color: var(--cosmic-input); }
+      .bg-ring { background-color: var(--cosmic-ring); }
+      .text-ring { color: var(--cosmic-ring); }
+      .border-ring { border-color: var(--cosmic-ring); }
+      .ring-ring { --tw-ring-color: var(--cosmic-ring); }
+    </style>
+    <style>
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      [data-icon] {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        -webkit-mask-size: contain;
+        mask-size: contain;
+        -webkit-mask-repeat: no-repeat;
+        mask-repeat: no-repeat;
+        -webkit-mask-position: center;
+        mask-position: center;
+        background-color: currentColor;
+      }
+    </style>
+</head>
+<body>
+
+<!-- ========== Fixed Cosmic Background ========== -->
+<div class="cosmic-bg" aria-hidden="true">
+  <div class="nebula-layer nebula-layer-1" data-mouse-parallax="0.015" data-scroll-parallax="0.05"></div>
+  <div class="nebula-layer nebula-layer-2" data-mouse-parallax="0.022" data-scroll-parallax="0.07"></div>
+  <div class="nebula-layer nebula-layer-3" data-mouse-parallax="0.010" data-scroll-parallax="0.04"></div>
+  <div class="scan-line"></div>
+  <canvas id="starfield-canvas" aria-label="动态星空背景 — 多层深度的星点与偶尔掠过的流星" role="img"></canvas>
+  <canvas id="cosmic-object-canvas" aria-label="宇宙核心视觉主体 — 缓慢自转的发光星体，周围环绕轨道粒子和光环" role="img"></canvas>
+</div>
+
+<!-- ========== Navigation ========== -->
+<nav class="cosmic-nav" id="cosmicNav" aria-label="主导航">
+  <div class="nav-inner">
+    <a href="#hero" class="nav-logo" aria-label="深空宇宙首页">
+      <span class="nav-logo-dot" aria-hidden="true"></span>
+      <span class="nav-logo-text">深空</span>
+      <span class="nav-logo-sub">COSMOS</span>
+    </a>
+    <div class="nav-links">
+      <a href="#hero" class="nav-link" data-nav-key="home">首页</a>
+      <a href="#explore" class="nav-link" data-nav-key="explore">探索</a>
+      <a href="#data" class="nav-link" data-nav-key="data">数据</a>
+      <a href="#convergence" class="nav-link" data-nav-key="about">关于</a>
+    </div>
+    <button class="nav-cta" aria-label="进入深空探索">进入深空</button>
+  </div>
+</nav>
+
+<!-- ========== Hero Section ========== -->
+<section class="hero-section" id="hero">
+  <div class="hero-content">
+    <div class="hero-label-wrap">
+      <span class="status-dot" aria-hidden="true"></span>
+      <span class="hero-label coordinate-label">DEEP SPACE / SECTOR-01</span>
+    </div>
+    <h1 class="hero-title" style="text-wrap: balance; word-break: keep-all; overflow-wrap: break-word;">穿越深空<br>探索未知</h1>
+    <p class="hero-subtitle">在浩瀚宇宙的静谧深处，开启一段跨越星际的沉浸式旅程。每一束穿越亿万光年的微光，都是宇宙留给探索者的低语。</p>
+    <div class="hero-buttons">
+      <button class="cosmic-btn primary" aria-label="启程探索深空">
+        <span class="btn-light" aria-hidden="true"></span>
+        <span class="btn-text">启程探索</span>
+        <span class="btn-arrow" aria-hidden="true">&#8594;</span>
+      </button>
+      <button class="cosmic-btn secondary" aria-label="了解更多深空信息">
+        <span class="btn-text">了解更多</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="hero-coords" aria-hidden="true">
+    <div class="coord-marker coord-marker-tl"><span class="cm-h"></span><span class="cm-v"></span></div>
+    <div class="coord-marker coord-marker-br"><span class="cm-h"></span><span class="cm-v"></span></div>
+    <span class="coord-label-text cl-1">RA 14h 29m 43s</span>
+    <span class="coord-label-text cl-2">DEC -62&deg; 40' 46"</span>
+    <span class="coord-label-text cl-3">DIST 4.246 ly</span>
+  </div>
+
+  <div class="scroll-hint" aria-hidden="true">
+    <span class="scroll-hint-text">向下滚动</span>
+    <span class="scroll-hint-line"></span>
+    <span class="scroll-hint-text-en">SCROLL</span>
+  </div>
+</section>
+
+<!-- ========== Section 1: Floating Panels (Nebula) ========== -->
+<section class="story-section section-nebula" id="explore" data-phase="nebula">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <span class="coordinate-label section-label">SECTOR-07 / DEEP FIELD</span>
+      <h2 class="section-title" style="text-wrap: balance; word-break: keep-all; overflow-wrap: break-word;">探索未知</h2>
+      <p class="section-desc">越过已知星图的边界，进入尚未被记录的深空区域。每一次跃迁都是对未知的致敬，每一帧寂静都是宇宙最诚实的回答。</p>
+    </div>
+    <div class="panels-row reveal">
+      <div class="glass-panel">
+        <div class="panel-header"><span class="status-dot" aria-hidden="true"></span><span class="panel-label">深空扫描</span></div>
+        <div class="panel-data">
+          <div class="data-row"><span class="data-key">距地球</span><span class="data-val">4.246 光年</span></div>
+          <div class="data-row"><span class="data-key">信号强度</span><span class="data-val">-127 dBm</span></div>
+          <div class="data-row"><span class="data-key">扫描进度</span><span class="data-val data-val-accent">73%</span></div>
+        </div>
+        <div class="panel-bar" aria-hidden="true"><div class="panel-bar-fill" style="width:73%"></div></div>
+      </div>
+      <div class="glass-panel">
+        <div class="panel-header"><span class="status-dot status-dot-cyan" aria-hidden="true"></span><span class="panel-label">星体识别</span></div>
+        <div class="panel-data">
+          <div class="data-row"><span class="data-key">恒星类型</span><span class="data-val">M 型红矮星</span></div>
+          <div class="data-row"><span class="data-key">表面温度</span><span class="data-val">3,042 K</span></div>
+          <div class="data-row"><span class="data-key">行星数量</span><span class="data-val">7</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="orbit-decoration orbit-1" aria-hidden="true"></div>
+  </div>
+</section>
+
+<!-- ========== Section 2: Large Visual + Text (Expand) ========== -->
+<section class="story-section section-expand" id="navigation" data-phase="expand">
+  <div class="section-inner section-split">
+    <div class="split-text reveal">
+      <span class="coordinate-label section-label">SECTOR-12 / NAVIGATION</span>
+      <h2 class="section-title" style="text-wrap: balance; word-break: keep-all; overflow-wrap: break-word;">星际导航</h2>
+      <p class="section-desc">以引力波为航标，以脉冲星为灯塔。在无尽的黑暗中，精确计算每一次轨道转移，让沉默的星海不再迷失方向。</p>
+      <div class="nav-stats">
+        <div class="nav-stat"><span class="nav-stat-val">247.3&deg;</span><span class="nav-stat-label">航向</span></div>
+        <div class="nav-stat"><span class="nav-stat-val">0.87<span class="nav-stat-unit">c</span></span><span class="nav-stat-label">巡航速度</span></div>
+        <div class="nav-stat"><span class="nav-stat-val">12.4<span class="nav-stat-unit">年</span></span><span class="nav-stat-label">预计抵达</span></div>
+      </div>
+    </div>
+    <div class="split-visual reveal">
+      <div class="visual-frame">
+        <div class="visual-radar" aria-hidden="true">
+          <div class="radar-ring rr-1"></div>
+          <div class="radar-ring rr-2"></div>
+          <div class="radar-ring rr-3"></div>
+          <div class="radar-cross-h"></div>
+          <div class="radar-cross-v"></div>
+          <div class="radar-center"></div>
+          <div class="radar-dot rd-1"></div>
+          <div class="radar-dot rd-2"></div>
+          <div class="radar-dot rd-3"></div>
+          <div class="radar-sweep"></div>
+        </div>
+        <div class="visual-labels" aria-hidden="true">
+          <span class="visual-label-coord">NAV-LINK ACTIVE</span>
+          <span class="visual-label-coord">3 BEACONS LOCKED</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Section 3: Space Nodes (Data) ========== -->
+<section class="story-section section-nodes" id="data" data-phase="nodes">
+  <div class="section-inner">
+    <div class="section-header reveal">
+      <span class="coordinate-label section-label">SECTOR-23 / DATA STREAM</span>
+      <h2 class="section-title" style="text-wrap: balance; word-break: keep-all; overflow-wrap: break-word;">深空数据</h2>
+      <p class="section-desc">来自遥远星系的信号穿越亿万年抵达此处。每一条数据都是宇宙留给我们的低语，每一次解码都是与时间的对话。</p>
+    </div>
+    <div class="nodes-grid reveal">
+      <div class="space-node">
+        <div class="node-dot" aria-hidden="true"></div>
+        <div class="node-info"><span class="node-id">NODE-07</span><span class="node-status ns-active">已连接</span></div>
+        <span class="node-coord">&alpha;: 14.29 / &delta;: -62.40</span>
+      </div>
+      <div class="node-connector" aria-hidden="true"></div>
+      <div class="space-node">
+        <div class="node-dot node-dot-cyan" aria-hidden="true"></div>
+        <div class="node-info"><span class="node-id">NODE-12</span><span class="node-status ns-active">已连接</span></div>
+        <span class="node-coord">&alpha;: 07.42 / &delta;: +31.18</span>
+      </div>
+      <div class="node-connector" aria-hidden="true"></div>
+      <div class="space-node">
+        <div class="node-dot node-dot-pulse" aria-hidden="true"></div>
+        <div class="node-info"><span class="node-id">NODE-23</span><span class="node-status ns-sync">同步中</span></div>
+        <span class="node-coord">&alpha;: 22.15 / &delta;: -08.33</span>
+      </div>
+      <div class="node-connector" aria-hidden="true"></div>
+      <div class="space-node">
+        <div class="node-dot node-dot-dim" aria-hidden="true"></div>
+        <div class="node-info"><span class="node-id">NODE-31</span><span class="node-status ns-pending">待发现</span></div>
+        <span class="node-coord">&alpha;: --.-- / &delta;: --.--</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Section 4: Convergence ========== -->
+<section class="story-section section-convergence" id="convergence" data-phase="convergence">
+  <div class="section-inner convergence-inner">
+    <div class="convergence-visual" aria-hidden="true">
+      <div class="conv-ring cr-1"></div>
+      <div class="conv-ring cr-2"></div>
+      <div class="conv-ring cr-3"></div>
+      <div class="conv-core"></div>
+      <div class="conv-line cl-1"></div>
+      <div class="conv-line cl-2"></div>
+      <div class="conv-line cl-3"></div>
+      <div class="conv-line cl-4"></div>
+    </div>
+    <div class="convergence-content reveal">
+      <span class="coordinate-label section-label">SECTOR-31 / CONVERGENCE</span>
+      <h2 class="section-title convergence-title" style="text-wrap: balance; word-break: keep-all; overflow-wrap: break-word;">宇宙汇聚</h2>
+      <p class="section-desc convergence-desc">所有路径终将交汇。在时空的曲率深处，亿万星辰归于同一个奇点，探索的尽头亦是起点。</p>
+      <div class="convergence-stats">
+        <div class="conv-stat"><span class="conv-stat-val">1,247</span><span class="conv-stat-label">参与节点</span></div>
+        <div class="conv-stat"><span class="conv-stat-val">99.7<span class="conv-stat-unit">%</span></span><span class="conv-stat-label">数据完整度</span></div>
+      </div>
+      <button class="cosmic-btn primary convergence-btn" aria-label="开启深空之旅">
+        <span class="btn-light" aria-hidden="true"></span>
+        <span class="btn-text">开启旅程</span>
+        <span class="btn-arrow" aria-hidden="true">&#8594;</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ========== Footer ========== -->
+<footer class="cosmic-footer">
+  <div class="footer-inner">
+    <div class="footer-star" aria-hidden="true"></div>
+    <p class="footer-text">深空宇宙 — 探索永无止境</p>
+    <p class="footer-copy">COSMOS DEEP SPACE EXPLORATION &middot; 占位内容</p>
+  </div>
+</footer>
+
+<!-- ========== Custom Styles (in body, not head) ========== -->
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:var(--cosmic-font-body,'Inter',system-ui,sans-serif);background:var(--cosmic-background,#020617);color:var(--cosmic-foreground,#f8fafc);overflow-x:hidden;position:relative;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* ===== Cosmic Background ===== */
+.cosmic-bg{position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;overflow:hidden}
+#starfield-canvas{position:absolute;top:0;left:0;width:100%;height:100%;z-index:2}
+#cosmic-object-canvas{position:absolute;top:50%;left:62%;transform:translate(-50%,-50%);z-index:3;pointer-events:none;will-change:opacity,filter,transform;transition:opacity .6s ease}
+
+/* ===== Nebula Layers ===== */
+.nebula-layer{position:absolute;border-radius:50%;filter:blur(70px);pointer-events:none;will-change:transform}
+.nebula-layer-1{top:-12%;left:-8%;width:72%;height:72%;background:radial-gradient(ellipse at 40% 40%,rgba(37,99,235,.10) 0%,rgba(30,58,138,.06) 25%,rgba(109,40,217,.03) 50%,transparent 70%)}
+.nebula-layer-2{top:28%;right:-12%;width:68%;height:68%;background:radial-gradient(ellipse at 60% 50%,rgba(109,40,217,.08) 0%,rgba(37,99,235,.05) 30%,rgba(30,58,138,.03) 55%,transparent 75%)}
+.nebula-layer-3{bottom:-18%;left:18%;width:62%;height:62%;background:radial-gradient(ellipse at 50% 50%,rgba(125,211,252,.05) 0%,rgba(37,99,235,.04) 25%,rgba(109,40,217,.02) 50%,transparent 70%)}
+
+/* ===== Scan Line ===== */
+.scan-line{position:absolute;top:0;left:0;width:100%;height:1px;background:linear-gradient(90deg,transparent,rgba(125,211,252,.12),transparent);z-index:1;opacity:0;animation:scanLine 12s linear infinite}
+@keyframes scanLine{0%{top:0;opacity:0}8%{opacity:.4}92%{opacity:.4}100%{top:100%;opacity:0}}
+
+/* ===== Navigation ===== */
+.cosmic-nav{position:fixed;top:0;left:0;width:100%;z-index:100;transition:all .5s cubic-bezier(.16,1,.3,1);padding:20px 0}
+.cosmic-nav.scrolled{padding:10px 0;background:rgba(2,6,23,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.06)}
+.nav-inner{max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;padding:0 48px}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none;color:inherit}
+.nav-logo-dot{width:8px;height:8px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 12px rgba(125,211,252,.6);animation:dotPulse 3s ease-in-out infinite}
+@keyframes dotPulse{0%,100%{opacity:.6}50%{opacity:1}}
+.nav-logo-text{font-size:16px;font-weight:600;color:#f8fafc;letter-spacing:.04em}
+.nav-logo-sub{font-size:10px;color:#64748b;letter-spacing:.2em;font-weight:400}
+.nav-links{display:flex;gap:36px}
+.nav-link{font-size:14px;color:#94a3b8;text-decoration:none;transition:color .3s ease;letter-spacing:.02em}
+.nav-link:hover{color:#e2e8f0}
+.nav-cta{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;padding:8px 20px;border-radius:8px;font-size:13px;cursor:pointer;transition:all .3s ease;backdrop-filter:blur(8px)}
+.nav-cta:hover{background:rgba(125,211,252,.08);border-color:rgba(125,211,252,.25)}
+
+/* ===== Hero Section ===== */
+.hero-section{position:relative;z-index:10;min-height:100vh;display:flex;align-items:center;padding:0 48px;max-width:1400px;margin:0 auto}
+.hero-content{max-width:640px}
+.hero-label-wrap{display:flex;align-items:center;gap:10px;margin-bottom:28px;opacity:0;animation:fadeUp .8s cubic-bezier(.16,1,.3,1) .2s forwards}
+.hero-label{font-size:12px;color:#64748b;letter-spacing:.18em}
+.hero-title{font-size:clamp(2.5rem,6vw,4.8rem);font-weight:600;line-height:1.1;letter-spacing:-.02em;margin-bottom:24px;background:linear-gradient(180deg,#f8fafc 0%,#e2e8f0 55%,#bae6fd 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;opacity:0;animation:heroEnter 1.6s cubic-bezier(.16,1,.3,1) .4s forwards}
+@keyframes heroEnter{0%{opacity:0;transform:translateY(28px)}100%{opacity:1;transform:translateY(0)}}
+.hero-subtitle{font-size:clamp(1rem,1.4vw,1.15rem);line-height:1.7;color:rgba(226,232,240,.72);max-width:480px;margin-bottom:40px;opacity:0;animation:fadeUp 1s cubic-bezier(.16,1,.3,1) .7s forwards}
+@keyframes fadeUp{0%{opacity:0;transform:translateY(16px)}100%{opacity:1;transform:translateY(0)}}
+.hero-buttons{display:flex;gap:16px;flex-wrap:wrap;opacity:0;animation:fadeUp 1s cubic-bezier(.16,1,.3,1) .9s forwards}
+
+/* ===== Coordinate Markers ===== */
+.hero-coords{position:absolute;inset:0;pointer-events:none}
+.coord-marker{position:absolute;width:16px;height:16px;opacity:.25}
+.coord-marker-tl{top:100px;left:24px}
+.coord-marker-br{bottom:100px;right:24px}
+.cm-h{position:absolute;top:50%;left:0;width:100%;height:1px;background:rgba(125,211,252,.5)}
+.cm-v{position:absolute;left:50%;top:0;width:1px;height:100%;background:rgba(125,211,252,.5)}
+.coord-label-text{position:absolute;font-size:10px;letter-spacing:.12em;color:rgba(125,211,252,.3);font-family:'SF Mono',Monaco,monospace;white-space:nowrap}
+.cl-1{top:130px;left:48px}
+.cl-2{bottom:130px;right:48px}
+.cl-3{top:50%;right:28px;transform:translateY(-50%) rotate(90deg);transform-origin:center}
+
+/* ===== Scroll Hint ===== */
+.scroll-hint{position:absolute;bottom:40px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:10px;opacity:0;animation:fadeUp 1s ease 1.4s forwards}
+.scroll-hint-text{font-size:11px;color:#64748b;letter-spacing:.15em}
+.scroll-hint-text-en{font-size:9px;color:#475569;letter-spacing:.3em}
+.scroll-hint-line{width:1px;height:36px;background:linear-gradient(to bottom,transparent,rgba(148,163,184,.4));animation:scrollPulse 2.5s ease-in-out infinite}
+@keyframes scrollPulse{0%,100%{opacity:.3;transform:scaleY(.6)}50%{opacity:.8;transform:scaleY(1)}}
+
+/* ===== Status Dots ===== */
+.status-dot{width:6px;height:6px;border-radius:50%;background:#2563eb;box-shadow:0 0 8px rgba(37,99,235,.5);display:inline-block;animation:dotPulse 3s ease-in-out infinite}
+.status-dot-cyan{background:#22d3ee;box-shadow:0 0 8px rgba(34,211,238,.5)}
+.coordinate-label{font-family:'SF Mono',Monaco,monospace;font-size:11px;letter-spacing:.18em;color:#64748b;text-transform:uppercase}
+
+/* ===== Cosmic Buttons ===== */
+.cosmic-btn{position:relative;display:inline-flex;align-items:center;gap:10px;padding:13px 28px;border-radius:10px;font-size:14px;font-weight:500;cursor:pointer;overflow:hidden;transition:all .35s cubic-bezier(.16,1,.3,1);background:rgba(7,12,28,.5);border:1px solid rgba(255,255,255,.1);color:#e2e8f0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 0 24px rgba(37,99,235,.06)}
+.cosmic-btn::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(125,211,252,.08),transparent);transition:left .6s ease}
+.cosmic-btn:hover::before{left:100%}
+.cosmic-btn:hover{border-color:rgba(125,211,252,.3);transform:translateY(-2px);background:rgba(7,12,28,.65);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 4px 32px rgba(37,99,235,.12)}
+.cosmic-btn:active{transform:translateY(0) scale(.98)}
+.btn-light{width:6px;height:6px;border-radius:50%;background:#7dd3fc;box-shadow:0 0 8px rgba(125,211,252,.6);flex-shrink:0}
+.btn-arrow{transition:transform .35s ease;color:#7dd3fc}
+.cosmic-btn:hover .btn-arrow{transform:translateX(4px)}
+.cosmic-btn.secondary{background:transparent;border-color:rgba(255,255,255,.08)}
+.cosmic-btn:focus-visible{outline:2px solid rgba(125,211,252,.5);outline-offset:3px}
+
+/* ===== Glass Panels ===== */
+.glass-panel{background:rgba(7,12,28,.45);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:28px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 8px 40px rgba(0,0,0,.3);transition:all .5s cubic-bezier(.16,1,.3,1)}
+.glass-panel:hover{border-color:rgba(125,211,252,.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 8px 48px rgba(37,99,235,.08)}
+.panel-header{display:flex;align-items:center;gap:8px;margin-bottom:20px}
+.panel-label{font-size:13px;font-weight:500;color:#e2e8f0;letter-spacing:.04em}
+.panel-data{display:flex;flex-direction:column;gap:12px}
+.data-row{display:flex;justify-content:space-between;align-items:center;font-size:13px}
+.data-key{color:#64748b}
+.data-val{color:#e2e8f0;font-family:'SF Mono',Monaco,monospace;font-size:12px}
+.data-val-accent{color:#7dd3fc}
+.panel-bar{margin-top:16px;height:2px;background:rgba(255,255,255,.06);border-radius:1px;overflow:hidden}
+.panel-bar-fill{height:100%;background:linear-gradient(90deg,#2563eb,#7dd3fc);border-radius:1px;box-shadow:0 0 8px rgba(125,211,252,.3)}
+
+/* ===== Story Sections (general) ===== */
+.story-section{position:relative;z-index:10;padding:140px 48px;max-width:1400px;margin:0 auto}
+.section-header{margin-bottom:64px;max-width:640px}
+.section-label{display:block;margin-bottom:20px}
+.section-title{font-size:clamp(1.8rem,3.5vw,2.8rem);font-weight:600;line-height:1.2;letter-spacing:-.015em;color:#f8fafc;margin-bottom:20px}
+.section-desc{font-size:clamp(.95rem,1.2vw,1.05rem);line-height:1.75;color:#94a3b8;max-width:520px}
+
+/* ===== Section 1: Floating Panels ===== */
+.panels-row{display:flex;gap:32px;flex-wrap:wrap}
+.panels-row .glass-panel{flex:1;min-width:280px}
+
+/* ===== Orbit Decoration ===== */
+.orbit-decoration{position:absolute;border:1px solid rgba(125,211,252,.06);border-radius:50%;pointer-events:none}
+.orbit-1{width:600px;height:600px;top:50%;right:-200px;transform:translateY(-50%)}
+
+/* ===== Section 2: Split Layout ===== */
+.section-split{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.split-text{max-width:480px}
+.nav-stats{display:flex;gap:40px;margin-top:36px;flex-wrap:wrap}
+.nav-stat{display:flex;flex-direction:column;gap:4px}
+.nav-stat-val{font-size:28px;font-weight:600;color:#f8fafc;letter-spacing:-.01em}
+.nav-stat-unit{font-size:14px;color:#7dd3fc;font-weight:400}
+.nav-stat-label{font-size:12px;color:#64748b;letter-spacing:.1em}
+.split-visual{display:flex;justify-content:center}
+.visual-frame{position:relative;width:360px;height:360px}
+.visual-radar{position:relative;width:100%;height:100%;border-radius:50%;border:1px solid rgba(125,211,252,.08)}
+.radar-ring{position:absolute;border-radius:50%;border:1px solid rgba(125,211,252,.06);top:50%;left:50%;transform:translate(-50%,-50%)}
+.rr-1{width:66%;height:66%}
+.rr-2{width:44%;height:44%}
+.rr-3{width:22%;height:22%}
+.radar-cross-h{position:absolute;top:50%;left:0;width:100%;height:1px;background:rgba(125,211,252,.04)}
+.radar-cross-v{position:absolute;left:50%;top:0;width:1px;height:100%;background:rgba(125,211,252,.04)}
+.radar-center{position:absolute;top:50%;left:50%;width:8px;height:8px;border-radius:50%;background:#7dd3fc;transform:translate(-50%,-50%);box-shadow:0 0 16px rgba(125,211,252,.5)}
+.radar-dot{position:absolute;width:5px;height:5px;border-radius:50%;background:#93c5fd;box-shadow:0 0 8px rgba(147,197,253,.5)}
+.rd-1{top:30%;left:60%}
+.rd-2{top:65%;left:35%}
+.rd-3{top:45%;left:75%}
+.radar-sweep{position:absolute;top:50%;left:50%;width:50%;height:1px;background:linear-gradient(90deg,rgba(125,211,252,.25),transparent);transform-origin:left center;animation:radarSweep 6s linear infinite}
+@keyframes radarSweep{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+.visual-labels{position:absolute;bottom:-8px;left:0;right:0;display:flex;justify-content:space-between}
+.visual-label-coord{font-size:9px;color:#475569;letter-spacing:.15em;font-family:'SF Mono',Monaco,monospace}
+
+/* ===== Section 3: Space Nodes ===== */
+.nodes-grid{display:flex;align-items:center;gap:0;flex-wrap:wrap;justify-content:center}
+.space-node{display:flex;flex-direction:column;align-items:center;gap:10px;padding:24px;min-width:160px;text-align:center}
+.node-dot{width:12px;height:12px;border-radius:50%;background:#2563eb;box-shadow:0 0 16px rgba(37,99,235,.5);position:relative}
+.node-dot::after{content:'';position:absolute;inset:-6px;border:1px solid rgba(37,99,235,.15);border-radius:50%}
+.node-dot-cyan{background:#22d3ee;box-shadow:0 0 16px rgba(34,211,238,.5)}
+.node-dot-cyan::after{border-color:rgba(34,211,238,.15)}
+.node-dot-pulse{background:#fbbf24;box-shadow:0 0 16px rgba(251,191,36,.5);animation:nodePulse 2s ease-in-out infinite}
+.node-dot-pulse::after{border-color:rgba(251,191,36,.15)}
+@keyframes nodePulse{0%,100%{opacity:.6}50%{opacity:1}}
+.node-dot-dim{background:#334155;box-shadow:none}
+.node-dot-dim::after{border-color:rgba(51,65,85,.2)}
+.node-info{display:flex;flex-direction:column;gap:4px;align-items:center}
+.node-id{font-size:14px;font-weight:600;color:#e2e8f0;font-family:'SF Mono',Monaco,monospace;letter-spacing:.05em}
+.node-status{font-size:11px;letter-spacing:.08em}
+.ns-active{color:#22d3ee}
+.ns-sync{color:#fbbf24}
+.ns-pending{color:#475569}
+.node-coord{font-size:10px;color:#475569;font-family:'SF Mono',Monaco,monospace}
+.node-connector{flex:1;height:1px;min-width:24px;max-width:60px;background:linear-gradient(90deg,rgba(125,211,252,.15),rgba(125,211,252,.05))}
+
+/* ===== Section 4: Convergence ===== */
+.convergence-inner{display:grid;grid-template-columns:1fr 1fr;gap:80px;align-items:center}
+.convergence-visual{position:relative;width:360px;height:360px;margin:0 auto;display:flex;align-items:center;justify-content:center}
+.conv-ring{position:absolute;border-radius:50%;border:1px solid rgba(125,211,252,.08);top:50%;left:50%;transform:translate(-50%,-50%)}
+.cr-1{width:100%;height:100%;animation:convRotate 30s linear infinite}
+.cr-2{width:70%;height:70%;animation:convRotate 20s linear infinite reverse}
+.cr-3{width:40%;height:40%;animation:convRotate 15s linear infinite}
+@keyframes convRotate{0%{transform:translate(-50%,-50%) rotate(0deg)}100%{transform:translate(-50%,-50%) rotate(360deg)}}
+.conv-core{width:16px;height:16px;border-radius:50%;background:#f8fafc;box-shadow:0 0 40px rgba(125,211,252,.4),0 0 80px rgba(37,99,235,.2);animation:convBreath 4s ease-in-out infinite}
+@keyframes convBreath{0%,100%{transform:scale(1);opacity:.8}50%{transform:scale(1.3);opacity:1}}
+.conv-line{position:absolute;top:50%;left:50%;width:50%;height:1px;background:linear-gradient(90deg,rgba(125,211,252,.2),transparent);transform-origin:left center}
+.cl-1{transform:translate(0,-50%) rotate(0deg)}
+.cl-2{transform:translate(0,-50%) rotate(90deg)}
+.cl-3{transform:translate(0,-50%) rotate(180deg)}
+.cl-4{transform:translate(0,-50%) rotate(270deg)}
+.convergence-content{max-width:480px}
+.convergence-stats{display:flex;gap:48px;margin:32px 0}
+.conv-stat{display:flex;flex-direction:column;gap:4px}
+.conv-stat-val{font-size:32px;font-weight:600;color:#f8fafc}
+.conv-stat-unit{font-size:16px;color:#7dd3fc}
+.conv-stat-label{font-size:12px;color:#64748b;letter-spacing:.1em}
+
+/* ===== Footer ===== */
+.cosmic-footer{position:relative;z-index:10;padding:140px 48px 60px;text-align:center;background:linear-gradient(to bottom,transparent,rgba(2,6,23,.7))}
+.footer-inner{display:flex;flex-direction:column;align-items:center;gap:16px}
+.footer-star{width:4px;height:4px;border-radius:50%;background:#f8fafc;box-shadow:0 0 12px rgba(248,250,252,.4),0 0 24px rgba(125,211,252,.15);animation:footerStarPulse 4s ease-in-out infinite}
+@keyframes footerStarPulse{0%,100%{opacity:.4}50%{opacity:.8}}
+.footer-text{font-size:14px;color:#94a3b8;letter-spacing:.04em}
+.footer-copy{font-size:11px;color:#334155;letter-spacing:.15em;font-family:'SF Mono',Monaco,monospace}
+
+/* ===== Reveal Animation ===== */
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .9s cubic-bezier(.16,1,.3,1),transform .9s cubic-bezier(.16,1,.3,1)}
+.reveal.revealed{opacity:1;transform:translateY(0)}
+
+/* ===== Focus Styles ===== */
+a:focus-visible,button:focus-visible{outline:2px solid rgba(125,211,252,.5);outline-offset:3px;border-radius:4px}
+
+/* ===== Responsive (Mobile) ===== */
+@media(max-width:768px){
+  .nav-inner{padding:0 20px}
+  .nav-links{display:none}
+  .nav-cta{padding:6px 14px;font-size:12px}
+  .hero-section{padding:0 20px}
+  .hero-content{max-width:100%}
+  .hero-coords{display:none}
+  .scroll-hint{bottom:24px}
+  .story-section{padding:80px 20px}
+  .section-header{margin-bottom:40px}
+  .panels-row{flex-direction:column}
+  .section-split{grid-template-columns:1fr;gap:48px}
+  .split-visual{order:-1}
+  .visual-frame{width:280px;height:280px}
+  .convergence-inner{grid-template-columns:1fr;gap:48px}
+  .convergence-visual{width:280px;height:280px;order:-1}
+  .convergence-stats{gap:32px}
+  .nodes-grid{flex-direction:column;gap:0}
+  .node-connector{width:1px;height:24px;min-height:24px;min-width:0;max-width:none;background:linear-gradient(180deg,rgba(125,211,252,.15),rgba(125,211,252,.05))}
+  .cosmic-footer{padding:80px 20px 40px}
+  .nav-stats{gap:24px}
+  .nav-stat-val{font-size:22px}
+  .conv-stat-val{font-size:26px}
+  #cosmic-object-canvas{left:50%;top:38%}
+}
+
+/* ===== Reduced Motion ===== */
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  .reveal{opacity:1;transform:none}
+  .scan-line{display:none}
+  .radar-sweep{animation:none}
+  .conv-ring{animation:none}
+  .scroll-hint-line{animation:none}
+}
+</style>
+
+<!-- ========== JavaScript ========== -->
+<script>
+(function(){
+'use strict';
+
+var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+var isMobile = window.matchMedia('(max-width: 768px)').matches;
+var isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+var isLowPerf = isMobile || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4);
+var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+var COLORS = {
+  starWhite:'#f8fafc', iceBlue:'#7dd3fc', softBlue:'#93c5fd',
+  nebulaBlue:'#60a5fa', softPurple:'#a78bfa', cyan:'#22d3ee'
+};
+var STAR_COLORS = ['#f8fafc','#f8fafc','#f8fafc','#e2e8f0','#93c5fd','#7dd3fc','#a78bfa'];
+
+/* ===== StarField ===== */
+function StarField(canvas){
+  this.canvas = canvas;
+  this.ctx = canvas.getContext('2d');
+  this.stars = [];
+  this.shootingStars = [];
+  this.parallaxX = 0;
+  this.parallaxY = 0;
+  this.scrollOffset = 0;
+  this.shootTimer = null;
+  this.width = 0;
+  this.height = 0;
+  this.resize();
+  this.initStars();
+  if(!prefersReducedMotion){
+    this.scheduleShootingStar();
+  }
+}
+StarField.prototype.resize = function(){
+  this.width = window.innerWidth;
+  this.height = window.innerHeight;
+  this.canvas.width = this.width * dpr;
+  this.canvas.height = this.height * dpr;
+  this.ctx.setTransform(1,0,0,1,0,0);
+  this.ctx.scale(dpr, dpr);
+};
+StarField.prototype.initStars = function(){
+  this.stars = [];
+  var count = isMobile ? (isLowPerf ? 50 : 90) : (isLowPerf ? 150 : 280);
+  for(var i=0;i<count;i++){
+    var depth = Math.random();
+    var isDistant = depth < 0.65;
+    var isMidground = depth >= 0.65 && depth < 0.88;
+    this.stars.push({
+      x: Math.random()*this.width,
+      y: Math.random()*this.height,
+      radius: isDistant ? Math.random()*0.7+0.2 : (isMidground ? Math.random()*1.0+0.5 : Math.random()*1.8+0.8),
+      baseOpacity: isDistant ? Math.random()*0.4+0.2 : Math.random()*0.5+0.35,
+      twinkleAmp: isDistant ? Math.random()*0.08+0.02 : Math.random()*0.15+0.05,
+      twinkleSpeed: Math.random()*0.0015+0.0003,
+      twinklePhase: Math.random()*Math.PI*2,
+      driftX: isMidground ? (Math.random()-0.5)*0.015 : (isDistant ? 0 : (Math.random()-0.5)*0.04),
+      driftY: isMidground ? (Math.random()-0.5)*0.01 : (isDistant ? 0 : (Math.random()-0.5)*0.03),
+      depth: depth,
+      glow: isMidground ? Math.random()*2+1.5 : (depth>=0.88 ? Math.random()*4+3 : 0),
+      color: STAR_COLORS[Math.floor(Math.random()*STAR_COLORS.length)],
+      originalX: 0,
+      originalY: 0
+    });
+  }
+  for(var j=0;j<this.stars.length;j++){
+    this.stars[j].originalX = this.stars[j].x;
+    this.stars[j].originalY = this.stars[j].y;
+  }
+};
+StarField.prototype.scheduleShootingStar = function(){
+  var self = this;
+  var delay = (8 + Math.random()*12) * 1000;
+  this.shootTimer = setTimeout(function(){
+    if(self.shootingStars.length < 2){
+      self.createShootingStar();
+    }
+    self.scheduleShootingStar();
+  }, delay);
+};
+StarField.prototype.createShootingStar = function(){
+  var startX = Math.random()*this.width*0.6;
+  var startY = Math.random()*this.height*0.4;
+  var angle = Math.PI*0.2 + Math.random()*Math.PI*0.15;
+  var speed = 6 + Math.random()*4;
+  this.shootingStars.push({
+    x: startX, y: startY,
+    vx: Math.cos(angle)*speed,
+    vy: Math.sin(angle)*speed,
+    opacity: 0,
+    life: 0,
+    maxLife: 60 + Math.random()*30
+  });
+};
+StarField.prototype.setParallax = function(mx, my, sy){
+  this.parallaxX = mx;
+  this.parallaxY = my;
+  this.scrollOffset = sy;
+};
+StarField.prototype.update = function(dt){
+  for(var i=0;i<this.stars.length;i++){
+    var s = this.stars[i];
+    s.twinklePhase += s.twinkleSpeed * dt;
+    s.x += s.driftX * dt * 0.06;
+    s.y += s.driftY * dt * 0.06;
+    if(s.x < -10) s.x = this.width+10;
+    if(s.x > this.width+10) s.x = -10;
+    if(s.y < -10) s.y = this.height+10;
+    if(s.y > this.height+10) s.y = -10;
+  }
+  for(var j=this.shootingStars.length-1;j>=0;j--){
+    var sh = this.shootingStars[j];
+    sh.life++;
+    sh.x += sh.vx;
+    sh.y += sh.vy;
+    if(sh.life < 10){
+      sh.opacity = sh.life / 10;
+    } else if(sh.life > sh.maxLife - 15){
+      sh.opacity = Math.max(0, (sh.maxLife - sh.life) / 15);
+    } else {
+      sh.opacity = 1;
+    }
+    if(sh.life >= sh.maxLife || sh.x > this.width+50 || sh.y > this.height+50){
+      this.shootingStars.splice(j, 1);
+    }
+  }
+};
+StarField.prototype.draw = function(){
+  var ctx = this.ctx;
+  ctx.clearRect(0,0,this.width,this.height);
+  for(var i=0;i<this.stars.length;i++){
+    var s = this.stars[i];
+    var twinkle = Math.sin(s.twinklePhase) * s.twinkleAmp;
+    var opacity = Math.max(0, Math.min(1, s.baseOpacity + twinkle));
+    var pX = s.x + this.parallaxX * s.depth * 20;
+    var pY = s.y + this.parallaxY * s.depth * 20 + this.scrollOffset * s.depth * 0.08;
+    pY = pY % this.height;
+    if(pY < 0) pY += this.height;
+    if(s.glow > 0){
+      var g = ctx.createRadialGradient(pX, pY, 0, pX, pY, s.glow);
+      g.addColorStop(0, s.color);
+      g.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.globalAlpha = opacity * 0.25;
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.arc(pX, pY, s.glow, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = opacity;
+    ctx.fillStyle = s.color;
+    ctx.beginPath();
+    ctx.arc(pX, pY, s.radius, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  for(var j=0;j<this.shootingStars.length;j++){
+    var sh = this.shootingStars[j];
+    var trailLen = 50;
+    var grad = ctx.createLinearGradient(sh.x, sh.y, sh.x - sh.vx*trailLen/6, sh.y - sh.vy*trailLen/6);
+    grad.addColorStop(0, 'rgba(248,250,252,'+sh.opacity+')');
+    grad.addColorStop(0.5, 'rgba(125,211,252,'+sh.opacity*0.5+')');
+    grad.addColorStop(1, 'rgba(125,211,252,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(sh.x, sh.y);
+    ctx.lineTo(sh.x - sh.vx*trailLen/6, sh.y - sh.vy*trailLen/6);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(248,250,252,'+sh.opacity+')';
+    ctx.beginPath();
+    ctx.arc(sh.x, sh.y, 1.5, 0, Math.PI*2);
+    ctx.fill();
+  }
+};
+StarField.prototype.destroy = function(){
+  if(this.shootTimer){ clearTimeout(this.shootTimer); }
+};
+
+/* ===== CosmicObject ===== */
+function CosmicObject(canvas){
+  this.canvas = canvas;
+  this.ctx = canvas.getContext('2d');
+  this.size = isMobile ? 300 : 500;
+  this.rotation = 0;
+  this.breathPhase = 0;
+  this.mouseX = 0;
+  this.mouseY = 0;
+  this.targetMX = 0;
+  this.targetMY = 0;
+  this.rings = [];
+  this.particles = [];
+  this.coreParticles = [];
+  this.resize();
+  this.initParticles();
+}
+CosmicObject.prototype.resize = function(){
+  this.size = isMobile ? 300 : 500;
+  this.canvas.style.width = this.size + 'px';
+  this.canvas.style.height = this.size + 'px';
+  this.canvas.width = this.size * dpr;
+  this.canvas.height = this.size * dpr;
+  this.ctx.setTransform(1,0,0,1,0,0);
+  this.ctx.scale(dpr, dpr);
+};
+CosmicObject.prototype.initParticles = function(){
+  this.rings = [
+    {radius:0.44, rotation:0, speed:0.0003, tilt:0.3, opacity:0.15},
+    {radius:0.34, rotation:Math.PI/3, speed:0.0005, tilt:-0.2, opacity:0.12},
+    {radius:0.24, rotation:Math.PI/6, speed:0.0008, tilt:0.5, opacity:0.10}
+  ];
+  this.particles = [];
+  var pCount = isMobile ? 30 : 65;
+  for(var i=0;i<pCount;i++){
+    var ringIdx = Math.floor(Math.random()*this.rings.length);
+    this.particles.push({
+      ringIdx: ringIdx,
+      angle: Math.random()*Math.PI*2,
+      speed: this.rings[ringIdx].speed * (0.7 + Math.random()*0.6),
+      size: Math.random()*1.2 + 0.4,
+      opacity: Math.random()*0.5 + 0.3,
+      color: STAR_COLORS[Math.floor(Math.random()*STAR_COLORS.length)]
+    });
+  }
+  this.coreParticles = [];
+  var cCount = isMobile ? 12 : 28;
+  for(var j=0;j<cCount;j++){
+    this.coreParticles.push({
+      angle: Math.random()*Math.PI*2,
+      radius: Math.random()*0.13 + 0.04,
+      speed: (Math.random()-0.5)*0.003,
+      size: Math.random()*0.7 + 0.3,
+      opacity: Math.random()*0.4 + 0.2,
+      color: STAR_COLORS[Math.floor(Math.random()*STAR_COLORS.length)]
+    });
+  }
+};
+CosmicObject.prototype.setMouseDeflection = function(mx, my){
+  this.targetMX = mx * 12;
+  this.targetMY = my * 12;
+};
+CosmicObject.prototype.update = function(dt){
+  this.rotation += 0.0002 * dt;
+  this.breathPhase += 0.008 * dt;
+  this.mouseX += (this.targetMX - this.mouseX) * 0.04;
+  this.mouseY += (this.targetMY - this.mouseY) * 0.04;
+  for(var i=0;i<this.rings.length;i++){
+    this.rings[i].rotation += this.rings[i].speed * dt;
+  }
+  for(var j=0;j<this.particles.length;j++){
+    this.particles[j].angle += this.particles[j].speed * dt;
+  }
+  for(var k=0;k<this.coreParticles.length;k++){
+    this.coreParticles[k].angle += this.coreParticles[k].speed * dt;
+  }
+};
+CosmicObject.prototype.draw = function(){
+  var ctx = this.ctx;
+  var s = this.size;
+  var cx = s/2 + this.mouseX;
+  var cy = s/2 + this.mouseY;
+  var breath = Math.sin(this.breathPhase) * 0.06 + 1;
+  var coreR = s * 0.075 * breath;
+  ctx.clearRect(0, 0, s, s);
+
+  /* 1. Outer atmosphere */
+  var og = ctx.createRadialGradient(cx, cy, 0, cx, cy, s*0.5);
+  og.addColorStop(0, 'rgba(37,99,235,0.08)');
+  og.addColorStop(0.3, 'rgba(109,40,217,0.05)');
+  og.addColorStop(0.6, 'rgba(30,58,138,0.02)');
+  og.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = og;
+  ctx.fillRect(0, 0, s, s);
+
+  /* 2. Orbital rings */
+  for(var i=0;i<this.rings.length;i++){
+    var ring = this.rings[i];
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ring.rotation);
+    ctx.scale(1, Math.cos(ring.tilt));
+    ctx.beginPath();
+    ctx.arc(0, 0, s * ring.radius, 0, Math.PI*2);
+    ctx.strokeStyle = 'rgba(125,211,252,' + ring.opacity + ')';
+    ctx.lineWidth = 0.6;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  /* 3. Ring particles */
+  for(var j=0;j<this.particles.length;j++){
+    var p = this.particles[j];
+    var r = s * this.rings[p.ringIdx].radius;
+    var ringTilt = this.rings[p.ringIdx].tilt;
+    var ringRot = this.rings[p.ringIdx].rotation;
+    var lx = Math.cos(p.angle) * r;
+    var ly = Math.sin(p.angle) * r * Math.cos(ringTilt);
+    var rx = lx * Math.cos(ringRot) - ly * Math.sin(ringRot);
+    var ry = lx * Math.sin(ringRot) + ly * Math.cos(ringRot);
+    var px = cx + rx;
+    var py = cy + ry;
+    var pg = ctx.createRadialGradient(px, py, 0, px, py, p.size*3.5);
+    pg.addColorStop(0, p.color);
+    pg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.globalAlpha = p.opacity * 0.3;
+    ctx.fillStyle = pg;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size*3.5, 0, Math.PI*2);
+    ctx.fill();
+    ctx.globalAlpha = p.opacity;
+    ctx.fillStyle = p.color;
+    ctx.beginPath();
+    ctx.arc(px, py, p.size, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* 4. Inner halo */
+  var hg = ctx.createRadialGradient(cx, cy, 0, cx, cy, s*0.16);
+  hg.addColorStop(0, 'rgba(125,211,252,' + (0.28*breath) + ')');
+  hg.addColorStop(0.5, 'rgba(37,99,235,' + (0.14*breath) + ')');
+  hg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = hg;
+  ctx.fillRect(0, 0, s, s);
+
+  /* 5. Core gradient */
+  var cg = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR*2.2);
+  cg.addColorStop(0, 'rgba(248,250,252,0.95)');
+  cg.addColorStop(0.18, 'rgba(186,230,253,' + (0.75*breath) + ')');
+  cg.addColorStop(0.45, 'rgba(59,130,246,' + (0.38*breath) + ')');
+  cg.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = cg;
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR*2.2, 0, Math.PI*2);
+  ctx.fill();
+
+  /* 6. Core particles */
+  for(var k=0;k<this.coreParticles.length;k++){
+    var cp = this.coreParticles[k];
+    var cr = s * cp.radius;
+    var cpx = cx + Math.cos(cp.angle) * cr;
+    var cpy = cy + Math.sin(cp.angle) * cr;
+    ctx.globalAlpha = cp.opacity;
+    ctx.fillStyle = cp.color;
+    ctx.beginPath();
+    ctx.arc(cpx, cpy, cp.size, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+
+  /* 7. Central bright point */
+  ctx.fillStyle = 'rgba(248,250,252,' + (0.9*breath) + ')';
+  ctx.beginPath();
+  ctx.arc(cx, cy, coreR*0.35, 0, Math.PI*2);
+  ctx.fill();
+};
+
+/* ===== Global State ===== */
+var starfield = null;
+var cosmicObj = null;
+var animationId = null;
+var isVisible = true;
+var lastTime = 0;
+var mouseX = 0, mouseY = 0;
+var targetMX = 0, targetMY = 0;
+var smoothScrollY = 0;
+var parallaxEls = [];
+
+/* ===== Master Animation Loop ===== */
+function masterLoop(timestamp){
+  if(!isVisible){ return; }
+  if(!lastTime){ lastTime = timestamp; }
+  var dt = Math.min(timestamp - lastTime, 50);
+  lastTime = timestamp;
+
+  /* Lerp mouse */
+  mouseX += (targetMX - mouseX) * 0.05;
+  mouseY += (targetMY - mouseY) * 0.05;
+  /* Lerp scroll */
+  smoothScrollY += (window.scrollY - smoothScrollY) * 0.1;
+
+  /* Apply DOM parallax */
+  for(var i=0;i<parallaxEls.length;i++){
+    var el = parallaxEls[i];
+    var mf = parseFloat(el.getAttribute('data-mouse-parallax')) || 0;
+    var sf = parseFloat(el.getAttribute('data-scroll-parallax')) || 0;
+    var ox = mouseX * mf * 100;
+    var oy = mouseY * mf * 100 + smoothScrollY * sf;
+    el.style.transform = 'translate3d(' + ox + 'px,' + oy + 'px,0)';
+  }
+
+  /* Update & draw starfield */
+  if(starfield){
+    starfield.setParallax(mouseX, mouseY, smoothScrollY);
+    starfield.update(dt);
+    starfield.draw();
+  }
+  /* Update & draw cosmic object */
+  if(cosmicObj){
+    cosmicObj.setMouseDeflection(mouseX, mouseY);
+    cosmicObj.update(dt);
+    cosmicObj.draw();
+  }
+
+  animationId = requestAnimationFrame(masterLoop);
+}
+
+/* ===== Scroll Effects ===== */
+var scrollTicking = false;
+function onScroll(){
+  if(!scrollTicking){
+    requestAnimationFrame(function(){
+      updateScrollEffects();
+      scrollTicking = false;
+    });
+    scrollTicking = true;
+  }
+}
+function updateScrollEffects(){
+  var sy = window.scrollY;
+  var hh = window.innerHeight;
+  /* Nav glass */
+  var nav = document.getElementById('cosmicNav');
+  if(nav){
+    if(sy > 50){ nav.classList.add('scrolled'); }
+    else { nav.classList.remove('scrolled'); }
+  }
+  /* Hero scroll effects */
+  var progress = Math.min(sy / hh, 1);
+  var cosmicCanvas = document.getElementById('cosmic-object-canvas');
+  if(cosmicCanvas){
+    cosmicCanvas.style.opacity = Math.max(0, 1 - progress * 0.95);
+    var scale = 1 + progress * 0.12;
+    var blur = progress * 3;
+    cosmicCanvas.style.filter = 'blur(' + blur + 'px)';
+    cosmicCanvas.style.transform = 'translate(-50%,-50%) scale(' + scale + ')';
+  }
+  var heroContent = document.querySelector('.hero-content');
+  if(heroContent){
+    heroContent.style.opacity = Math.max(0, 1 - progress * 1.4);
+    heroContent.style.transform = 'translateY(' + (-progress * 28) + 'px)';
+  }
+  var scrollHint = document.querySelector('.scroll-hint');
+  if(scrollHint){
+    scrollHint.style.opacity = Math.max(0, 1 - progress * 4);
+  }
+}
+
+/* ===== Mouse Handler ===== */
+function onMouseMove(e){
+  targetMX = (e.clientX / window.innerWidth - 0.5) * 2;
+  targetMY = (e.clientY / window.innerHeight - 0.5) * 2;
+}
+function onMouseLeave(){
+  targetMX = 0;
+  targetMY = 0;
+}
+
+/* ===== Resize Handler ===== */
+var resizeTimer = null;
+function onResize(){
+  if(resizeTimer){ clearTimeout(resizeTimer); }
+  resizeTimer = setTimeout(function(){
+    isMobile = window.matchMedia('(max-width: 768px)').matches;
+    if(starfield){ starfield.resize(); starfield.initStars(); }
+    if(cosmicObj){ cosmicObj.resize(); cosmicObj.initParticles(); }
+  }, 250);
+}
+
+/* ===== Visibility Handler ===== */
+function onVisibilityChange(){
+  if(document.hidden){
+    isVisible = false;
+    if(animationId){ cancelAnimationFrame(animationId); animationId = null; }
+  } else {
+    if(!isVisible){
+      isVisible = true;
+      lastTime = 0;
+      if(!prefersReducedMotion){ animationId = requestAnimationFrame(masterLoop); }
+    }
+  }
+}
+
+/* ===== Initialization ===== */
+function init(){
+  var starCanvas = document.getElementById('starfield-canvas');
+  var objCanvas = document.getElementById('cosmic-object-canvas');
+  if(starCanvas){
+    starfield = new StarField(starCanvas);
+  }
+  if(objCanvas){
+    cosmicObj = new CosmicObject(objCanvas);
+  }
+
+  /* Collect parallax elements */
+  parallaxEls = Array.prototype.slice.call(
+    document.querySelectorAll('[data-mouse-parallax],[data-scroll-parallax]')
+  );
+
+  /* IntersectionObserver for reveals */
+  var revealEls = document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window){
+    var io = new IntersectionObserver(function(entries){
+      for(var i=0;i<entries.length;i++){
+        if(entries[i].isIntersecting){
+          entries[i].target.classList.add('revealed');
+        }
+      }
+    }, { threshold: 0.12, rootMargin: '0px 0px -60px 0px' });
+    for(var j=0;j<revealEls.length;j++){
+      io.observe(revealEls[j]);
+    }
+  } else {
+    for(var k=0;k<revealEls.length;k++){
+      revealEls[k].classList.add('revealed');
+    }
+  }
+
+  /* Event listeners */
+  window.addEventListener('scroll', onScroll, { passive: true });
+  window.addEventListener('resize', onResize);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+  if(!isTouchDevice && !prefersReducedMotion){
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseleave', onMouseLeave);
+  }
+
+  /* Start animation */
+  if(prefersReducedMotion){
+    if(starfield){ starfield.draw(); }
+    if(cosmicObj){ cosmicObj.draw(); }
+  } else {
+    animationId = requestAnimationFrame(masterLoop);
+  }
+
+  /* Initial scroll check */
+  updateScrollEffects();
+}
+
+if(document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+})();
+</script>
+
+<script>if(window.lucide){lucide.createIcons();}</script>
+</body>
+</html>

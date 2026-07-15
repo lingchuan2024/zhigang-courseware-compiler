@@ -29,7 +29,7 @@ export function DormantHomeLanding({ onOpenLibrary, onOpenQa, onOpenSettings }: 
       <div className="fixed inset-0">
         <AstronomyBackdrop variant="dormant" />
       </div>
-      <div aria-hidden="true" className="pointer-events-none fixed inset-0 bg-[linear-gradient(180deg,rgba(1,2,7,.04),rgba(1,2,7,.45)_45%,rgba(1,2,7,.9)_86%,#010207)]" />
+      <div aria-hidden="true" data-home-nebula-veil className="pointer-events-none fixed inset-0 bg-[linear-gradient(180deg,rgba(1,2,7,.04),rgba(1,2,7,.18)_45%,rgba(1,2,7,.52)_86%,rgba(1,2,7,.72))]" />
       <div aria-hidden="true" className="pointer-events-none fixed inset-0 opacity-[0.16] [background-image:radial-gradient(rgba(255,255,255,.65)_0.6px,transparent_0.8px)] [background-size:47px_43px]" />
 
       <header className="relative z-20 mx-auto flex max-w-[90rem] items-center justify-between px-6 py-6 md:px-10 md:py-8">

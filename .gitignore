@@ -13,3 +13,13 @@ dist/
 .vite/
 coverage/
 .worktrees/
+
+# pnpm store (local cache, should not be committed)
+.pnpm-store/
+
+# Trae workspace artifacts
+.trae-html-share-packages/
+.superpowers/
+
+# Deployment artifacts (already in repo as standalone files)
+# deploy.sh is tracked separately

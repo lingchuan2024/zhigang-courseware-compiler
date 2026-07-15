@@ -106,6 +106,18 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                 </select>
               </Field>
             </div>
+            <p className="mt-3 text-xs leading-5 text-space-muted">
+              没有 Token？
+              <a
+                href="https://mineru.net/apiManage/token"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="ml-1 font-medium text-celadon-light underline decoration-celadon/40 underline-offset-4 hover:text-celadon"
+              >
+                免费申请 MinerU Token ↗
+              </a>
+              <span className="ml-1">官方当前提供每日免费高优先级解析额度，具体以官网为准。</span>
+            </p>
             <div className="mt-4 flex gap-5 text-sm text-ink-light">
               <label className="flex items-center gap-2"><input type="checkbox" checked={mineru.enableFormula} onChange={event => setMineru({ ...mineru, enableFormula: event.target.checked })} />识别公式</label>
               <label className="flex items-center gap-2"><input type="checkbox" checked={mineru.enableTable} onChange={event => setMineru({ ...mineru, enableTable: event.target.checked })} />识别表格</label>

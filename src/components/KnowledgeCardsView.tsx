@@ -113,7 +113,7 @@ function MarkdownKnowledgeCardsView() {
 
   if (cards.length === 0) {
     return (
-      <div className="grid h-screen flex-1 place-items-center bg-space-950/[0.76] px-8 text-center">
+      <div className="grid h-screen flex-1 place-items-center bg-space-950/[0.58] px-8 text-center">
         <div className="max-w-md rounded-2xl border border-space-border bg-space-850/90 p-8 shadow-nebula-panel backdrop-blur-xl">
           <h1 className="font-song text-2xl font-bold text-space-text">暂无知识卡片</h1>
           <p className="mt-3 text-sm leading-6 text-space-muted">请先完成知识结构提取，系统会为每个二级知识节点生成可追溯的知识卡片。</p>
@@ -129,7 +129,7 @@ function MarkdownKnowledgeCardsView() {
   }
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950/[0.72] text-space-text">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950/[0.54] text-space-text">
       <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识结构">←</button>
@@ -255,7 +255,7 @@ function LegacyKnowledgeCardsView() {
     || '该知识卡片暂无正文。';
 
   return (
-    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950/[0.72] text-space-text">
+    <div className="flex h-screen min-w-0 flex-1 flex-col overflow-hidden bg-space-950/[0.54] text-space-text">
       <header className="flex h-[72px] flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/95 px-5 backdrop-blur-xl">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识结构">←</button>

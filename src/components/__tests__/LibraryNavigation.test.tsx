@@ -144,6 +144,8 @@ describe('multi-course library navigation', () => {
     await act(async () => button('添加第一份课件').click());
     expect(container!.textContent).toContain('课程与课件');
     expect(container!.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
+    expect(container!.querySelector('[data-app-shell-content] > main > aside')?.className).toContain('bg-space-900/[0.78]');
+    expect(container!.querySelector('[data-app-shell-content] > main > section')?.className).toContain('bg-space-950/[0.5]');
 
     const input = container!.querySelector<HTMLInputElement>('input[placeholder="例如：机器学习"]')!;
     act(() => {
@@ -179,10 +181,14 @@ describe('multi-course library navigation', () => {
     await act(async () => button('添加课件').click());
 
     expect(container!.querySelector('[data-astronomy-backdrop="workspace"]')).not.toBeNull();
+    expect(container!.querySelector('[data-astronomy-backdrop="workspace"] + div main > div')?.className)
+      .toContain('bg-space-950/[0.5]');
 
     act(() => useStore.getState().setStage('notes'));
     await act(async () => {});
     expect(container!.querySelector('[data-astronomy-backdrop="reading"]')).not.toBeNull();
+    expect(container!.querySelector('[data-astronomy-backdrop="reading"] + div main > div')?.className)
+      .toContain('bg-space-950/[0.58]');
     act(() => useStore.setState({ stage: 'upload' }));
   });
 

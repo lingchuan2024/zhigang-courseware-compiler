@@ -330,7 +330,7 @@ function LegacyNotesView({ onOpenSettings }: { onOpenSettings: () => void }) {
   const citations = activeKp?.note?.citations || [];
 
   return (
-    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.82] text-space-text">
+    <div className="flex h-screen flex-1 flex-col overflow-hidden bg-space-950/[0.58] text-space-text">
       {/* 顶部栏 */}
       <header className="flex flex-shrink-0 items-center justify-between border-b border-space-border bg-space-900/[0.97] px-6 py-3 backdrop-blur-xl">
         <div className="flex items-center gap-4">

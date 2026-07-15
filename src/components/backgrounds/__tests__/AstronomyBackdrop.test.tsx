@@ -12,7 +12,7 @@ const BASE_BACKGROUND_CLASS_NAME = 'pointer-events-none absolute inset-0 overflo
 const IMAGE_BASE_CLASS_NAME = 'absolute inset-0 h-full w-full object-cover';
 const LAYER_BASE_CLASS_NAME = 'absolute inset-0';
 const VIGNETTE_CLASS_NAME = 'absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,2,7,.2)_58%,rgba(0,1,5,.68)_100%)]';
-const QA_WASH_CLASS_NAME = 'bg-[linear-gradient(105deg,rgba(2,4,10,.93)_0%,rgba(5,6,18,.68)_58%,rgba(2,4,10,.9)_100%)]';
+const QA_WASH_CLASS_NAME = 'bg-[linear-gradient(105deg,rgba(2,4,10,.83)_0%,rgba(5,6,18,.5)_58%,rgba(2,4,10,.78)_100%)]';
 
 interface BackdropExpectation {
   variant: AstronomyBackdropVariant;
@@ -25,32 +25,32 @@ const backdrops: BackdropExpectation[] = [
   {
     variant: 'dormant',
     filename: 'horsehead-dormant',
-    imageClassName: 'object-[54%_46%] opacity-[0.18] saturate-[0.62] brightness-[0.68] md:opacity-[0.22]',
-    washClassName: 'bg-[linear-gradient(112deg,rgba(1,2,7,.88)_0%,rgba(2,5,12,.66)_52%,rgba(1,2,7,.91)_100%)]',
+    imageClassName: 'object-[54%_58%] opacity-[0.42] saturate-[0.92] brightness-[0.9] md:opacity-[0.5]',
+    washClassName: 'bg-[linear-gradient(112deg,rgba(1,2,7,.86)_0%,rgba(2,5,12,.42)_52%,rgba(1,2,7,.28)_100%)]',
   },
   {
     variant: 'library',
     filename: 'tarantula-library',
-    imageClassName: 'object-[58%_42%] opacity-[0.18] saturate-[0.82] brightness-[0.68] md:opacity-[0.22]',
-    washClassName: 'bg-[linear-gradient(110deg,rgba(2,4,10,.91)_0%,rgba(3,7,15,.64)_56%,rgba(2,4,10,.88)_100%)]',
+    imageClassName: 'object-[58%_42%] opacity-[0.34] saturate-[0.92] brightness-[0.82] md:opacity-[0.42]',
+    washClassName: 'bg-[linear-gradient(110deg,rgba(2,4,10,.8)_0%,rgba(3,7,15,.48)_56%,rgba(2,4,10,.74)_100%)]',
   },
   {
     variant: 'qa',
     filename: 'tarantula-qa',
-    imageClassName: 'object-[52%_42%] opacity-[0.15] saturate-[0.8] brightness-[0.64] md:opacity-[0.19]',
+    imageClassName: 'object-[52%_42%] opacity-[0.32] saturate-[0.9] brightness-[0.8] md:opacity-[0.4]',
     washClassName: QA_WASH_CLASS_NAME,
   },
   {
     variant: 'workspace',
     filename: 'cosmic-cliffs-workspace',
-    imageClassName: 'object-[58%_45%] opacity-[0.14] saturate-[0.72] brightness-[0.62] md:opacity-[0.18]',
-    washClassName: 'bg-[linear-gradient(108deg,rgba(2,4,10,.92)_0%,rgba(3,7,14,.68)_55%,rgba(2,4,10,.9)_100%)]',
+    imageClassName: 'object-[58%_45%] opacity-[0.3] saturate-[0.84] brightness-[0.76] md:opacity-[0.38]',
+    washClassName: 'bg-[linear-gradient(108deg,rgba(2,4,10,.84)_0%,rgba(3,7,14,.54)_55%,rgba(2,4,10,.8)_100%)]',
   },
   {
     variant: 'reading',
     filename: 'southern-ring-reading',
-    imageClassName: 'object-center opacity-[0.1] saturate-[0.66] brightness-[0.58] md:opacity-[0.13]',
-    washClassName: 'bg-[radial-gradient(circle_at_55%_44%,rgba(3,7,14,.7)_0%,rgba(2,4,10,.9)_66%,rgba(1,2,7,.97)_100%)]',
+    imageClassName: 'object-center opacity-[0.24] saturate-[0.78] brightness-[0.72] md:opacity-[0.32]',
+    washClassName: 'bg-[radial-gradient(circle_at_55%_44%,rgba(3,7,14,.5)_0%,rgba(2,4,10,.75)_66%,rgba(1,2,7,.91)_100%)]',
   },
 ];
 
