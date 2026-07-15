@@ -37,6 +37,17 @@ function renderCanvas(
 }
 
 describe('KnowledgeNetworkCanvas', () => {
+  it('keeps unselected relationships readable without weakening normal nodes', () => {
+    const rendered = renderCanvas();
+    const edge = rendered.container.querySelector<SVGGElement>('[data-edge="r1"]')!;
+    const first = rendered.container.querySelector<SVGGElement>('[data-node="t1"]')!;
+    const second = rendered.container.querySelector<SVGGElement>('[data-node="t2"]')!;
+
+    expect(edge.getAttribute('opacity')).toBe('0.34');
+    expect(first.getAttribute('opacity')).toBe('1');
+    expect(second.getAttribute('opacity')).toBe('1');
+  });
+
   it('selects a graph node and renders its traversal number', () => {
     const rendered = renderCanvas();
     const node = rendered.container.querySelector<SVGGElement>('[aria-label="概率模型"]')!;

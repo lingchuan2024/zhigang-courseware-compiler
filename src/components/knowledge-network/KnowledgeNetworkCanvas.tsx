@@ -268,7 +268,7 @@ export function KnowledgeNetworkCanvas({
             const labelX = source && target ? (source.x + source.width / 2 + target.x + target.width / 2) / 2 : 0;
             const labelY = source && target ? (source.y + source.height / 2 + target.y + target.height / 2) / 2 - 7 : 0;
             return (
-              <g key={edge.id} opacity={selectedId ? (connected ? 0.9 : 0.08) : 0.2} data-edge={edge.id}>
+              <g key={edge.id} opacity={selectedId ? (connected ? 0.9 : 0.08) : 0.34} data-edge={edge.id}>
                 <path d={path} fill="none" stroke={color} strokeWidth={connected && selectedId ? 2.4 : 1.6} markerEnd="url(#network-arrow)" />
                 {connected && selectedId && (
                   <text x={labelX} y={labelY} textAnchor="middle" fontSize="10" fill={color} paintOrder="stroke" stroke="#010207" strokeWidth="4">
