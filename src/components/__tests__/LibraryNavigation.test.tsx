@@ -76,20 +76,30 @@ describe('multi-course library navigation', () => {
     expect(useLibraryStore.getState().nebulaSummaries).toEqual([
       expect.objectContaining({ courseId: course.id, knowledgeCount: 1 }),
     ]);
+    expect(container!.textContent).not.toContain('让每一份课件，成为可探索的知识宇宙。');
+    expect(container!.textContent).toContain('知识被观测');
   });
 
   it('starts at home, creates a course, and opens its upload workspace', async () => {
     await act(async () => root!.render(createElement(App)));
     expect(container!.textContent).toContain('知纲');
-    expect(container!.querySelector('h1')?.textContent).toBe('知纲');
+    expect(container!.querySelector('h1')?.textContent).toContain('让每一份课件');
     expect(container!.textContent).not.toContain('还没有被点亮的知识星');
     expect(container!.textContent).not.toContain('知识被观测，星云才会发光。');
+    expect(container!.textContent).toContain('知识结构');
+    expect(container!.textContent).toContain('完整笔记');
+    expect(container!.textContent).toContain('全库知识问答');
     expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
-    expect(button('添加课件')).not.toBeNull();
+    expect(button('添加第一份课件')).not.toBeNull();
     expect(container!.textContent).not.toContain('OBSERVATORY ONLINE');
     expect(container!.textContent).not.toContain('CURRENT SURVEY');
 
-    await act(async () => button('添加课件').click());
+    await act(async () => button('全库知识问答').click());
+    expect(container!.querySelector('[data-astronomy-backdrop="qa"]')).not.toBeNull();
+    act(() => useLibraryStore.getState().navigate('home'));
+    await act(async () => {});
+
+    await act(async () => button('添加第一份课件').click());
     expect(container!.textContent).toContain('课程与课件');
     expect(container!.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
 
@@ -115,7 +125,7 @@ describe('multi-course library navigation', () => {
 
     act(() => useLibraryStore.getState().navigate('home'));
     await act(async () => {});
-    await act(async () => button('添加课件').click());
+    await act(async () => button('添加第一份课件').click());
 
     const input = container!.querySelector<HTMLInputElement>('input[placeholder="例如：机器学习"]')!;
     act(() => {
@@ -136,11 +146,12 @@ describe('multi-course library navigation', () => {
 
   it('returns from the library to the start page', async () => {
     await act(async () => root!.render(createElement(App)));
-    await act(async () => button('添加课件').click());
+    await act(async () => button('添加第一份课件').click());
     await act(async () => button('返回首页').click());
     expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
     expect(container!.textContent).not.toContain('还没有被点亮的知识星');
     expect(container!.textContent).not.toContain('知识被观测，星云才会发光。');
+    expect(container!.textContent).toContain('让每一份课件，成为可探索的知识宇宙。');
   });
 
   it('opens a course from its nebula hotspot', async () => {
@@ -173,7 +184,7 @@ describe('multi-course library navigation', () => {
       fileType: 'pdf', pageCount: 10, stage: 'cards', status: 'ready', uploadedAt: 1, updatedAt: 2,
     });
     await act(async () => root!.render(createElement(App)));
-    await act(async () => button('添加课件').click());
+    await act(async () => button('添加第一份课件').click());
 
     expect(container!.textContent).toContain('lecture1.pdf');
     await act(async () => button('删除课件').click());
@@ -188,7 +199,7 @@ describe('multi-course library navigation', () => {
     const kept = await createLibraryCourse({ name: '保留课程' });
     const removed = await createLibraryCourse({ name: '待移除空间' });
     await act(async () => root!.render(createElement(App)));
-    await act(async () => button('添加课件').click());
+    await act(async () => button('添加第一份课件').click());
     await act(async () => button('待移除空间').click());
     await act(async () => button('删除课程').click());
 
