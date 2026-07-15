@@ -22,13 +22,14 @@ function renderCanvas(
   onSelect = vi.fn(),
   graph: KnowledgeNetworkModel = model,
   onCollapseExpandedGroup?: ReturnType<typeof vi.fn>,
+  selectedId: string | null = null,
 ): { container: HTMLElement; onSelect: ReturnType<typeof vi.fn> } {
   const container = document.createElement('div');
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => root.render(createElement(KnowledgeNetworkCanvas, {
     model: graph,
-    selectedId: null,
+    selectedId,
     onSelect,
     search: '',
     onCollapseExpandedGroup,
@@ -46,6 +47,34 @@ describe('KnowledgeNetworkCanvas', () => {
     expect(edge.getAttribute('opacity')).toBe('0.34');
     expect(first.getAttribute('opacity')).toBe('1');
     expect(second.getAttribute('opacity')).toBe('1');
+  });
+
+  it('focuses the selected node, its direct neighbors, and connected relationships', () => {
+    const selectedGraph: KnowledgeNetworkModel = {
+      ...model,
+      nodes: [
+        ...model.nodes,
+        { id: 't3', label: '贝叶斯决策', description: '描述', kind: 'topic', category: 'concept', importance: 'important', confidence: 0.8, sourceRanges: [], order: 2, sequence: 3 },
+      ],
+      edges: [
+        ...model.edges,
+        { id: 'r2', sourceId: 't2', targetId: 't3', type: 'hard_prerequisite', label: '硬前置', reason: '', confidence: 0.9, isPath: false },
+      ],
+    };
+
+    const rendered = renderCanvas(vi.fn(), selectedGraph, undefined, 't1');
+    const first = rendered.container.querySelector<SVGGElement>('[data-node="t1"]')!;
+    const second = rendered.container.querySelector<SVGGElement>('[data-node="t2"]')!;
+    const third = rendered.container.querySelector<SVGGElement>('[data-node="t3"]')!;
+    const connectedEdge = rendered.container.querySelector<SVGGElement>('[data-edge="r1"]')!;
+    const unrelatedEdge = rendered.container.querySelector<SVGGElement>('[data-edge="r2"]')!;
+
+    expect(first.getAttribute('opacity')).toBe('1');
+    expect(first.getAttribute('aria-selected')).toBe('true');
+    expect(second.getAttribute('opacity')).toBe('1');
+    expect(third.getAttribute('opacity')).toBe('0.32');
+    expect(connectedEdge.getAttribute('opacity')).toBe('0.9');
+    expect(unrelatedEdge.getAttribute('opacity')).toBe('0.08');
   });
 
   it('selects a graph node and renders its traversal number', () => {
