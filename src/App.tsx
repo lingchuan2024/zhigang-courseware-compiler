@@ -17,6 +17,7 @@ import { AstronomyBackdrop } from './components/backgrounds/AstronomyBackdrop';
 
 function App() {
   const stage = useStore(s => s.stage);
+  const startMinerUParse = useStore(s => s.startMinerUParse);
   const initializeFromStorage = useStore(s => s.initializeFromStorage);
   const screen = useLibraryStore(s => s.screen);
   const initializeLibrary = useLibraryStore(s => s.initialize);
@@ -65,7 +66,7 @@ function App() {
       case 'upload':
         return <UploadView />;
       case 'document':
-        return <DocumentReviewWorkspace />;
+        return <DocumentReviewWorkspace onRequestMinerUParse={startMinerUParse} />;
       case 'mineru':
         return <MinerUParseView onOpenSettings={() => setSettingsOpen(true)} />;
       case 'structure':

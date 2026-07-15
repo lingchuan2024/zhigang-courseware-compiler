@@ -12,6 +12,7 @@ interface ReviewToolbarProps {
   onConfirm: () => void;
   onBack: () => void;
   hasModel: boolean;
+  isConfirming?: boolean;
 }
 
 export function ReviewToolbar({
@@ -28,6 +29,7 @@ export function ReviewToolbar({
   onConfirm,
   onBack,
   hasModel,
+  isConfirming = false,
 }: ReviewToolbarProps) {
   return (
     <header className="z-10 flex-shrink-0 border-b border-space-border bg-space-900">
@@ -59,9 +61,10 @@ export function ReviewToolbar({
           )}
           <button
             onClick={onConfirm}
-            className="btn-primary px-4 py-1.5"
+            disabled={isConfirming}
+            className="btn-primary px-4 py-1.5 disabled:cursor-wait disabled:opacity-60"
           >
-            进入 MinerU 解析
+            {isConfirming ? '正在进入...' : '进入 MinerU 解析'}
           </button>
         </div>
       </div>

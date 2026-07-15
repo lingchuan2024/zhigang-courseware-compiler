@@ -13,7 +13,11 @@ import { MarkdownRenderer } from '../MarkdownRenderer';
 
 const NO_SEARCH_HITS = new Set<number>();
 
-export function DocumentReviewWorkspace() {
+interface DocumentReviewWorkspaceProps {
+  onRequestMinerUParse: () => Promise<void>;
+}
+
+export function DocumentReviewWorkspace({ onRequestMinerUParse }: DocumentReviewWorkspaceProps) {
   const document = useStore(state => state.document);
   const mineruConfig = useStore(state => state.mineruConfig);
   const staleMarker = useStore(state => state.staleMarker);
@@ -83,13 +87,14 @@ export function DocumentReviewWorkspace() {
   const handleFitWidth = useCallback(() => setScale(1), []);
 
   const handleConfirm = useCallback(async () => {
+    if (isConfirming) return;
     setIsConfirming(true);
     try {
-      navigateToStage('mineru');
+      await onRequestMinerUParse();
     } finally {
       setIsConfirming(false);
     }
-  }, [navigateToStage]);
+  }, [isConfirming, onRequestMinerUParse]);
 
   if (!document || (document.pages.length === 0 && !isMarkdown && !hasSourceDocs)) {
     return (
@@ -173,6 +178,7 @@ export function DocumentReviewWorkspace() {
         onConfirm={handleConfirm}
         onBack={() => navigateToStage('upload')}
         hasModel={!!mineruConfig?.apiKey}
+        isConfirming={isConfirming}
       />
 
       {staleMarker && (
