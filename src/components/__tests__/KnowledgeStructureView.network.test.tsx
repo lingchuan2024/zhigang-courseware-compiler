@@ -112,7 +112,12 @@ describe('KnowledgeStructureView two-layer network', () => {
 
     expect(container.querySelector('[aria-label="最大似然估计"]')).toBeNull();
     const teaching = container.querySelector<SVGGElement>('[aria-label="概率模型案例"]')!;
+    const definition = container.querySelector<SVGGElement>('[aria-label="概率模型定义"]')!;
     expect(teaching).not.toBeNull();
+    expect(definition).not.toBeNull();
+    expect(teaching.getAttribute('opacity')).toBe('1');
+    expect(definition.getAttribute('opacity')).toBe('1');
+    expect(container.textContent).toContain('课程原文：概率模型定义');
     act(() => teaching.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(container.textContent).toContain('内部原文：概率模型案例');
 

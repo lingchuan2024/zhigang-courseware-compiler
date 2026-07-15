@@ -97,6 +97,9 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
     () => expandedTopicId ? teachingNetwork : courseNetwork,
     [courseNetwork, expandedTopicId, teachingNetwork],
   );
+  const canvasSelectedNodeId = selectedNodeId && currentNetwork.nodes.some(node => node.id === selectedNodeId)
+    ? selectedNodeId
+    : null;
   const selectedNode = currentNetwork.nodes.find(node => node.id === selectedNodeId)
     ?? courseNetwork.nodes.find(node => node.id === selectedNodeId)
     ?? null;
@@ -244,7 +247,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
           )}
           <KnowledgeNetworkCanvas
             model={currentNetwork}
-            selectedId={selectedNodeId}
+            selectedId={canvasSelectedNodeId}
             onSelect={selectNode}
             search={search}
             relationTypes={relationType === 'all' ? undefined : [relationType]}
