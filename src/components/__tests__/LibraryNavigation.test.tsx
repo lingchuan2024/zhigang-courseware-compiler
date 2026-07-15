@@ -293,4 +293,25 @@ describe('multi-course library navigation', () => {
     expect(container!.textContent).toContain('保存配置');
     expect(container!.textContent).not.toContain('保存并开始解析');
   });
+
+  it('shows a failed MinerU launch without retrying automatically', async () => {
+    const startMinerUParse = vi.fn(async () => useStore.setState({
+      stage: 'mineru',
+      mineruParseResult: {
+        status: 'failed',
+        progress: 0,
+        assets: [],
+        sourceFileName: 'lecture.pdf',
+        error: 'network failed',
+      },
+    }));
+    await prepareDocument(true, startMinerUParse);
+
+    await act(async () => button('进入 MinerU 解析').click());
+    await act(async () => {});
+
+    expect(startMinerUParse).toHaveBeenCalledTimes(1);
+    expect(container!.textContent).toContain('network failed');
+    expect(container!.textContent).toContain('重新解析');
+  });
 });
