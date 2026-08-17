@@ -1,0 +1,24 @@
+src/components/Sidebar.tsx
+  h_da6fd0bc394304 243
+src/components/UploadView.tsx
+  h_da6fd0bc394304 141
+src/lib/examples.ts
+  h_da6fd0bc394304 125-126,135-136,148,168,188,208,228,248,268,288,306,353-356,370,375,392,394,413,547,561
+src/lib/persistence.ts
+  h_da6fd0bc394304 37-45
+src/store/useLibraryStore.ts
+  h_da6fd0bc394304 14,115
+src/store/useStore.ts
+  h_da6fd0bc394304 105,819-820
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "3858f350096dd703927c51d87d57ccecbdf72f40",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
