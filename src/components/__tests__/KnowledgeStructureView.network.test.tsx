@@ -130,67 +130,6 @@ describe('KnowledgeStructureView two-layer network', () => {
     expect(container.textContent).not.toContain('推荐路径');
   });
 
-  it('uses the same two-layer network for migrated legacy course data', () => {
-    act(() => useStore.setState({
-      sourceDocuments: [],
-      knowledgeTopics: [],
-      topicRelations: [],
-      teachingBlocks: [],
-      teachingRelations: [],
-      courseLearningPath: null,
-      narrativePaths: {},
-      document: {
-        id: 'legacy-doc', title: '旧版概率论课件', fileName: 'legacy.pdf', fileType: 'pdf', uploadedAt: 0,
-        pages: [{ pageNumber: 1, text: '课程原文：旧版概率模型定义' }],
-      },
-      evidences: [{
-        id: 'ev1', documentId: 'legacy-doc', pageNumber: 1, blockIndex: 0, type: 'definition',
-        content: '课程原文：旧版概率模型定义', confidence: 0.95, contentHash: 'legacy-hash',
-      }],
-      topics: [{
-        id: 'legacy-topic', title: '旧版概率模型', aliases: [], type: 'concept', learningGoal: '理解概率模型',
-        evidenceIds: ['ev1'], originalPageNumbers: [1], importance: 'core', confidence: 0.9,
-        originalOrder: 0, recommendedOrder: 0, noteStatus: 'pending',
-      }],
-      macroRelations: [],
-      knowledgePackages: [{
-        id: 'legacy-package',
-        topic: {
-          id: 'legacy-topic', title: '旧版概率模型', aliases: [], type: 'concept', learningGoal: '理解概率模型',
-          evidenceIds: ['ev1'], originalPageNumbers: [1], importance: 'core', confidence: 0.9,
-          originalOrder: 0, recommendedOrder: 0, noteStatus: 'pending',
-        },
-        source: {
-          evidenceIds: ['ev1'], combinedOriginalText: '课程原文：旧版概率模型定义',
-          evidence: [{ evidenceId: 'ev1', pageNumber: 1, type: 'definition', originalText: '课程原文：旧版概率模型定义' }],
-        },
-        internalStructure: {
-          items: [{
-            id: 'legacy-item', topicId: 'legacy-topic', type: 'definition', title: '内部定义',
-            content: 'AI 摘要不得替代原文', evidenceIds: ['ev1'], originalPageNumbers: [1],
-            originalOrder: 0, recommendedOrder: 0, confidence: 0.9,
-          }],
-          relations: [], orderedItemIds: ['legacy-item'], source: 'ai', warnings: [], status: 'ready',
-        },
-        macroRelations: [],
-        versions: { sourceVersion: 1, structureVersion: 1, noteVersion: 0, promptVersion: 'test' },
-      }],
-      learningPath: null,
-      structureExtractionStatus: 'ready',
-      knowledgePipelineStatus: 'idle',
-      jobStatus: 'completed',
-    }));
-
-    const { container } = renderView();
-    expect(container.querySelector('[data-testid="knowledge-network-canvas"]')).not.toBeNull();
-    const topic = container.querySelector<SVGGElement>('[aria-label="旧版概率模型"]')!;
-    expect(topic).not.toBeNull();
-    act(() => topic.dispatchEvent(new MouseEvent('click', { bubbles: true })));
-    expect(container.textContent).toContain('课程原文：旧版概率模型定义');
-
-    expect(container.querySelector('[aria-label="内部定义"]')).not.toBeNull();
-  });
-
   it('continues to knowledge cards instead of treating cards as the final note', () => {
     const { container } = renderView();
     const next = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('查看知识卡片'))!;

@@ -4,7 +4,7 @@ import { Sidebar } from './components/Sidebar';
 import { UploadView } from './components/UploadView';
 import { DocumentReviewWorkspace } from './components/document-review/DocumentReviewWorkspace';
 import { KnowledgeStructureView } from './components/KnowledgeStructureView';
-import { NotesView } from './components/NotesView';
+import { MasterNoteView } from './components/MasterNoteView';
 import { SettingsModal } from './components/SettingsModal';
 import { MinerUParseView } from './components/MinerUParseView';
 import { KnowledgeCardsView } from './components/KnowledgeCardsView';
@@ -102,7 +102,7 @@ function App() {
       case 'cards':
         return <KnowledgeCardsView />;
       case 'notes':
-        return <NotesView onOpenSettings={openDefaultSettings} />;
+        return <MasterNoteView onOpenSettings={openDefaultSettings} />;
       default:
         return <UploadView />;
     }

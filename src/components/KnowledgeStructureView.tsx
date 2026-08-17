@@ -7,9 +7,6 @@ import { KnowledgeNetworkCanvas } from './knowledge-network/KnowledgeNetworkCanv
 import { SourceEvidencePanel } from './knowledge-network/SourceEvidencePanel';
 import {
   buildCourseNetwork,
-  buildLegacyCourseNetwork,
-  buildLegacySourceDocuments,
-  buildLegacyTeachingNetwork,
   buildTeachingNetwork,
   type KnowledgeNetworkModel,
 } from '../lib/knowledge-network-adapter';
@@ -40,12 +37,6 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const courseLearningPath = useStore(state => state.courseLearningPath);
   const narrativePaths = useStore(state => state.narrativePaths);
   const knowledgePipelineStatus = useStore(state => state.knowledgePipelineStatus);
-  const document = useStore(state => state.document);
-  const evidences = useStore(state => state.evidences);
-  const legacyTopics = useStore(state => state.topics);
-  const legacyRelations = useStore(state => state.macroRelations);
-  const legacyPackages = useStore(state => state.knowledgePackages);
-  const legacyLearningPath = useStore(state => state.learningPath);
   const structureExtractionStatus = useStore(state => state.structureExtractionStatus);
   const extractionErrors = useStore(state => state.extractionErrors);
   const jobStatus = useStore(state => state.jobStatus);
@@ -58,40 +49,28 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const [relationType, setRelationType] = useState('all');
   const [sourcePanelOpen, setSourcePanelOpen] = useState(true);
 
-  const usesMarkdownArchitecture = sourceDocuments.length > 0 || knowledgeTopics.length > 0;
   const isRunning = jobStatus === 'running';
-  const isBlocked = usesMarkdownArchitecture
-    ? knowledgePipelineStatus === 'model-required'
-    : structureExtractionStatus === 'model-required';
-  const isFailed = usesMarkdownArchitecture
-    ? knowledgePipelineStatus === 'failed'
-    : structureExtractionStatus === 'failed';
+  const isBlocked = knowledgePipelineStatus === 'model-required';
+  const isFailed = knowledgePipelineStatus === 'failed' || structureExtractionStatus === 'failed';
 
   const courseNetwork = useMemo(
-    () => usesMarkdownArchitecture
-      ? buildCourseNetwork(knowledgeTopics, topicRelations, courseLearningPath)
-      : buildLegacyCourseNetwork(legacyTopics, legacyRelations, legacyLearningPath, evidences),
-    [courseLearningPath, evidences, knowledgeTopics, legacyLearningPath, legacyRelations, legacyTopics, topicRelations, usesMarkdownArchitecture],
+    () => buildCourseNetwork(knowledgeTopics, topicRelations, courseLearningPath),
+    [courseLearningPath, knowledgeTopics, topicRelations],
   );
-  const sourcePanelDocuments = useMemo(
-    () => usesMarkdownArchitecture ? sourceDocuments : buildLegacySourceDocuments(evidences, document),
-    [document, evidences, sourceDocuments, usesMarkdownArchitecture],
-  );
+  const sourcePanelDocuments = sourceDocuments;
   const selectedTopicLabel = expandedTopicId
     ? courseNetwork.nodes.find(node => node.id === expandedTopicId)?.label ?? null
     : null;
   const teachingNetwork = useMemo(
     () => expandedTopicId
-      ? usesMarkdownArchitecture
-        ? buildTeachingNetwork(
-            expandedTopicId,
-            teachingBlocks,
-            teachingRelations,
-            narrativePaths[expandedTopicId] ?? null,
-          )
-        : buildLegacyTeachingNetwork(expandedTopicId, legacyPackages, evidences)
+      ? buildTeachingNetwork(
+          expandedTopicId,
+          teachingBlocks,
+          teachingRelations,
+          narrativePaths[expandedTopicId] ?? null,
+        )
       : { nodes: [], edges: [], pathEdges: [], warnings: [] },
-    [evidences, expandedTopicId, legacyPackages, narrativePaths, teachingBlocks, teachingRelations, usesMarkdownArchitecture],
+    [expandedTopicId, narrativePaths, teachingBlocks, teachingRelations],
   );
   const currentNetwork: KnowledgeNetworkModel = useMemo(
     () => expandedTopicId ? teachingNetwork : courseNetwork,

@@ -188,7 +188,7 @@ describe('multi-course library navigation', () => {
     await act(async () => {});
     expect(container!.querySelector('[data-astronomy-backdrop="reading"]')).not.toBeNull();
     expect(container!.querySelector('[data-astronomy-backdrop="reading"] + div main > div')?.className)
-      .toContain('bg-space-950/[0.58]');
+      .toContain('bg-space-950/[0.82]');
     act(() => useStore.setState({ stage: 'upload' }));
   });
 
