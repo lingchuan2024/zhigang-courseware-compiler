@@ -1,0 +1,18 @@
+src/lib/__tests__/examples-v2.test.ts
+  h_da6fd0bc394304 1-22,25-37,39-51,53-64,66-74,76-79
+src/lib/examples.ts
+  h_da6fd0bc394304 2,4-16,19-20,22-118,122-352,354-360,362-461,464-507,510-565,569-580
+src/store/useStore.ts
+  h_da6fd0bc394304 31,1302,1305-1331,1339,1347-1355
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "01dc11c702e13a509a72896c07f2572b9cd76e8d",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
