@@ -33,4 +33,3 @@ deployment-guide/
 vite.config.js
 vite.config.d.ts
 vite/mineru-proxy.js
-pnpm-workspace.yaml

@@ -9,7 +9,7 @@ import type {
   SourceDocument,
 } from '../types';
 import { generateId } from './utils';
-import { normalizeMinerUMarkdown } from './markdown-normalizer-v2';
+import { normalizeMinerUMarkdown } from './source-markdown-normalizer';
 
 // ========== 常量 ==========
 
