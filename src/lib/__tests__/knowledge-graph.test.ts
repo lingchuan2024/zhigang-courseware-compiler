@@ -9,7 +9,6 @@ import {
   assessTopicSetQuality,
   generateTopicId,
 } from '../knowledge-graph';
-import { createExampleCourse } from '../examples';
 import { EvidenceAtom, EvidenceType, CourseTopic, MacroKnowledgeRelation } from '../../types';
 
 // 辅助函数：构造 EvidenceAtom（提供默认的 documentId / blockIndex / contentHash）
@@ -114,21 +113,6 @@ describe('knowledge-graph', () => {
       const uniqueIds = new Set(allEvIds);
       // 每个证据ID在所有主题中只出现一次（不重复分配）
       expect(allEvIds.length).toBe(uniqueIds.size);
-    });
-
-    it('should generate at least 8 meaningful topics for the example course', () => {
-      // 使用示例课程的证据（与examples.ts中的PAGES一致）
-      const { evidences } = createExampleCourse();
-      const result = generateLocalTopicsFromEvidences(evidences);
-
-      expect(result.topics.length).toBeGreaterThanOrEqual(8);
-
-      // 所有主题都应该有非空标题
-      for (const t of result.topics) {
-        expect(t.title.trim().length).toBeGreaterThan(0);
-        expect(t.title.length).toBeLessThanOrEqual(50);
-        expect(t.evidenceIds.length).toBeGreaterThan(0);
-      }
     });
   });
 

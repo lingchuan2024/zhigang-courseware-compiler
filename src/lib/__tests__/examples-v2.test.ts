@@ -1,107 +1,81 @@
-import { describe, it, expect } from 'vitest';
-import { createExampleCourse, createExampleCourseV2 } from '../examples';
-import { generateEvidences } from '../evidence';
+import { describe, expect, it } from 'vitest';
+import { createExampleCourse } from '../examples';
 
-describe('examples-v2', () => {
-  describe('createExampleCourse', () => {
-    it('should generate evidences via generateEvidences (not hardcoded)', () => {
-      const { document, evidences } = createExampleCourse();
+describe('example course (v6 fixture)', () => {
+  const example = createExampleCourse();
+  const blockIds = new Set(
+    example.sourceDocuments.flatMap(doc => doc.blocks.map(block => block.id)),
+  );
+  const topicIds = new Set(example.knowledgeTopics.map(topic => topic.id));
+  const teachingBlockIds = new Set(example.teachingBlocks.map(block => block.id));
 
-      // 文档应该有页面
-      expect(document.pages.length).toBeGreaterThan(0);
-      expect(document.title).toBe('概率模型基础');
+  it('covers every topic with cards and a narrative path', () => {
+    expect(example.knowledgeTopics.length).toBeGreaterThanOrEqual(8);
 
-      // 证据应该是通过generateEvidences从页面生成的（每个证据有ev_前缀ID）
-      expect(evidences.length).toBeGreaterThan(0);
-      expect(evidences.every(e => e.id.startsWith('ev_'))).toBe(true);
-
-      // 手动调用generateEvidences应得到相同数量的证据
-      // (ID是generateId随机生成的，所以数量和类型一致即可)
-      const manualEvidences = generateEvidences(document.pages);
-      expect(manualEvidences.length).toBe(evidences.length);
-    });
+    for (const topic of example.knowledgeTopics) {
+      const cards = example.knowledgeCards.filter(card => card.topicId === topic.id);
+      expect(cards.length).toBeGreaterThan(0);
+      expect(topic.name.trim().length).toBeGreaterThan(0);
+      expect(topic.sourceRanges.length).toBeGreaterThan(0);
+      expect(example.narrativePaths[topic.id]?.orderedTeachingBlockIds.length)
+        .toBe(cards.length);
+    }
   });
 
-  describe('createExampleCourseV2', () => {
-    it('should enter structure-review stage (produces topics and relations)', () => {
-      const result = createExampleCourseV2();
+  it('resolves every source range to real markdown blocks', () => {
+    const ranges = [
+      ...example.knowledgeTopics.map(topic => topic.sourceRanges).flat(),
+      ...example.teachingBlocks.map(block => block.sourceRanges).flat(),
+      ...example.knowledgeCards.map(card => card.sourceRanges).flat(),
+    ];
+    expect(ranges.length).toBeGreaterThan(0);
 
-      // createExampleCourseV2 生成完整的结构审查数据
-      expect(result.topics).toBeDefined();
-      expect(result.topics.length).toBeGreaterThan(0);
-      expect(result.macroRelations).toBeDefined();
-      expect(result.knowledgePackages).toBeDefined();
-      expect(result.knowledgePackages.length).toBe(result.topics.length);
-      expect(result.evidences).toBeDefined();
-      expect(result.document).toBeDefined();
-    });
+    for (const range of ranges) {
+      expect(blockIds.has(range.startBlockId)).toBe(true);
+      expect(blockIds.has(range.endBlockId)).toBe(true);
+    }
+  });
 
-    it('should cover key concepts: 概率模型, 最大似然估计, 线性回归, 正则化, Ridge, Lasso', () => {
-      const result = createExampleCourseV2();
-      const allTitles = result.topics.map(t => t.title).join(' ');
+  it('keeps topic relations and learning path consistent', () => {
+    for (const relation of example.topicRelations) {
+      expect(topicIds.has(relation.sourceTopicId)).toBe(true);
+      expect(topicIds.has(relation.targetTopicId)).toBe(true);
+    }
 
-      // 这些核心概念应该出现在主题标题或别名中
-      const keyConcepts = ['概率模型', '最大似然', '线性回归', '正则化', 'Ridge', 'Lasso'];
-      for (const concept of keyConcepts) {
-        expect(allTitles).toContain(concept);
-      }
-    });
+    const ordered = example.courseLearningPath.orderedTopicIds;
+    expect(ordered.length).toBe(example.knowledgeTopics.length);
+    expect(new Set(ordered).size).toBe(ordered.length);
+    for (const topicId of ordered) {
+      expect(topicIds.has(topicId)).toBe(true);
+    }
+  });
 
-    it('should not have a single "课程内容" fallback topic', () => {
-      const result = createExampleCourseV2();
+  it('references existing teaching blocks from cards and relations', () => {
+    for (const card of example.knowledgeCards) {
+      expect(teachingBlockIds.has(card.teachingBlockId)).toBe(true);
+      expect(card.conciseSummary.trim().length).toBeGreaterThan(0);
+      expect(card.detailedNote.trim().length).toBeGreaterThan(0);
+    }
 
-      // 不应该只有一个"课程内容"的降级主题
-      const fallbackTopic = result.topics.find(t => t.title === '课程内容');
-      // 如果存在"课程内容"主题，说明降级了，但不应该只有这一个
-      if (fallbackTopic) {
-        expect(result.topics.length).toBeGreaterThan(1);
-      }
-      // 更严格的检查：主题数量应远大于1
-      expect(result.topics.length).toBeGreaterThanOrEqual(8);
-    });
+    for (const relation of example.teachingRelations) {
+      expect(teachingBlockIds.has(relation.sourceBlockId)).toBe(true);
+      expect(teachingBlockIds.has(relation.targetBlockId)).toBe(true);
+    }
+  });
 
-    it('should have valid evidenceIds and page numbers for each topic', () => {
-      const result = createExampleCourseV2();
-      const validEvidenceIds = new Set(result.evidences.map(e => e.id));
-      const validPageNumbers = new Set(result.document.pages.map(p => p.pageNumber));
+  it('ships a completed master note with full card coverage', () => {
+    const note = example.courseMasterNote;
+    expect(note.status).toBe('completed');
+    expect(note.chapters.length).toBeGreaterThanOrEqual(2);
+    expect(note.chapters.every(chapter => chapter.status === 'completed')).toBe(true);
+    expect(note.markdown).toContain('# 概率模型基础');
+    expect(note.coverage.missingCardIds).toEqual([]);
+    expect(note.generatedFromStructureVersion).toBe(example.structureVersion);
+  });
 
-      for (const topic of result.topics) {
-        // 每个主题都有evidenceIds
-        expect(topic.evidenceIds.length).toBeGreaterThan(0);
-
-        // 所有evidenceIds都应该是有效的
-        for (const eid of topic.evidenceIds) {
-          expect(validEvidenceIds.has(eid)).toBe(true);
-        }
-
-        // 页码应该有效
-        expect(topic.originalPageNumbers.length).toBeGreaterThan(0);
-        for (const pg of topic.originalPageNumbers) {
-          expect(validPageNumbers.has(pg)).toBe(true);
-        }
-      }
-    });
-
-    it('should have at least 8 topics', () => {
-      const result = createExampleCourseV2();
-      expect(result.topics.length).toBeGreaterThanOrEqual(8);
-    });
-
-    it('should have knowledgePackages with notes generated', () => {
-      const result = createExampleCourseV2();
-
-      for (const kp of result.knowledgePackages) {
-        expect(kp.topic).toBeDefined();
-        expect(kp.topic.id).toBeDefined();
-        expect(kp.note).toBeDefined();
-        expect(kp.note!.contentMarkdown.length).toBeGreaterThan(0);
-        expect(kp.note!.shortSummary.length).toBeGreaterThan(0);
-      }
-    });
-
-    it('should produce structureWarnings (may be empty array for clean generation)', () => {
-      const result = createExampleCourseV2();
-      expect(Array.isArray(result.structureWarnings)).toBe(true);
-    });
+  it('provides a markdown document preview with multiple pages', () => {
+    expect(example.document.fileType).toBe('markdown');
+    expect(example.document.pages.length).toBeGreaterThan(5);
+    expect(example.sourceDocuments[0].markdown).toContain('最大似然估计');
   });
 });

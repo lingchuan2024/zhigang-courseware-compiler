@@ -28,7 +28,7 @@ import {
   extractTopicContent,
   generateTopicNote,
 } from '../lib/model-v2';
-import { createExampleCourseV2 } from '../lib/examples';
+import { createExampleCourse } from '../lib/examples';
 import { exportToMarkdownV2 } from '../lib/notes-v2';
 import { runFullPipeline } from '../lib/knowledge-pipeline';
 import { runKnowledgePipeline } from '../lib/knowledge-pipeline-v2';
@@ -1299,19 +1299,36 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   loadExampleCourse: () => {
-    const { document, topics, knowledgePackages } = createExampleCourseV2();
-    const evidences = generateEvidences(document.pages, document.id);
-    const learningUnits = generateLearningUnitsLocal(evidences);
-    const docId = document.id;
-    const { anchors, occurrences } = rebuildAnchors(knowledgePackages, docId);
+    const example = createExampleCourse();
 
     set({
-      document,
-      evidences,
-      topics,
-      macroRelations: [],
-      knowledgePackages,
-      learningUnits,
+      document: example.document,
+      sourceDocuments: example.sourceDocuments,
+      knowledgeTopics: example.knowledgeTopics,
+      topicRelations: example.topicRelations,
+      teachingBlocks: example.teachingBlocks,
+      teachingRelations: example.teachingRelations,
+      courseLearningPath: example.courseLearningPath,
+      narrativePaths: example.narrativePaths,
+      knowledgeCards: example.knowledgeCards,
+      topicNotes: [],
+      topicSyntheses: [],
+      chapterPlan: example.courseMasterNote.outline,
+      chapterNotes: example.courseMasterNote.chapters,
+      courseMasterNote: example.courseMasterNote,
+      glossary: example.glossary,
+      formulaCards: example.formulaCards,
+      unassignedBlocks: [],
+      knowledgeBaseVersions: {
+        source: example.sourceDocuments.length,
+        normalization: example.sourceDocuments.length,
+        topicStructure: example.structureVersion,
+        teachingStructure: example.teachingBlocks.length,
+        ordering: 1,
+        cards: example.knowledgeCards.length,
+        notes: example.courseMasterNote.chapters.length,
+        embeddings: 0,
+      },
       stage: 'structure',
       job: null,
       jobStatus: 'completed',
@@ -1319,16 +1336,23 @@ export const useStore = create<AppState>((set, get) => ({
       structureWarnings: [],
       structureSource: 'ai',
       structureExtractionStatus: 'ready',
+      knowledgePipelineStatus: 'ready',
       extractionErrors: [],
       learningPath: null,
       generationMemory: initialMemory,
-      globalAnchors: anchors,
-      occurrences,
       staleMarker: null,
       qualityReport: null,
       courseSections: [],
       viewMode: 'view',
-      pipelineProgress: IDLE_PROGRESS,
+      pipelineProgress: completeProgress(IDLE_PROGRESS),
+      mineruParseResult: {
+        status: 'completed',
+        progress: 100,
+        markdown: example.sourceDocuments[0].markdown,
+        assets: [],
+        sourceFileName: example.document.fileName,
+        completedAt: Date.now(),
+      },
     });
     saveState(get());
   },
