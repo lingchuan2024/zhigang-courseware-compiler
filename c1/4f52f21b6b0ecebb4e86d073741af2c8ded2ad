@@ -1,0 +1,14 @@
+.gitignore
+  h_da6fd0bc394304 26-36
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "c14f52f21b6b0ecebb4e86d073741af2c8ded2ad",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
