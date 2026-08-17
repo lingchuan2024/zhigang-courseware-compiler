@@ -1,0 +1,18 @@
+.github/workflows/ci.yml
+  h_da6fd0bc394304 1-41
+README.md
+  h_da6fd0bc394304 3-4
+package.json
+  h_da6fd0bc394304 6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "e0940995a995e192129afcb0b449dc6ad4d0a2f8",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
