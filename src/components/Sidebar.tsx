@@ -240,7 +240,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
           </span>
         </button>
         <button
-          onClick={loadExample}
+          onClick={() => loadExample(activeCourseId ?? undefined)}
           className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-ui text-sm text-ink-light transition-colors hover:bg-space-750 hover:text-white"
         >
           <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

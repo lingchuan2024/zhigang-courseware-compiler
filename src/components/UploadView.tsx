@@ -138,7 +138,7 @@ export function UploadView() {
         {/* 示例课程按钮 */}
         <div className="mt-8 text-center">
           <p className="mb-3 text-sm text-space-muted">或者</p>
-          <button onClick={loadExample} className="btn-outline">
+          <button onClick={() => loadExample(activeCourseId ?? undefined)} className="btn-outline">
             体验示例课程
           </button>
         </div>

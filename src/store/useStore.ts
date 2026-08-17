@@ -102,7 +102,7 @@ interface AppState extends ProjectState {
   setModelConfig: (config: ModelConfig | null) => void;
   setMinerUConfig: (config: MinerUConfig | null) => void;
   startMinerUParse: () => Promise<void>;
-  loadExampleCourse: () => void;
+  loadExampleCourse: (courseId?: string) => void;
   reset: () => void;
   setStage: (stage: ProductStage | WorkflowStage) => void;
   // v6 新架构
@@ -816,8 +816,8 @@ export const useStore = create<AppState>((set, get) => ({
     saveState(get());
   },
 
-  loadExampleCourse: () => {
-    const example = createExampleCourse();
+  loadExampleCourse: (courseId?: string) => {
+    const example = createExampleCourse(courseId);
 
     set({
       document: example.document,

@@ -122,7 +122,8 @@ function rangeOf(blocks: MarkdownBlock[]): SourceRange {
 interface TopicSpec {
   name: string;
   aliases: string[];
-  heading: string;
+  /** 主题覆盖的章节标题（可跨多个相邻小节） */
+  headings: string[];
   summary: string;
   learningObjective: string;
   importance: KnowledgeTopic['importance'];
@@ -131,6 +132,8 @@ interface TopicSpec {
   blocks: Array<{
     title: string;
     type: string;
+    /** 该讲解块引用的章节，默认第一个 */
+    heading?: string;
     summary: string;
     detailedNote: string;
     keyPoints: string[];
@@ -142,7 +145,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '概率模型',
     aliases: ['概率建模'],
-    heading: '2. 概率模型基本概念',
+    headings: ['2. 概率模型基本概念'],
     summary: '用含参数的概率分布描述数据生成机制，学习即参数估计。',
     learningObjective: '理解概率模型如何把学习问题转化为参数估计问题',
     importance: 'core',
@@ -162,7 +165,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '最大似然估计',
     aliases: ['MLE'],
-    heading: '3. 最大似然估计',
+    headings: ['3. 最大似然估计'],
     summary: '选择让观测数据出现概率最大的参数值。',
     learningObjective: '掌握似然函数与最大似然估计的定义',
     importance: 'core',
@@ -182,7 +185,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '线性回归模型',
     aliases: ['线性回归'],
-    heading: '4. 线性回归模型',
+    headings: ['4. 线性回归模型'],
     summary: '线性预测子加高斯噪声的经典概率模型。',
     learningObjective: '写出线性回归的概率形式并指出其分布假设',
     importance: 'core',
@@ -202,7 +205,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '线性回归的MLE推导',
     aliases: ['MLE与最小二乘'],
-    heading: '5. 线性回归的MLE推导',
+    headings: ['5. 线性回归的MLE推导'],
     summary: '高斯噪声假设下，MLE 等价于最小二乘。',
     learningObjective: '完成从对数似然到最小二乘目标的推导',
     importance: 'core',
@@ -222,7 +225,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '偏差-方差平衡',
     aliases: ['偏差方差权衡'],
-    heading: '6. 偏差-方差平衡',
+    headings: ['6. 偏差-方差平衡'],
     summary: '期望预测误差可分解为偏差平方、方差与不可约噪声。',
     learningObjective: '解释误差分解各项含义及其随复杂度的变化',
     importance: 'important',
@@ -242,7 +245,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '过拟合',
     aliases: ['过学习'],
-    heading: '7. 过拟合',
+    headings: ['7. 过拟合'],
     summary: '模型记住训练噪声，训练误差小而测试误差大。',
     learningObjective: '识别过拟合的表现与其在偏差-方差分解中的位置',
     importance: 'important',
@@ -262,7 +265,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: '正则化',
     aliases: ['MAP正则化'],
-    heading: '8. 正则化',
+    headings: ['8. 正则化'],
     summary: '在目标函数上加惩罚项抑制复杂度，等价于 MAP。',
     learningObjective: '理解正则化项的作用及其贝叶斯解释',
     importance: 'core',
@@ -282,7 +285,7 @@ const TOPIC_SPECS: TopicSpec[] = [
   {
     name: 'Ridge与Lasso回归',
     aliases: ['岭回归', 'L1正则化', 'L2正则化'],
-    heading: '9. Ridge回归（L2正则化）',
+    headings: ['9. Ridge回归（L2正则化）', '10. Lasso回归（L1正则化）'],
     summary: 'L2 惩罚收缩权重，L1 惩罚产生稀疏解。',
     learningObjective: '对比两种正则化的目标函数、求解与结果差异',
     importance: 'important',
@@ -300,6 +303,7 @@ const TOPIC_SPECS: TopicSpec[] = [
       {
         title: 'Lasso（L1）回归',
         type: 'formula',
+        heading: '10. Lasso回归（L1正则化）',
         summary: 'Ω(w) = ||w||₁，产生稀疏解。',
         detailedNote: 'Lasso 使用 L1 惩罚 Ω(w) = ||w||₁ = Σⱼ |wⱼ|：\n\nJ_Lasso(w) = Σᵢ(yᵢ - wᵀxᵢ)² + λΣⱼ|wⱼ|\n\nL1 惩罚会把部分权重压到恰好为零，产生稀疏解，实现自动特征选择。',
         keyPoints: ['稀疏解', '自动特征选择'],
@@ -346,9 +350,10 @@ export interface ExampleCourse {
   structureVersion: number;
 }
 
-export function createExampleCourse(): ExampleCourse {
-  const courseId = generateId('course');
-  const sourceDocument = createSourceDocument(EXAMPLE_MARKDOWN, courseId, '概率模型基础');
+/** courseId 传入时（工作区内加载示例）文档与知识产物挂到该课程空间，刷新后可从课件库恢复。 */
+export function createExampleCourse(courseId?: string): ExampleCourse {
+  const resolvedCourseId = courseId ?? generateId('course');
+  const sourceDocument = createSourceDocument(EXAMPLE_MARKDOWN, resolvedCourseId, '概率模型基础');
   const doc = sourceDocument;
 
   const topics: KnowledgeTopic[] = [];
@@ -362,12 +367,12 @@ export function createExampleCourse(): ExampleCourse {
   TOPIC_SPECS.forEach((spec, topicIndex) => {
     const topicId = `topic-${spec.name === '最大似然估计' ? 'mle' : `t${topicIndex + 1}`}`;
     topicIdByName.set(spec.name, topicId);
-    const sectionBlocks = blocksUnderHeading(doc, spec.heading);
+    const sectionBlocks = spec.headings.flatMap(heading => blocksUnderHeading(doc, heading));
     const sourceRanges = sectionBlocks.length > 0 ? [rangeOf(sectionBlocks)] : [];
 
     topics.push({
       id: topicId,
-      courseId,
+      courseId: resolvedCourseId,
       name: spec.name,
       aliases: spec.aliases,
       summary: spec.summary,
@@ -384,8 +389,9 @@ export function createExampleCourse(): ExampleCourse {
     const topicBlockIds: string[] = [];
     spec.blocks.forEach((blockSpec) => {
       const blockId = generateId('tb');
+      const citeBlocks = blocksUnderHeading(doc, blockSpec.heading ?? spec.headings[0]);
       const citedBlocks = blockSpec.excerptLines
-        .map(line => sectionBlocks[line])
+        .map(line => citeBlocks[line])
         .filter(Boolean);
       const blockRanges = citedBlocks.length > 0 ? [rangeOf(citedBlocks)] : sourceRanges;
 
@@ -404,7 +410,7 @@ export function createExampleCourse(): ExampleCourse {
       const cardId = generateId('card');
       knowledgeCards.push({
         id: cardId,
-        courseId,
+        courseId: resolvedCourseId,
         topicId,
         topicName: spec.name,
         teachingBlockId: blockId,
@@ -538,7 +544,7 @@ export function createExampleCourse(): ExampleCourse {
     retryCount: 0,
   }));
   const courseMasterNote = assembleCourseMasterNote({
-    courseId,
+    courseId: resolvedCourseId,
     title: '概率模型基础',
     outline,
     chapterNotes,
@@ -552,7 +558,7 @@ export function createExampleCourse(): ExampleCourse {
   const pageTexts = EXAMPLE_MARKDOWN.split(/\n(?=## )/);
   const document: CourseDocument = {
     id: doc.id,
-    courseId,
+    courseId: resolvedCourseId,
     title: '概率模型基础',
     fileName: 'example-概率模型基础.md',
     fileType: 'markdown',

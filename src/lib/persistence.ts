@@ -34,6 +34,15 @@ const PERSISTED_KEYS: (keyof ProjectState)[] = [
   'mineruParseResult',
 ];
 
+/** 从任意快照（可能是旧 schema 存量）中只挑出当前字段，防止已删除字段回流运行时状态。 */
+export function pickPersistedFields(snapshot: Record<string, unknown>): Partial<ProjectState> {
+  const picked: Record<string, unknown> = {};
+  for (const key of PERSISTED_KEYS) {
+    if (key in snapshot) picked[key] = snapshot[key];
+  }
+  return picked as Partial<ProjectState>;
+}
+
 // 保存状态到localStorage
 export function saveState(state: Partial<ProjectState>): void {
   try {
@@ -53,7 +62,6 @@ export function saveState(state: Partial<ProjectState>): void {
         }
       }
     }
-
     // 如果 job 是 running，保存时降级为 idle（刷新后不恢复 running 状态）
     if (toSave.jobStatus === 'running') {
       toSave.job = null;
