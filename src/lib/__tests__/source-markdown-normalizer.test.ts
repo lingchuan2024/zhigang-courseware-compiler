@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeMinerUMarkdown } from '../markdown-normalizer-v2';
+import { normalizeMinerUMarkdown } from '../source-markdown-normalizer';
 
 describe('normalizeMinerUMarkdown display math recovery', () => {
   it('closes a missing display-math delimiter after a balanced LaTeX environment', () => {

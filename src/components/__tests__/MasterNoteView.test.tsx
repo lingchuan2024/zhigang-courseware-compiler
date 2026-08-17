@@ -12,7 +12,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, con
 import { act, createElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { NotesView } from '../NotesView';
+import { MasterNoteView } from '../MasterNoteView';
 import { useStore } from '../../store/useStore';
 import type { ChapterNote, ChapterPlanItem, CourseMasterNote, KnowledgeCard, KnowledgeTopic } from '../../types';
 
@@ -52,7 +52,7 @@ function render() {
   document.body.appendChild(container);
   const root = createRoot(container);
   roots.push(root);
-  act(() => root.render(createElement(NotesView, { onOpenSettings: vi.fn() })));
+  act(() => root.render(createElement(MasterNoteView, { onOpenSettings: vi.fn() })));
   return container;
 }
 
@@ -66,7 +66,7 @@ afterEach(() => {
   document.body.innerHTML = '';
 });
 
-describe('NotesView V2 complete-note stage', () => {
+describe('MasterNoteView complete-note stage', () => {
   it('keeps the active reading shell translucent while note content stays opaque', () => {
     const master: CourseMasterNote = {
       id: 'master-1', title: '机器学习', outline: [plan], chapters: [completedChapter], glossary: [], formulaIndex: [],

@@ -1,5 +1,5 @@
 import type { MarkdownBlock } from '../types';
-import { normalizeMinerUMarkdown } from './markdown-normalizer-v2';
+import { normalizeMinerUMarkdown } from './source-markdown-normalizer';
 
 /**
  * Repair only the rendered preview of already-persisted MinerU blocks.

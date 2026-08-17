@@ -11,9 +11,6 @@ import type { ProductStateSnapshot } from '../../types';
 function state(overrides: Partial<ProductStateSnapshot> = {}): ProductStateSnapshot {
   return {
     document: null,
-    evidences: [],
-    topics: [],
-    knowledgePackages: [],
     sourceDocuments: [],
     knowledgeTopics: [],
     topicNotes: [],

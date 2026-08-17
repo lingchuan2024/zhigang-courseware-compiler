@@ -11,7 +11,7 @@ import {
   migrateLegacyProjectToLibrary,
 } from '../lib/library-repository';
 import { useStore } from './useStore';
-import { loadState } from '../lib/persistence';
+import { loadState, pickPersistedFields } from '../lib/persistence';
 
 export type LibraryScreen = 'home' | 'library' | 'workspace' | 'qa';
 
@@ -112,7 +112,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
       if (!snapshot) throw new Error('课件快照不存在，请重新导入课件');
       const current = useStore.getState();
       useStore.setState({
-        ...snapshot,
+        ...pickPersistedFields(snapshot as Record<string, unknown>),
         modelConfig: current.modelConfig,
         mineruConfig: current.mineruConfig,
       });

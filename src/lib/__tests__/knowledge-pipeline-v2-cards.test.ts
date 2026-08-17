@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ModelConfig } from '../../types';
 
 const mocks = vi.hoisted(() => ({
-  generateAllNotes: vi.fn(),
   callChatCompletion: vi.fn(),
 }));
 
@@ -79,10 +78,6 @@ vi.mock('../teaching-structure', () => ({
   })),
 }));
 
-vi.mock('../note-generator-v2', () => ({
-  generateAllNotes: mocks.generateAllNotes,
-}));
-
 import { runKnowledgePipeline } from '../knowledge-pipeline-v2';
 
 const config: ModelConfig = {
@@ -93,8 +88,6 @@ const config: ModelConfig = {
 
 describe('knowledge pipeline V2 card boundary', () => {
   beforeEach(() => {
-    mocks.generateAllNotes.mockReset();
-    mocks.generateAllNotes.mockResolvedValue([{ topicId: 'topic-1', markdown: '# 不应生成', sectionBindings: [], glossaryUpdates: [], formulaUpdates: [], version: 1 }]);
     mocks.callChatCompletion.mockReset();
     mocks.callChatCompletion.mockResolvedValue({
       data: {
@@ -129,7 +122,6 @@ describe('knowledge pipeline V2 card boundary', () => {
     expect(result.topicNotes).toEqual([]);
     expect(statuses).toContain('card-generation');
     expect(statuses).not.toContain('note-generation');
-    expect(mocks.generateAllNotes).not.toHaveBeenCalled();
   });
 
   it('normalizes fenced AI markdown and LaTeX delimiters before persisting a card', async () => {
