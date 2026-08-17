@@ -14,7 +14,6 @@ import {
   listLibraryDocuments,
   listRetrievalRecords,
   loadLibraryProjectSnapshot,
-  migrateLegacyProjectToLibrary,
   replaceDocumentRetrievalRecords,
   resetLibraryRepositoryForTests,
   saveChatConversation,
@@ -22,7 +21,7 @@ import {
   saveLibraryProjectSnapshot,
   upsertLibraryDocument,
 } from '../library-repository';
-import { saveState } from '../persistence';
+import { flushPendingSaves, saveState } from '../persistence';
 
 const DB_NAME = 'zhigang-library';
 const localStorageValues = new Map<string, string>();
@@ -324,7 +323,7 @@ describe('library repository', () => {
     expect((await listChatMessages('history')).map(item => item.id)).toEqual(['history-message']);
   });
 
-  it('mirrors an active course document when the legacy persistence path saves', async () => {
+  it('mirrors an active course document when saveState flushes', async () => {
     const state = {
       ...snapshot('doc-mirror', 'course-mirror', '镜像课件'),
       knowledgeCards: [{
@@ -334,35 +333,10 @@ describe('library repository', () => {
       }],
     };
     saveState(state);
-    await new Promise(resolve => setTimeout(resolve, 0));
+    await flushPendingSaves();
 
     expect((await loadLibraryProjectSnapshot('doc-mirror'))?.document?.courseId).toBe('course-mirror');
     expect((await listRetrievalRecords()).map(item => item.cardId)).toEqual(['card-mirror']);
-  });
-
-  it('migrates one legacy project into a course space without losing card indexes', async () => {
-    const legacy = {
-      ...snapshot('legacy-doc', 'legacy-doc', '旧机器学习课件'),
-      document: {
-        id: 'legacy-doc', title: '旧机器学习课件', fileName: 'legacy.pdf', fileType: 'pdf' as const, pages: [], uploadedAt: 1,
-      },
-      sourceDocuments: [],
-      knowledgeTopics: [],
-      knowledgeCards: [{
-        id: 'legacy-card', courseId: 'legacy-doc', topicId: 'topic-1', topicName: 'GLM', teachingBlockId: 'block-1', teachingType: 'formula',
-        title: 'GLM', conciseSummary: '摘要', detailedNote: '正文', sourceRanges: [], keywords: ['GLM'], aliases: [],
-        prerequisiteTopicIds: [], relatedTopicIds: [], confidence: 0.9, reviewStatus: 'generated' as const,
-      }],
-    };
-    const migrated = await migrateLegacyProjectToLibrary(legacy);
-
-    expect(migrated).not.toBeNull();
-    const course = (await listLibraryCourses())[0];
-    expect(course.documentIds).toEqual(['legacy-doc']);
-    const restored = await loadLibraryProjectSnapshot('legacy-doc');
-    expect(restored?.document?.courseId).toBe(course.id);
-    expect(restored?.knowledgeCards?.[0].courseId).toBe(course.id);
-    expect((await listRetrievalRecords())[0].courseId).toBe(course.id);
   });
 
   it('lists conversations by most recent update with an id tie-break', async () => {

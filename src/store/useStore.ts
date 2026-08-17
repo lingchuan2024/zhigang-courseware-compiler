@@ -9,7 +9,7 @@ import {
   WorkflowStage,
 } from '../types';
 import type { SourceDocument } from '../types';
-import { saveState, loadState, clearState } from '../lib/persistence';
+import { saveState, clearState } from '../lib/persistence';
 import { createExampleCourse } from '../lib/examples';
 import { runKnowledgePipeline } from '../lib/knowledge-pipeline-v2';
 import { enrichKnowledgeCards } from '../lib/card-enrichment';
@@ -37,8 +37,6 @@ import {
 import {
   clearStoredModelConfig,
   clearStoredMinerUConfig,
-  loadStoredModelConfig,
-  loadStoredMinerUConfig,
   saveStoredModelConfig,
   saveStoredMinerUConfig,
 } from '../lib/model-config-storage';
@@ -94,7 +92,6 @@ const initialState: ProjectState = {
 };
 
 interface AppState extends ProjectState {
-  initializeFromStorage: () => void;
   setDocument: (doc: CourseDocument) => void;
   navigateToStage: (stage: ProductStage) => void;
   returnToLatestStage: () => void;
@@ -117,22 +114,6 @@ interface AppState extends ProjectState {
 
 export const useStore = create<AppState>((set, get) => ({
   ...initialState,
-
-  initializeFromStorage: () => {
-    const saved = loadState();
-    const storedModelConfig = loadStoredModelConfig();
-    const storedMinerUConfig = loadStoredMinerUConfig();
-    if (saved) {
-      set({
-        ...initialState,
-        ...saved,
-        modelConfig: storedModelConfig,
-        mineruConfig: storedMinerUConfig,
-      });
-    } else {
-      set({ modelConfig: storedModelConfig, mineruConfig: storedMinerUConfig });
-    }
-  },
 
   setDocument: (doc) => {
     set({

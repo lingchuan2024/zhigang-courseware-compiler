@@ -1,7 +1,14 @@
 # 知纲收敛与下阶段计划
 
 日期：2026-08-17
-状态：Phase 0 已完成（分支 `phase-0-cleanup`，9 个提交）；Phase 1/2 待启动
+状态：Phase 0 已完成（PR #2 已合并）；Phase 1 进行中（分支 `feat/persistence-and-incremental`：T1 持久化单一真相源已完成，T2 增量更新、T3 模型健壮性待做）
+
+> **Phase 1 / T1 执行结果（2026-08-17）**：localStorage 只保留约 100 字节的工作区指针（schema v10），
+> 项目数据唯一真相源为 IndexedDB 课程库快照；全量快照镜像改为 500ms 防抖合并写（flush 于
+> beforeunload/visibilitychange），启动不再有同步恢复路径，模型配置仍在独立 key。删除了
+> loadState/initializeFromStorage/migrateLegacyProjectToLibrary 等旧恢复链路。
+> 验收：单元测试断言 localStorage 无项目数据；浏览器实测两份课件并存、刷新存活、
+> 从课件库恢复工作区。决策点落地：维持"刷新回首页"，"原地停留"作为独立小改进留待后续。
 
 > **Phase 0 执行结果（2026-08-17）**：仓库 −38,304 行 / +1,227 行（含 5 个遗留目录约 5MB）；
 > src 非测试代码 35,849 → 21,440 行（−40%）；测试 81 文件 999 用例 → 56 文件 451 用例

@@ -14,13 +14,13 @@ import { AppShell } from './components/AppShell';
 import { useLibraryStore } from './store/useLibraryStore';
 import { KnowledgeQaView } from './components/KnowledgeQaView';
 import { AstronomyBackdrop } from './components/backgrounds/AstronomyBackdrop';
+import { loadStoredModelConfig, loadStoredMinerUConfig } from './lib/model-config-storage';
 
 function App() {
   const stage = useStore(s => s.stage);
   const startMinerUParse = useStore(s => s.startMinerUParse);
   const courseDocument = useStore(s => s.document);
   const mineruConfig = useStore(s => s.mineruConfig);
-  const initializeFromStorage = useStore(s => s.initializeFromStorage);
   const screen = useLibraryStore(s => s.screen);
   const initializeLibrary = useLibraryStore(s => s.initialize);
   const libraryInitialized = useLibraryStore(s => s.initialized);
@@ -55,9 +55,14 @@ function App() {
   };
 
   useEffect(() => {
-    initializeFromStorage();
+    // 模型/MinerU 配置存在独立 localStorage key，启动时同步恢复；
+    // 项目数据不进 localStorage，由课程库（IndexedDB）按需加载。
+    useStore.setState({
+      modelConfig: loadStoredModelConfig(),
+      mineruConfig: loadStoredMinerUConfig(),
+    });
     void initializeLibrary().finally(() => setInitialized(true));
-  }, [initializeFromStorage, initializeLibrary]);
+  }, [initializeLibrary]);
 
   if (!initialized || !libraryInitialized) {
     return (

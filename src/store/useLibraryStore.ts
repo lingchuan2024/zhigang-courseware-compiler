@@ -8,10 +8,9 @@ import {
   listLibraryDocuments,
   listCourseNebulaSummaries,
   loadLibraryProjectSnapshot,
-  migrateLegacyProjectToLibrary,
 } from '../lib/library-repository';
 import { useStore } from './useStore';
-import { loadState, pickPersistedFields } from '../lib/persistence';
+import { cleanupLegacyStorage, pickPersistedFields, writeWorkspacePointer } from '../lib/persistence';
 
 export type LibraryScreen = 'home' | 'library' | 'workspace' | 'qa';
 
@@ -61,7 +60,7 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
   initialize: async () => {
     set({ loading: true, error: null, screen: 'home' });
     try {
-      await migrateLegacyProjectToLibrary(loadState());
+      cleanupLegacyStorage();
       const data = await loadLibraryData();
       const activeCourseId = data.courses.some(course => course.id === get().activeCourseId)
         ? get().activeCourseId
@@ -117,6 +116,9 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         mineruConfig: current.mineruConfig,
       });
       const document = get().documents.find(item => item.id === documentId);
+      if (snapshot.document?.courseId) {
+        writeWorkspacePointer(documentId, snapshot.document.courseId);
+      }
       set({
         activeCourseId: document?.courseId ?? snapshot.document?.courseId ?? get().activeCourseId,
         screen: 'workspace',
