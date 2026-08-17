@@ -23,3 +23,14 @@ coverage/
 
 # Deployment artifacts (already in repo as standalone files)
 # deploy.sh is tracked separately
+
+# 构建产物与实验目录不入库
+cosmic-universe-test/
+deep-space-cosmic/
+trae-demo-post/
+project-evaluation/
+deployment-guide/
+vite.config.js
+vite.config.d.ts
+vite/mineru-proxy.js
+pnpm-workspace.yaml
