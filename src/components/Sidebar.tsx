@@ -24,13 +24,10 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const modelConfig = useStore(s => s.modelConfig);
   const mineruConfig = useStore(s => s.mineruConfig);
   const mineruParseResult = useStore(s => s.mineruParseResult);
-  const topics = useStore(s => s.topics);
-  const knowledgePackages = useStore(s => s.knowledgePackages);
   const navigateToStage = useStore(s => s.navigateToStage);
   const returnToLatestStage = useStore(s => s.returnToLatestStage);
   const staleMarker = useStore(s => s.staleMarker);
   const structureExtractionStatus = useStore(s => s.structureExtractionStatus);
-  const evidences = useStore(s => s.evidences);
   const viewMode = useStore(s => s.viewMode);
   const sourceDocuments = useStore(s => s.sourceDocuments);
   const knowledgeTopics = useStore(s => s.knowledgeTopics);
@@ -43,13 +40,10 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const knowledgeBaseVersions = useStore(s => s.knowledgeBaseVersions);
 
   const hasModel = !!modelConfig?.apiKey;
-  const hasTopics = topics.length > 0 || knowledgeTopics.length > 0;
+  const hasTopics = knowledgeTopics.length > 0;
 
-  const steps = deriveProductSteps(stage, {
+  const navigationSnapshot = {
     document,
-    evidences,
-    topics,
-    knowledgePackages,
     structureExtractionStatus,
     jobStatus,
     staleMarker,
@@ -63,28 +57,12 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     courseMasterNote,
     knowledgeBaseVersions,
     mineruParseResult,
-  });
+  };
+
+  const steps = deriveProductSteps(stage, navigationSnapshot);
 
   // 检测是否在查看较早步骤
-  const latestStage = getLatestStage({
-    document,
-    evidences,
-    topics,
-    knowledgePackages,
-    structureExtractionStatus,
-    jobStatus,
-    staleMarker,
-    sourceDocuments,
-    knowledgeTopics,
-    topicNotes,
-    knowledgeCards,
-    topicSyntheses,
-    chapterPlan,
-    chapterNotes,
-    courseMasterNote,
-    knowledgeBaseVersions,
-    mineruParseResult,
-  });
+  const latestStage = getLatestStage(navigationSnapshot);
   const isViewingEarlier = viewMode === 'view' && stage !== latestStage &&
     PRODUCT_STAGE_ORDER.indexOf(stage) < PRODUCT_STAGE_ORDER.indexOf(latestStage);
 
@@ -228,7 +206,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                   </p>
                   <p className="mt-1 font-mono text-xs text-space-muted">
                     {document.pages.length} 页
-                    {hasTopics && ` · ${knowledgeTopics.length || topics.length} 个知识点`}
+                    {hasTopics && ` · ${knowledgeTopics.length} 个知识点`}
                     {staleMarker && ' · 需更新'}
                   </p>
                 </div>

@@ -3,9 +3,6 @@ import type {
   ProductStepStatus,
   ProductStateSnapshot,
   StageNavigationResult,
-  StaleMarker,
-  CourseTopic,
-  KnowledgePackage,
 } from '../types';
 
 // ============== 六步流程常量 ==============
@@ -36,40 +33,29 @@ export const STAGE_NUMBERS: Record<ProductStage, number> = {
  * 判断某个阶段是否已完成（基于真实数据，非数组下标）
  */
 export function isStageCompleted(stage: ProductStage, state: ProductStateSnapshot): boolean {
-  const usesMarkdownKnowledgeBase = Boolean(
-    state.sourceDocuments?.length ||
-    state.knowledgeTopics?.length ||
-    state.knowledgeCards?.length,
-  );
   switch (stage) {
     case 'upload':
       return state.document !== null;
     case 'document':
       return state.document !== null;
     case 'mineru':
-      return (state.mineruParseResult?.status === 'completed' &&
-              Boolean(state.mineruParseResult.markdown) &&
-              Boolean(state.sourceDocuments?.length)) ||
-             // 旧项目已有结构时视为曾完成解析，保证只读导航兼容。
-             (state.topics.length > 0 && state.knowledgePackages.length > 0);
+      return state.mineruParseResult?.status === 'completed' &&
+             Boolean(state.mineruParseResult.markdown) &&
+             Boolean(state.sourceDocuments?.length);
     case 'structure':
-      return Boolean(state.knowledgeTopics?.length) ||
-             (state.topics.length > 0 && state.knowledgePackages.length > 0);
+      return Boolean(state.knowledgeTopics?.length);
     case 'cards':
-      return Boolean(state.knowledgeCards?.length) ||
-             (!usesMarkdownKnowledgeBase && state.knowledgePackages.some(kp => kp.note));
-    case 'notes':
-      if (usesMarkdownKnowledgeBase) {
-        const note = state.courseMasterNote;
-        const structureVersion = state.knowledgeBaseVersions?.topicStructure ?? 0;
-        return Boolean(
-          note &&
-          note.status === 'completed' &&
-          note.markdown.trim().length > 0 &&
-          note.generatedFromStructureVersion === structureVersion,
-        );
-      }
-      return state.knowledgePackages.some(kp => kp.note !== undefined && kp.note !== null);
+      return Boolean(state.knowledgeCards?.length);
+    case 'notes': {
+      const note = state.courseMasterNote;
+      const structureVersion = state.knowledgeBaseVersions?.topicStructure ?? 0;
+      return Boolean(
+        note &&
+        note.status === 'completed' &&
+        note.markdown.trim().length > 0 &&
+        note.generatedFromStructureVersion === structureVersion,
+      );
+    }
     default:
       return false;
   }
@@ -87,15 +73,14 @@ export function hasStageData(stage: ProductStage, state: ProductStateSnapshot): 
     case 'mineru':
       return Boolean(state.mineruParseResult) || Boolean(state.sourceDocuments?.length);
     case 'structure':
-      return Boolean(state.knowledgeTopics?.length) || state.topics.length > 0;
+      return Boolean(state.knowledgeTopics?.length);
     case 'cards':
-      return Boolean(state.knowledgeCards?.length) || state.knowledgePackages.some(kp => kp.note);
+      return Boolean(state.knowledgeCards?.length);
     case 'notes':
       return Boolean(
         state.courseMasterNote ||
         state.chapterNotes?.length ||
-        state.topicSyntheses?.length ||
-        state.knowledgePackages.some(kp => kp.note !== undefined && kp.note !== null),
+        state.topicSyntheses?.length,
       );
     default:
       return false;
@@ -121,11 +106,7 @@ export function isStageFailed(stage: ProductStage, state: ProductStateSnapshot):
     return state.structureExtractionStatus === 'failed';
   }
   if (stage === 'notes') {
-    if (state.courseMasterNote?.status === 'failed') return true;
-    // 有失败的知识点且没有成功的笔记
-    const hasNotes = state.knowledgePackages.some(kp => kp.note);
-    const hasFailed = state.knowledgePackages.some(kp => kp.topic.noteStatus === 'failed');
-    return hasFailed && !hasNotes;
+    return state.courseMasterNote?.status === 'failed';
   }
   return false;
 }
@@ -206,84 +187,6 @@ export function canNavigateToStage(
     mode: 'edit',
     invalidatedResources: [],
     requiresConfirmation: false,
-  };
-}
-
-/**
- * 获取编辑影响的预览
- */
-export function getInvalidationPreview(
-  fromStage: ProductStage,
-  state: { topics: CourseTopic[]; knowledgePackages: KnowledgePackage[] },
-): {
-  affectedTopicIds: string[];
-  affectedPackageIds: string[];
-  description: string;
-} {
-  if (fromStage === 'document') {
-    // 编辑证据 → 影响所有知识点和笔记
-    return {
-      affectedTopicIds: state.topics.map(t => t.id),
-      affectedPackageIds: state.knowledgePackages.map(kp => kp.id),
-      description: '修改课件证据后，现有知识结构和笔记需要重新生成。当前结果不会立即删除，而会标记为"需要更新"。',
-    };
-  }
-
-  if (fromStage === 'structure') {
-    // 编辑知识结构 → 只影响笔记
-    return {
-      affectedTopicIds: state.topics.map(t => t.id),
-      affectedPackageIds: state.knowledgePackages.map(kp => kp.id),
-      description: '修改知识结构后，相关笔记需要重新生成。当前结果不会立即删除，而会标记为"需要更新"。',
-    };
-  }
-
-  return {
-    affectedTopicIds: [],
-    affectedPackageIds: [],
-    description: '',
-  };
-}
-
-// ============== Stale 标记创建器 ==============
-
-export function createEvidenceEditStaleMarker(
-  topics: CourseTopic[],
-  knowledgePackages: KnowledgePackage[],
-): StaleMarker {
-  return {
-    reason: 'evidence-edited',
-    affectedTopicIds: topics.map(t => t.id),
-    affectedPackageIds: knowledgePackages.map(kp => kp.id),
-    timestamp: Date.now(),
-  };
-}
-
-export function createStructureEditStaleMarker(
-  topicIds: string[],
-  knowledgePackages: KnowledgePackage[],
-): StaleMarker {
-  return {
-    reason: 'structure-edited',
-    affectedTopicIds: topicIds,
-    affectedPackageIds: knowledgePackages
-      .filter(kp => topicIds.includes(kp.topic.id))
-      .map(kp => kp.id),
-    timestamp: Date.now(),
-  };
-}
-
-export function createTopicEditStaleMarker(
-  topicId: string,
-  knowledgePackages: KnowledgePackage[],
-): StaleMarker {
-  return {
-    reason: 'topic-edited',
-    affectedTopicIds: [topicId],
-    affectedPackageIds: knowledgePackages
-      .filter(kp => kp.topic.id === topicId)
-      .map(kp => kp.id),
-    timestamp: Date.now(),
   };
 }
 
