@@ -1,5 +1,7 @@
 # 知纲 - 课件编译器
 
+[![CI](https://github.com/lingchuan2024/zhigang-courseware-compiler/actions/workflows/ci.yml/badge.svg)](https://github.com/lingchuan2024/zhigang-courseware-compiler/actions/workflows/ci.yml)
+
 知纲不是把 PPT/PDF 直接总结成 Markdown 的工具，而是一个"课件编译器"：
 
 ```
