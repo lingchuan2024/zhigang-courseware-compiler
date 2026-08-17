@@ -1,0 +1,14 @@
+README.md
+  h_da6fd0bc394304 6,9-10,14-19,21,23-30,32-33,35,37-38,40-41,47-51,54,56-57,59,61-63,65,67-68,70-71,73,75,77-82,86-91,95-101,107-131,133-136,142
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "645c3a2ac4ea724e34178342d1228f4de4b33abe",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
