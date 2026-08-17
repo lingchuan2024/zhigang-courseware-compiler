@@ -1,0 +1,20 @@
+src/App.tsx
+  h_da6fd0bc394304 7,105
+src/components/KnowledgeStructureView.tsx
+  h_da6fd0bc394304 53-54,57-58,60,66-71,73
+src/components/__tests__/LibraryNavigation.test.tsx
+  h_da6fd0bc394304 191
+src/components/__tests__/MasterNoteView.test.tsx
+  h_da6fd0bc394304 15,55,69
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "6529c8fa15b1d30dd19d12e100df670adea779d3",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
