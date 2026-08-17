@@ -1,0 +1,20 @@
+pnpm-workspace.yaml
+  h_da6fd0bc394304 1-2
+src/lib/__tests__/source-markdown-normalizer.test.ts
+  h_da6fd0bc394304 2
+src/lib/markdown-parser.ts
+  h_da6fd0bc394304 12
+src/lib/source-preview.ts
+  h_da6fd0bc394304 2
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "27c48d3c071dad8b1c7552cb07f03da02e1afbca",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
