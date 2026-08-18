@@ -1,0 +1,16 @@
+README.md
+  h_da6fd0bc394304 96
+docs/plans/2026-08-17-cleanup-and-next-phase-plan.md
+  h_da6fd0bc394304 4,18-24
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "0f04bb11c8f2e784613a584f4047ebfcc26dc231",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
