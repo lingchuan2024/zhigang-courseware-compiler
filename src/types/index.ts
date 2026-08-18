@@ -433,13 +433,16 @@ export type StaleReason =
   | 'evidence-edited'
   | 'structure-edited'
   | 'topic-edited'
-  | 'evidence-deleted';
+  | 'evidence-deleted'
+  | 'source-reparsed';
 
 export interface StaleMarker {
   reason: StaleReason;
   affectedTopicIds: string[];
   affectedPackageIds: string[];
   timestamp: number;
+  /** 面向用户的一句话说明（如重解析的影响摘要）。 */
+  summary?: string;
 }
 
 // ============== 导航守卫 ==============

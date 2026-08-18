@@ -9,6 +9,8 @@ interface KnowledgeNetworkCanvasProps {
   search: string;
   relationTypes?: string[];
   onCollapseExpandedGroup?: () => void;
+  /** 需要重提取的节点（重解析后原文有变化的知识点）。 */
+  staleNodeIds?: ReadonlySet<string>;
 }
 
 interface ViewBox {
@@ -70,6 +72,7 @@ export function KnowledgeNetworkCanvas({
   search,
   relationTypes,
   onCollapseExpandedGroup,
+  staleNodeIds,
 }: KnowledgeNetworkCanvasProps) {
   const filteredEdges = useMemo(() => {
     if (!relationTypes || relationTypes.length === 0) return model.edges;
@@ -335,6 +338,19 @@ export function KnowledgeNetworkCanvas({
                 </text>
                 {node.kind === 'topic' && node.importance === 'core' && (
                   <text x={position.width - 12} y="18" textAnchor="end" fontSize="10" fontWeight="700" fill="#f4d8a8">核心</text>
+                )}
+                {staleNodeIds?.has(node.id) && (
+                  <text
+                    x={position.width - 10}
+                    y={node.kind === 'topic' && node.importance === 'core' ? 34 : 20}
+                    textAnchor="end"
+                    fontSize="10"
+                    fontWeight="700"
+                    fill="#f5b544"
+                    aria-label={`${node.label} 需更新`}
+                  >
+                    需更新
+                  </text>
                 )}
               </g>
             );

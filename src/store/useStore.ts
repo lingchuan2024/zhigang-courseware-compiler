@@ -5,6 +5,7 @@ import {
   CourseDocument,
   ModelConfig,
   MinerUConfig,
+  MinerUParseResult,
   CourseGenerationMemory,
   WorkflowStage,
 } from '../types';
@@ -16,8 +17,9 @@ import { enrichKnowledgeCards } from '../lib/card-enrichment';
 import { regenerateChapterNote, runMasterNoteGeneration } from '../lib/master-note-generator';
 import { assembleCourseMasterNote, isCompletedMasterNote } from '../lib/course-master-note';
 import { createSourceDocument } from '../lib/markdown-parser';
+import { diffReparse, remapSourceRanges } from '../lib/reparse-diff';
 import { loadDocumentSource } from '../lib/document-source';
-import { runMinerUParse } from '../lib/mineru-client';
+import { runMinerUParse, type MinerUParseOutput } from '../lib/mineru-client';
 import {
   IDLE_PROGRESS,
   createStructureExtractionProgress,
@@ -110,6 +112,88 @@ interface AppState extends ProjectState {
   startMasterNoteGeneration: () => Promise<void>;
   retryChapterNote: (chapterId: string) => Promise<void>;
   resetKnowledgeBase: () => void;
+}
+
+/**
+ * 重解析结果落地（纯函数）：按内容对齐新旧文档，未受影响的主题/卡片只重映射引用，
+ * 引用内容变化的标记 stale；不再无条件清空知识产物。
+ */
+function computeReparseUpdate(
+  parsed: SourceDocument,
+  output: MinerUParseOutput,
+  sourceFileName: string,
+  state: ProjectState,
+): Partial<ProjectState> {
+  const diff = diffReparse(state.sourceDocuments, [parsed], state.knowledgeTopics);
+  const staleIds = new Set(diff.staleTopicIds);
+
+  const knowledgeTopics = state.knowledgeTopics.map(topic =>
+    staleIds.has(topic.id)
+      ? topic
+      : { ...topic, sourceRanges: remapSourceRanges(topic.sourceRanges, diff.alignment) },
+  );
+  const teachingBlocks = state.teachingBlocks.map(block =>
+    staleIds.has(block.topicId)
+      ? block
+      : { ...block, sourceRanges: remapSourceRanges(block.sourceRanges, diff.alignment) },
+  );
+  const knowledgeCards = state.knowledgeCards.map(card =>
+    staleIds.has(card.topicId)
+      ? { ...card, status: 'stale' as const }
+      : { ...card, sourceRanges: remapSourceRanges(card.sourceRanges, diff.alignment) },
+  );
+
+  // 覆盖 stale 主题的章节标记为需重写，母笔记按确定性组装降级为 partial；
+  // 未受影响的章节保留，可按章重试（retryChapterNote）。
+  const staleCards = new Set(knowledgeCards.filter(card => staleIds.has(card.topicId)).map(card => card.id));
+  const chapterNotes = state.chapterNotes.map(chapter =>
+    chapter.sourceCardIds.some(cardId => staleCards.has(cardId))
+      ? { ...chapter, status: 'stale' as const }
+      : chapter,
+  );
+  const hasStaleChapter = chapterNotes.some(chapter => chapter.status !== 'completed');
+  const courseMasterNote = hasStaleChapter && state.courseMasterNote
+    ? assembleCourseMasterNote({
+        courseId: state.document?.courseId ?? '',
+        title: state.courseMasterNote.title,
+        outline: state.courseMasterNote.outline,
+        chapterNotes,
+        knowledgeCards,
+        glossary: state.glossary,
+        formulaIndex: state.formulaCards,
+        structureVersion: state.knowledgeBaseVersions.topicStructure,
+      })
+    : state.courseMasterNote;
+
+  const hasStaleWork = diff.staleTopicIds.length > 0 || diff.newUncoveredBlockCount > 0;
+  return {
+    sourceDocuments: [parsed],
+    mineruParseResult: {
+      batchId: output.batchId,
+      status: 'completed', progress: 100, markdown: output.markdown,
+      assets: output.assets, sourceFileName, completedAt: Date.now(),
+    } as MinerUParseResult,
+    knowledgeTopics,
+    teachingBlocks,
+    knowledgeCards,
+    chapterNotes,
+    courseMasterNote,
+    staleMarker: hasStaleWork
+      ? {
+          reason: 'source-reparsed',
+          affectedTopicIds: diff.staleTopicIds,
+          affectedPackageIds: [],
+          timestamp: Date.now(),
+          summary: diff.summary,
+        }
+      : null,
+    knowledgePipelineStatus: state.knowledgeTopics.length > 0 ? 'ready' : 'idle',
+    knowledgeBaseVersions: {
+      ...state.knowledgeBaseVersions,
+      source: state.knowledgeBaseVersions.source + 1,
+      normalization: state.knowledgeBaseVersions.normalization + 1,
+    },
+  };
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -287,18 +371,7 @@ export const useStore = create<AppState>((set, get) => ({
         }),
       });
       const parsed = createSourceDocument(output.markdown, document.courseId ?? document.id, document.title);
-      set({
-        sourceDocuments: [parsed],
-        mineruParseResult: {
-          batchId: output.batchId,
-          status: 'completed', progress: 100, markdown: output.markdown,
-          assets: output.assets, sourceFileName: document.fileName, completedAt: Date.now(),
-        },
-        knowledgeTopics: [], topicRelations: [], teachingBlocks: [], teachingRelations: [],
-        courseLearningPath: null, narrativePaths: {}, knowledgeCards: [], topicNotes: [],
-        topicSyntheses: [], chapterPlan: [], chapterNotes: [], courseMasterNote: null,
-        knowledgePipelineStatus: 'idle',
-      });
+      set(computeReparseUpdate(parsed, output, document.fileName, get()));
       saveState(get());
     } catch (error) {
       fail(error instanceof Error ? error.message : String(error));

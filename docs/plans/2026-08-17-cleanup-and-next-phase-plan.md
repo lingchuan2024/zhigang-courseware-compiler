@@ -1,7 +1,14 @@
 # 知纲收敛与下阶段计划
 
 日期：2026-08-17
-状态：Phase 0 已完成（PR #2 已合并）；Phase 1 进行中（分支 `feat/persistence-and-incremental`：T1 持久化单一真相源已完成，T2 增量更新、T3 模型健壮性待做）
+状态：Phase 0 已完成（PR #2 已合并）；Phase 1 进行中（分支 `feat/persistence-and-incremental`：T1 持久化单一真相源、T2 重解析增量标记已完成，T3 模型健壮性待做）
+
+> **Phase 1 / T2 执行结果（2026-08-17）**：重跑 MinerU 不再清空知识产物——按纯内容哈希对齐新旧文档块，
+> 未受影响的主题/讲解块/卡片仅重映射引用（含 documentId 变化），引用内容变化的主题标 stale
+> （卡片 status='stale'、覆盖章节降级、母笔记重组为 partial，可按章重试）；新增未被覆盖的内容块计入
+> 提示。Sidebar 横幅与知识网节点"需更新"徽章接入真实 staleMarker。设计结论：主题级局部重提取在
+> 内容变化语义下不成立（主题划分来自全局合并），结构重提取保持全量，由 store 集成测试
+> （mock MinerU）与视图测试覆盖。
 
 > **Phase 1 / T1 执行结果（2026-08-17）**：localStorage 只保留约 100 字节的工作区指针（schema v10），
 > 项目数据唯一真相源为 IndexedDB 课程库快照；全量快照镜像改为 500ms 防抖合并写（flush 于
