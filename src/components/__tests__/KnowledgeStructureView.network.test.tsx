@@ -130,6 +130,18 @@ describe('KnowledgeStructureView two-layer network', () => {
     expect(container.textContent).not.toContain('推荐路径');
   });
 
+  it('shows block coverage from structure quality when present', () => {
+    act(() => useStore.setState({
+      structureQuality: {
+        coverageRate: 0.875, totalBlocks: 40, assignedBlocks: 35,
+        topicCount: 8, topicsWithTeachingBlocks: 8,
+      },
+    }));
+    const { container } = renderView();
+    expect(container.textContent).toContain('内容覆盖率 88%');
+    act(() => useStore.setState({ structureQuality: null }));
+  });
+
   it('marks reparse-affected topics with a stale badge', () => {
     act(() => useStore.setState({
       staleMarker: {

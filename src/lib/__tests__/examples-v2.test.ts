@@ -73,6 +73,15 @@ describe('example course (v6 fixture)', () => {
     expect(note.generatedFromStructureVersion).toBe(example.structureVersion);
   });
 
+  it('reports real structure quality computed from its own blocks', () => {
+    const quality = example.structureQuality;
+    expect(quality.totalBlocks).toBe(example.sourceDocuments[0].blocks.length);
+    expect(quality.topicCount).toBe(example.knowledgeTopics.length);
+    expect(quality.assignedBlocks).toBeGreaterThan(0);
+    expect(quality.coverageRate).toBeGreaterThan(0);
+    expect(quality.coverageRate).toBeLessThanOrEqual(1);
+  });
+
   it('provides a markdown document preview with multiple pages', () => {
     expect(example.document.fileType).toBe('markdown');
     expect(example.document.pages.length).toBeGreaterThan(5);

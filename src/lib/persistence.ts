@@ -40,7 +40,7 @@ const PERSISTED_KEYS: (keyof ProjectState)[] = [
   'topicSyntheses', 'chapterPlan', 'chapterNotes', 'courseMasterNote',
   'glossary', 'formulaCards', 'unassignedBlocks',
   'knowledgeBaseVersions', 'knowledgePipelineStatus',
-  'mineruParseResult',
+  'mineruParseResult', 'structureQuality',
 ];
 
 /** 从任意快照（可能是旧 schema 存量）中只挑出当前字段，防止已删除字段回流运行时状态。 */

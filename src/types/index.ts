@@ -478,6 +478,16 @@ export type StructureExtractionStatus =
 
 // ============== 产品流程状态快照 ==============
 
+/** 结构质量摘要 — 来自管线的校验报告，供 UI 呈现可信度。 */
+export interface StructureQuality {
+  /** 内容块覆盖率（0-1） */
+  coverageRate: number;
+  totalBlocks: number;
+  assignedBlocks: number;
+  topicCount: number;
+  topicsWithTeachingBlocks: number;
+}
+
 export interface ProductStateSnapshot {
   document: CourseDocument | null;
   structureExtractionStatus: StructureExtractionStatus;
@@ -562,6 +572,8 @@ export interface ProjectState {
   knowledgeBaseVersions: KnowledgeBaseVersions;
   /** 新架构处理状态 */
   knowledgePipelineStatus: KnowledgePipelineStatus;
+  /** 管线校验产出的结构质量摘要 */
+  structureQuality: StructureQuality | null;
 }
 // ======================================================================
 // ============== Markdown 知识库架构（V2） ==============

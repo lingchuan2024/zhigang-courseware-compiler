@@ -163,7 +163,12 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
                       <span className={`grid h-7 w-7 flex-shrink-0 place-items-center rounded-full text-xs font-bold ${active ? 'bg-celadon text-space-950' : 'bg-space-750 text-space-muted'}`}>{index + 1}</span>
                       <div className="min-w-0 flex-1">
                         <p className="line-clamp-2 text-sm font-medium leading-5">{chapter.title}</p>
-                        <p className={`mt-1 text-[11px] ${note?.status === 'failed' ? 'text-red-400' : active ? 'text-space-muted' : 'text-space-faint'}`}>{chapterStateLabel(note)}</p>
+                        <p className={`mt-1 text-[11px] ${note?.status === 'failed' ? 'text-red-400' : active ? 'text-space-muted' : 'text-space-faint'}`}>
+                          {chapterStateLabel(note)}
+                          {note?.status === 'completed' && note.sourceCardIds.length > 0 && (
+                            <span className="ml-1.5 text-space-faint">· 引用 {note.sourceCardIds.length} 张卡片</span>
+                          )}
+                        </p>
                       </div>
                     </div>
                   </button>
