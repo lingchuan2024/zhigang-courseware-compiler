@@ -1,0 +1,26 @@
+README.md
+  h_da6fd0bc394304 98
+docs/plans/2026-08-17-cleanup-and-next-phase-plan.md
+  h_da6fd0bc394304 4,13-17
+src/components/SettingsModal.tsx
+  h_da6fd0bc394304 5,37,44,160-189,209-221
+src/lib/__tests__/model-usage.test.ts
+  h_da6fd0bc394304 7,15-25,28,32-58
+src/lib/__tests__/model-v2-transient-retry.test.ts
+  h_da6fd0bc394304 1-143
+src/lib/model-usage.ts
+  h_da6fd0bc394304 38-109,112-124,148,150-162
+src/lib/model-v2.ts
+  h_da6fd0bc394304 39-51,54-59,61-65,85-86,89,92,95-108,110-139
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "03fc9df60eb3c9402d7f46f73062d77c62987647",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
