@@ -1,0 +1,28 @@
+src/components/KnowledgeStructureView.tsx
+  h_da6fd0bc394304 46,182-189
+src/components/MasterNoteView.tsx
+  h_da6fd0bc394304 166-171
+src/components/__tests__/KnowledgeStructureView.network.test.tsx
+  h_da6fd0bc394304 133-144
+src/lib/__tests__/examples-v2.test.ts
+  h_da6fd0bc394304 76-84
+src/lib/examples.ts
+  h_da6fd0bc394304 21-22,353,576-584,599
+src/lib/persistence.ts
+  h_da6fd0bc394304 43
+src/store/useStore.ts
+  h_da6fd0bc394304 15,94,118-129,204,241,506,875,921
+src/types/index.ts
+  h_da6fd0bc394304 481-490,575-576
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "54043f7279d5b2e1a63423cb52d46ee114da8180",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
