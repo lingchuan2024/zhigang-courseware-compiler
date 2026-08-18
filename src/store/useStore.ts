@@ -12,7 +12,7 @@ import {
 import type { SourceDocument } from '../types';
 import { saveState, clearState } from '../lib/persistence';
 import { createExampleCourse } from '../lib/examples';
-import { runKnowledgePipeline } from '../lib/knowledge-pipeline-v2';
+import { runKnowledgePipeline, type PipelineResultV2 } from '../lib/knowledge-pipeline-v2';
 import { enrichKnowledgeCards } from '../lib/card-enrichment';
 import { regenerateChapterNote, runMasterNoteGeneration } from '../lib/master-note-generator';
 import { assembleCourseMasterNote, isCompletedMasterNote } from '../lib/course-master-note';
@@ -91,6 +91,7 @@ const initialState: ProjectState = {
     embeddings: 0,
   },
   knowledgePipelineStatus: 'idle',
+  structureQuality: null,
 };
 
 interface AppState extends ProjectState {
@@ -112,6 +113,18 @@ interface AppState extends ProjectState {
   startMasterNoteGeneration: () => Promise<void>;
   retryChapterNote: (chapterId: string) => Promise<void>;
   resetKnowledgeBase: () => void;
+}
+
+/** 从管线校验报告提取 UI 用的结构质量摘要。 */
+function buildStructureQuality(validation: PipelineResultV2['validation'] | undefined): import('../types').StructureQuality | null {
+  if (!validation) return null;
+  return {
+    coverageRate: validation.coverage.coverageRate,
+    totalBlocks: validation.coverage.totalBlocks,
+    assignedBlocks: validation.coverage.assignedBlocks,
+    topicCount: validation.topicStats.totalTopics,
+    topicsWithTeachingBlocks: validation.topicStats.topicsWithTeachingBlocks,
+  };
 }
 
 /**
@@ -188,6 +201,7 @@ function computeReparseUpdate(
         }
       : null,
     knowledgePipelineStatus: state.knowledgeTopics.length > 0 ? 'ready' : 'idle',
+    structureQuality: null,
     knowledgeBaseVersions: {
       ...state.knowledgeBaseVersions,
       source: state.knowledgeBaseVersions.source + 1,
@@ -224,6 +238,7 @@ export const useStore = create<AppState>((set, get) => ({
       chapterNotes: [],
       courseMasterNote: null,
       knowledgePipelineStatus: 'idle',
+      structureQuality: null,
     });
     saveState(get());
   },
@@ -488,6 +503,7 @@ export const useStore = create<AppState>((set, get) => ({
         formulaCards: result.formulaCards,
         unassignedBlocks: result.unassignedBlocks,
         knowledgeBaseVersions: result.versions,
+        structureQuality: buildStructureQuality(result.validation),
         jobStatus: result.status === 'ready' ? 'completed' : 'failed',
         pipelineProgress: result.status === 'ready'
           ? completeProgress(get().pipelineProgress)
@@ -856,6 +872,7 @@ export const useStore = create<AppState>((set, get) => ({
       formulaCards: [],
       unassignedBlocks: [],
       knowledgePipelineStatus: 'idle',
+      structureQuality: null,
       knowledgeBaseVersions: {
         source: 0,
         normalization: 0,
@@ -901,6 +918,7 @@ export const useStore = create<AppState>((set, get) => ({
         notes: example.courseMasterNote.chapters.length,
         embeddings: 0,
       },
+      structureQuality: example.structureQuality,
       stage: 'structure',
       job: null,
       jobStatus: 'completed',

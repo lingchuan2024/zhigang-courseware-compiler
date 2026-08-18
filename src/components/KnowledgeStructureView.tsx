@@ -43,6 +43,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const pipelineProgress = useStore(state => state.pipelineProgress);
   const navigateToStage = useStore(state => state.navigateToStage);
   const staleMarker = useStore(state => state.staleMarker);
+  const structureQuality = useStore(state => state.structureQuality);
 
   const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -178,6 +179,14 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
             </div>
             <p className="mt-1 text-xs text-space-muted">
               {courseNetwork.nodes.length} 个核心知识 · {courseNetwork.edges.length} 个课程关系
+              {structureQuality && (
+                <span
+                  className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${structureQuality.coverageRate >= 0.9 ? 'bg-celadon/12 text-celadon-light' : 'bg-amber-400/12 text-amber-300'}`}
+                  title={`内容块分配到知识结构的比例（${structureQuality.assignedBlocks}/${structureQuality.totalBlocks} 块）`}
+                >
+                  内容覆盖率 {Math.round(structureQuality.coverageRate * 100)}%
+                </span>
+              )}
               {staleMarker?.reason === 'source-reparsed' && staleNodeIds.size > 0 && (
                 <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[11px] text-amber-300">
                   重解析：{staleNodeIds.size} 个知识点需更新

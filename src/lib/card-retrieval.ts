@@ -93,6 +93,13 @@ function scoreRecord(terms: string[], record: RetrievalRecord): { score: number;
   return { score, matchedTerms };
 }
 
+function compareHits(a: KnowledgeCardSearchHit, b: KnowledgeCardSearchHit): number {
+  if (b.score !== a.score) return b.score - a.score;
+  const rank = (hit: KnowledgeCardSearchHit) => (hit.origin === 'lexical' ? 0 : 1);
+  if (rank(a) !== rank(b)) return rank(a) - rank(b);
+  return a.record.cardId.localeCompare(b.record.cardId);
+}
+
 export function searchKnowledgeCards(
   query: string,
   records: RetrievalRecord[],
@@ -143,7 +150,7 @@ export function searchKnowledgeCards(
   }
 
   return [...expanded.values()]
-    .sort((a, b) => b.score - a.score || (a.origin === 'lexical' ? -1 : 1) || a.record.cardId.localeCompare(b.record.cardId))
+    .sort(compareHits)
     .slice(0, options.limit ?? 8);
 }
 
@@ -153,8 +160,34 @@ export function searchKnowledgeCardsWithContext(
   records: RetrievalRecord[],
   options: KnowledgeCardSearchOptions = {},
 ): KnowledgeCardSearchHit[] {
+  return searchKnowledgeCardsWithQueries([question], history, records, options);
+}
+
+/**
+ * 多查询检索（查询改写后使用）：对每个查询独立打分，按卡片取最高分合并，
+ * 再走与单查询相同的历史席位策略。
+ */
+export function searchKnowledgeCardsWithQueries(
+  queries: string[],
+  history: ChatHistoryTurn[],
+  records: RetrievalRecord[],
+  options: KnowledgeCardSearchOptions = {},
+): KnowledgeCardSearchHit[] {
   const limit = options.limit ?? 8;
   if (limit <= 0) return [];
+  const activeQueries = queries.map(query => query.trim()).filter(Boolean);
+
+  // 逐查询取词法命中（含一跳图扩展），同卡片保留最高分，来源记为最优查询
+  const bestByCard = new Map<string, KnowledgeCardSearchHit>();
+  for (const query of activeQueries) {
+    for (const hit of searchKnowledgeCards(query, records, { ...options, limit })) {
+      const current = bestByCard.get(hit.record.cardId);
+      if (!current || hit.score > current.score) bestByCard.set(hit.record.cardId, hit);
+    }
+  }
+  const currentHits = [...bestByCard.values()]
+    .sort(compareHits)
+    .slice(0, limit);
 
   const recentQuestions = history
     .filter(turn => turn.role === 'user')
@@ -162,7 +195,6 @@ export function searchKnowledgeCardsWithContext(
     .filter(Boolean)
     .slice(-2)
     .reverse();
-  const currentHits = searchKnowledgeCards(question, records, { ...options, limit });
   if (limit === 1 || recentQuestions.length === 0) return currentHits;
 
   const reservedHistoryLimit = Math.min(2, Math.max(1, Math.floor(limit / 3)));

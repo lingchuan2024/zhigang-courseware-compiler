@@ -25,6 +25,15 @@ import {
   type QaAnswerer,
 } from '../useQaStore';
 
+vi.mock('../../lib/query-rewrite', () => ({
+  buildVocabulary: () => [],
+  rewriteQueryForRetrieval: async (_config: unknown, question: string) => ({
+    queries: [question.trim()],
+    rewritten: false,
+  }),
+}));
+
+
 const config: ModelConfig = {
   endpoint: 'https://example.test/v1',
   model: 'test-model',

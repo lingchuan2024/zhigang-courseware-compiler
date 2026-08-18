@@ -217,6 +217,7 @@ const TASK_LABELS: Record<string, string> = {
   'topic-candidate-extraction': '候选提取',
   'topic-granularity-judgment': '粒度判定',
   'topic-quality-repair': '质量修复',
+  'query-rewrite': '查询改写',
 };
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

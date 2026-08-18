@@ -18,6 +18,8 @@ import {
 import { generateId } from './utils';
 import { createSourceDocument } from './markdown-parser';
 import { assembleCourseMasterNote, planFallbackChapters } from './course-master-note';
+import { validateKnowledgeStructure } from './knowledge-validation';
+import type { StructureQuality } from '../types';
 
 // 示例课件：与真实流程一致，先有 Markdown 源文档，再挂知识结构与卡片。
 // 数据为手工固化的 v6 结构（无 AI 也能完整演示知识网、卡片、母笔记）。
@@ -348,6 +350,7 @@ export interface ExampleCourse {
   formulaCards: FormulaCard[];
   courseMasterNote: CourseMasterNote;
   structureVersion: number;
+  structureQuality: StructureQuality;
 }
 
 /** courseId 传入时（工作区内加载示例）文档与知识产物挂到该课程空间，刷新后可从课件库恢复。 */
@@ -570,6 +573,15 @@ export function createExampleCourse(courseId?: string): ExampleCourse {
     uploadedAt: Date.now(),
   };
 
+  const validation = validateKnowledgeStructure(doc.blocks, topics, teachingBlocks, topicRelations, []);
+  const structureQuality: StructureQuality = {
+    coverageRate: validation.coverage.coverageRate,
+    totalBlocks: validation.coverage.totalBlocks,
+    assignedBlocks: validation.coverage.assignedBlocks,
+    topicCount: validation.topicStats.totalTopics,
+    topicsWithTeachingBlocks: validation.topicStats.topicsWithTeachingBlocks,
+  };
+
   return {
     document,
     sourceDocuments: [doc],
@@ -584,5 +596,6 @@ export function createExampleCourse(courseId?: string): ExampleCourse {
     formulaCards,
     courseMasterNote,
     structureVersion,
+    structureQuality,
   };
 }
