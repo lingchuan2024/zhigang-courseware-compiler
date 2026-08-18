@@ -35,8 +35,93 @@ export interface CompletionResult<T> {
 
 const usageRecords: ModelUsage[] = [];
 
+// ========== 累计用量持久化（跨会话，localStorage 小聚合，不含内容） ==========
+
+const USAGE_STORAGE_KEY = 'zhigang_model_usage';
+
+interface PersistedTaskAggregate {
+  taskType: ModelTaskType;
+  model: string;
+  callCount: number;
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalCacheHitTokens: number;
+  totalCacheMissTokens: number;
+  totalDurationMs: number;
+  updatedAt: number;
+}
+
+interface PersistedUsage {
+  schemaVersion: 1;
+  tasks: PersistedTaskAggregate[];
+  updatedAt: number;
+}
+
+function readPersistedUsage(): PersistedUsage {
+  try {
+    const raw = localStorage.getItem(USAGE_STORAGE_KEY);
+    if (!raw) return { schemaVersion: 1, tasks: [], updatedAt: 0 };
+    const parsed = JSON.parse(raw) as PersistedUsage;
+    if (parsed.schemaVersion !== 1 || !Array.isArray(parsed.tasks)) {
+      return { schemaVersion: 1, tasks: [], updatedAt: 0 };
+    }
+    return parsed;
+  } catch {
+    return { schemaVersion: 1, tasks: [], updatedAt: 0 };
+  }
+}
+
+function writePersistedUsage(store: PersistedUsage): void {
+  try {
+    localStorage.setItem(USAGE_STORAGE_KEY, JSON.stringify(store));
+  } catch (error) {
+    console.warn('Failed to persist model usage:', error);
+  }
+}
+
+function accumulateUsage(store: PersistedUsage, usage: ModelUsage): void {
+  const existing = store.tasks.find(
+    item => item.taskType === usage.taskType && item.model === usage.model,
+  );
+  if (existing) {
+    existing.callCount += 1;
+    existing.totalPromptTokens += usage.promptTokens ?? 0;
+    existing.totalCompletionTokens += usage.completionTokens ?? 0;
+    existing.totalCacheHitTokens += usage.promptCacheHitTokens ?? 0;
+    existing.totalCacheMissTokens += usage.promptCacheMissTokens ?? 0;
+    existing.totalDurationMs += usage.durationMs;
+    existing.updatedAt = Date.now();
+  } else {
+    store.tasks.push({
+      taskType: usage.taskType,
+      model: usage.model,
+      callCount: 1,
+      totalPromptTokens: usage.promptTokens ?? 0,
+      totalCompletionTokens: usage.completionTokens ?? 0,
+      totalCacheHitTokens: usage.promptCacheHitTokens ?? 0,
+      totalCacheMissTokens: usage.promptCacheMissTokens ?? 0,
+      totalDurationMs: usage.durationMs,
+      updatedAt: Date.now(),
+    });
+  }
+  store.updatedAt = Date.now();
+}
+
 export function recordUsage(usage: ModelUsage): void {
   usageRecords.push(usage);
+  const store = readPersistedUsage();
+  accumulateUsage(store, usage);
+  writePersistedUsage(store);
+}
+
+/** 清空累计用量统计（含本机持久化数据）。 */
+export function resetUsageStats(): void {
+  usageRecords.length = 0;
+  try {
+    localStorage.removeItem(USAGE_STORAGE_KEY);
+  } catch (error) {
+    console.warn('Failed to clear model usage:', error);
+  }
 }
 
 export function getUsageRecords(): ModelUsage[] {
@@ -60,43 +145,21 @@ export interface TaskUsageSummary {
   totalDurationMs: number;
 }
 
+/** 按任务返回累计用量（跨会话持久化，而非仅本次运行）。 */
 export function getUsageSummaryByTask(): TaskUsageSummary[] {
-  const taskGroups = new Map<ModelTaskType, ModelUsage[]>();
-
-  for (const record of usageRecords) {
-    const group = taskGroups.get(record.taskType) || [];
-    group.push(record);
-    taskGroups.set(record.taskType, group);
-  }
-
-  const summaries: TaskUsageSummary[] = [];
-
-  for (const [taskType, records] of taskGroups) {
-    const callCount = records.length;
-    const totalPromptTokens = records.reduce((sum, r) => sum + (r.promptTokens ?? 0), 0);
-    const totalCompletionTokens = records.reduce((sum, r) => sum + (r.completionTokens ?? 0), 0);
-    const totalCacheHitTokens = records.reduce((sum, r) => sum + (r.promptCacheHitTokens ?? 0), 0);
-    const totalCacheMissTokens = records.reduce((sum, r) => sum + (r.promptCacheMissTokens ?? 0), 0);
-    const totalDurationMs = records.reduce((sum, r) => sum + r.durationMs, 0);
-
-    const overallCacheHitRate =
-      totalCacheHitTokens + totalCacheMissTokens > 0
-        ? totalCacheHitTokens / (totalCacheHitTokens + totalCacheMissTokens)
-        : undefined;
-
-    summaries.push({
-      taskType,
-      callCount,
-      totalPromptTokens,
-      totalCompletionTokens,
-      totalCacheHitTokens,
-      totalCacheMissTokens,
-      overallCacheHitRate,
-      totalDurationMs,
-    });
-  }
-
-  return summaries;
+  return readPersistedUsage().tasks.map(item => ({
+    taskType: item.taskType,
+    callCount: item.callCount,
+    totalPromptTokens: item.totalPromptTokens,
+    totalCompletionTokens: item.totalCompletionTokens,
+    totalCacheHitTokens: item.totalCacheHitTokens,
+    totalCacheMissTokens: item.totalCacheMissTokens,
+    overallCacheHitRate:
+      item.totalCacheHitTokens + item.totalCacheMissTokens > 0
+        ? item.totalCacheHitTokens / (item.totalCacheHitTokens + item.totalCacheMissTokens)
+        : undefined,
+    totalDurationMs: item.totalDurationMs,
+  }));
 }
 
 // ========== Usage Extraction ==========

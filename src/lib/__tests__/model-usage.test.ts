@@ -4,6 +4,7 @@ import {
   recordUsage,
   getUsageRecords,
   clearUsageRecords,
+  resetUsageStats,
   getUsageSummaryByTask,
   formatUsageForDisplay,
   formatSummaryForDisplay,
@@ -11,13 +12,50 @@ import {
   type ModelTaskType,
 } from '../model-usage';
 
+const localStorageValues = new Map<string, string>();
+Object.defineProperty(globalThis, 'localStorage', {
+  configurable: true,
+  value: {
+    getItem: (key: string) => localStorageValues.get(key) ?? null,
+    setItem: (key: string, value: string) => localStorageValues.set(key, value),
+    removeItem: (key: string) => localStorageValues.delete(key),
+    clear: () => localStorageValues.clear(),
+  },
+});
+
 describe('model-usage', () => {
   beforeEach(() => {
-    clearUsageRecords();
+    resetUsageStats();
   });
 
   afterEach(() => {
-    clearUsageRecords();
+    resetUsageStats();
+  });
+
+  describe('累计用量持久化', () => {
+    it('清空内存记录后，累计汇总仍可从本机存储恢复', () => {
+      const usage: ModelUsage = {
+        promptTokens: 100, completionTokens: 40, totalTokens: 140,
+        promptCacheHitTokens: 60, promptCacheMissTokens: 40, cacheHitRate: 0.6,
+        durationMs: 1200, model: 'deepseek-chat', taskType: 'note-generation',
+        promptVersion: 'v1',
+      };
+      recordUsage(usage);
+      recordUsage(usage);
+
+      // 模拟刷新：内存记录清空，仅剩持久化数据
+      clearUsageRecords();
+      expect(getUsageRecords()).toEqual([]);
+
+      const summary = getUsageSummaryByTask();
+      expect(summary).toHaveLength(1);
+      expect(summary[0].callCount).toBe(2);
+      expect(summary[0].totalPromptTokens).toBe(200);
+      expect(summary[0].overallCacheHitRate).toBeCloseTo(0.6);
+
+      resetUsageStats();
+      expect(getUsageSummaryByTask()).toEqual([]);
+    });
   });
 
   // Helper: build a DeepSeek-style API response
