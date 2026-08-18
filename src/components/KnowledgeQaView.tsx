@@ -411,6 +411,12 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                         </section>
                       ))}
 
+                      {message.retrievalQueries && message.retrievalQueries.length > 1 && (
+                        <p className="mt-3 text-[11px] text-space-faint">
+                          检索：{message.retrievalQueries.join(' · ')}
+                        </p>
+                      )}
+
                       {(message.status === 'failed' || message.status === 'interrupted') && (
                         <div className="rounded-2xl border border-cinnabar/20 bg-cinnabar/5 p-4">
                           <p className="font-song text-base font-bold text-cinnabar">回答未完成</p>

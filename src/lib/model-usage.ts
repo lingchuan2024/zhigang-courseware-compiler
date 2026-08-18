@@ -10,7 +10,8 @@ export type ModelTaskType =
   | 'topic-merge'
   | 'topic-candidate-extraction'
   | 'topic-granularity-judgment'
-  | 'topic-quality-repair';
+  | 'topic-quality-repair'
+  | 'query-rewrite';
 
 export interface ModelUsage {
   promptTokens: number | undefined;

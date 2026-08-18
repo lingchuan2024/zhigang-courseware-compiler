@@ -16,6 +16,15 @@ import { useStore } from '../../store/useStore';
 import type { ChatMessage, RagAnswer } from '../../types';
 import { KnowledgeQaView } from '../KnowledgeQaView';
 
+vi.mock('../../lib/query-rewrite', () => ({
+  buildVocabulary: () => [],
+  rewriteQueryForRetrieval: async (_config: unknown, question: string) => ({
+    queries: [question.trim()],
+    rewritten: false,
+  }),
+}));
+
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const initialQaState = {

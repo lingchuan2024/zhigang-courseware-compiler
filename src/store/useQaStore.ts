@@ -9,9 +9,10 @@ import type {
 } from '../types';
 import { answerWithKnowledgeCards } from '../lib/card-rag';
 import {
-  searchKnowledgeCardsWithContext,
+  searchKnowledgeCardsWithQueries,
   type KnowledgeCardSearchHit,
 } from '../lib/card-retrieval';
+import { buildVocabulary, rewriteQueryForRetrieval } from '../lib/query-rewrite';
 import * as repository from '../lib/library-repository';
 import {
   createCitationSnapshots,
@@ -352,8 +353,15 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
       repository.listLibraryDocuments(),
     ]);
     assertGenerationActive(conversationId, token);
-    const hits = searchKnowledgeCardsWithContext(
+    // 查询改写（纯增强：无 Key 或失败时仅用原问题检索）
+    const rewrite = await rewriteQueryForRetrieval(
+      config,
       userMessage.content,
+      buildVocabulary(records),
+    );
+    assertGenerationActive(conversationId, token);
+    const hits = searchKnowledgeCardsWithQueries(
+      rewrite.queries,
       history,
       records,
       courseIds.length > 0 ? { courseIds } : {},
@@ -372,6 +380,7 @@ async function generateAnswer(input: GenerationInput): Promise<void> {
       status: 'completed',
       answer,
       citations: createCitationSnapshots(cardIds, hits, courses, documents),
+      retrievalQueries: rewrite.rewritten ? rewrite.queries : undefined,
       error: undefined,
       updatedAt: nextTimestamp(),
     };

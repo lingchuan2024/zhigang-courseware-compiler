@@ -313,6 +313,8 @@ export interface ChatMessage {
   status: ChatMessageStatus;
   answer?: RagAnswer;
   citations?: ChatCitationSnapshot[];
+  /** 本次回答实际使用的检索查询（查询改写生效时记录，首条为原始问题）。 */
+  retrievalQueries?: string[];
   error?: string;
   retryOfMessageId?: string;
   createdAt: number;
