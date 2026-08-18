@@ -130,6 +130,25 @@ describe('KnowledgeStructureView two-layer network', () => {
     expect(container.textContent).not.toContain('推荐路径');
   });
 
+  it('marks reparse-affected topics with a stale badge', () => {
+    act(() => useStore.setState({
+      staleMarker: {
+        reason: 'source-reparsed',
+        affectedTopicIds: ['t2'],
+        affectedPackageIds: [],
+        timestamp: Date.now(),
+        summary: '课件已重新解析：1 个知识点的原文有变化',
+      },
+    }));
+    const { container } = renderView();
+    expect(container.textContent).toContain('重解析：1 个知识点需更新');
+    const badge = container.querySelector('[aria-label="最大似然估计 需更新"]');
+    expect(badge).not.toBeNull();
+    // 未受影响的节点没有徽章
+    expect(container.querySelector('[aria-label="概率模型 需更新"]')).toBeNull();
+    act(() => useStore.setState({ staleMarker: null }));
+  });
+
   it('continues to knowledge cards instead of treating cards as the final note', () => {
     const { container } = renderView();
     const next = Array.from(container.querySelectorAll('button')).find(button => button.textContent?.includes('查看知识卡片'))!;

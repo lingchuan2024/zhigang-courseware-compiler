@@ -11,6 +11,18 @@ interface SidebarProps {
   onOpenSettings: () => void;
 }
 
+
+function staleLabel(marker: { reason: string; summary?: string }): string {
+  if (marker.summary) return marker.summary;
+  switch (marker.reason) {
+    case 'evidence-edited': return '课件证据已修改，知识结构和笔记需要重新生成';
+    case 'structure-edited': return '知识结构已修改，笔记需要重新生成';
+    case 'topic-edited': return '知识点已修改，相关笔记需要重新生成';
+    case 'source-reparsed': return '课件已重新解析，相关内容需要重新生成';
+    default: return '';
+  }
+}
+
 export function Sidebar({ onOpenSettings }: SidebarProps) {
   const navigateLibrary = useLibraryStore(state => state.navigate);
   const refreshLibrary = useLibraryStore(state => state.refresh);
@@ -183,11 +195,12 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         {staleMarker && (
           <div className="mt-4 bg-amber-400/10 border border-amber-400/30 rounded-lg p-3">
             <p className="text-xs font-ui text-amber-400/90 mb-1">数据已修改</p>
-            <p className="text-xs text-amber-400/60">
-              {staleMarker.reason === 'evidence-edited' && '课件证据已修改，知识结构和笔记需要重新生成'}
-              {staleMarker.reason === 'structure-edited' && '知识结构已修改，笔记需要重新生成'}
-              {staleMarker.reason === 'topic-edited' && '知识点已修改，相关笔记需要重新生成'}
-            </p>
+            <p className="text-xs text-amber-400/60">{staleLabel(staleMarker)}</p>
+            {staleMarker.reason === 'source-reparsed' && staleMarker.affectedTopicIds.length > 0 && (
+              <p className="mt-1 text-[11px] text-amber-400/45">
+                受影响知识点 {staleMarker.affectedTopicIds.length} 个 · 在知识结构中会以"需更新"标出
+              </p>
+            )}
           </div>
         )}
 

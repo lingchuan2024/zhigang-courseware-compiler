@@ -1,14 +1,23 @@
 import {
   ProjectState,
-  ProductStage,
 } from '../types';
 import { replaceDocumentRetrievalRecords, saveLibraryProjectSnapshot, upsertLibraryDocument } from './library-repository';
 import { buildRetrievalRecords } from './card-retrieval';
 
-const STORAGE_KEY = 'zhigang_project_state';
+// v10 持久化模型：项目数据唯一真相源是 IndexedDB 课程库快照，
+// localStorage 只保留一个轻量"工作区指针"（当前打开的课件），
+// 模型/MinerU 配置仍由 model-config-storage 的独立 key 保存。
 
-// v9：只持久化 v6 Markdown 架构字段。v8 及更早的 localStorage 数据
-// 含 v1/v2-5 遗留结构，加载时直接丢弃（无存量用户，不做迁移）。
+const POINTER_KEY = 'zhigang_workspace_pointer';
+/** v9 及以前的全量状态 key，启动时一次性清除。 */
+const LEGACY_STATE_KEY = 'zhigang_project_state';
+const MIRROR_DEBOUNCE_MS = 500;
+
+interface WorkspacePointer {
+  schemaVersion: 10;
+  documentId: string;
+  courseId: string;
+}
 
 // 清除页面preview data URL以减小存储体积
 function stripPreviews<T extends { preview?: string } | undefined>(obj: T): T {
@@ -18,7 +27,7 @@ function stripPreviews<T extends { preview?: string } | undefined>(obj: T): T {
   return result;
 }
 
-// v6 持久化字段（不包含API Key，不包含大图片预览）
+// 快照字段白名单（不含 API Key，不含大图片预览）
 const PERSISTED_KEYS: (keyof ProjectState)[] = [
   'stage', 'job', 'jobStatus',
   'document',
@@ -43,151 +52,150 @@ export function pickPersistedFields(snapshot: Record<string, unknown>): Partial<
   return picked as Partial<ProjectState>;
 }
 
-// 保存状态到localStorage
-export function saveState(state: Partial<ProjectState>): void {
+/** 记录当前工作区指针（很小，直接同步写；供刷新后定位最近打开的课件）。 */
+export function writeWorkspacePointer(documentId: string, courseId: string): void {
   try {
-    const toSave: Record<string, unknown> = {
-      schemaVersion: 9,
-    };
+    const pointer: WorkspacePointer = { schemaVersion: 10, documentId, courseId };
+    localStorage.setItem(POINTER_KEY, JSON.stringify(pointer));
+  } catch (error) {
+    console.warn('Failed to write workspace pointer:', error);
+  }
+}
 
-    for (const key of PERSISTED_KEYS) {
-      if (key in state) {
-        if (key === 'document' && state.document) {
-          toSave[key] = {
-            ...state.document,
-            pages: state.document.pages.map(p => stripPreviews(p)),
-          };
-        } else {
-          toSave[key] = state[key];
-        }
+function clearWorkspacePointer(): void {
+  try {
+    localStorage.removeItem(POINTER_KEY);
+  } catch (error) {
+    console.warn('Failed to clear workspace pointer:', error);
+  }
+}
+
+/** 清除 v9 及以前遗留在 localStorage 的全量项目状态（数据已镜像在 IndexedDB 课程库）。 */
+export function cleanupLegacyStorage(): void {
+  try {
+    localStorage.removeItem(LEGACY_STATE_KEY);
+  } catch (error) {
+    console.warn('Failed to clean legacy storage:', error);
+  }
+}
+
+async function mirrorToLibrary(state: Partial<ProjectState>): Promise<void> {
+  const activeDocument = state.document;
+  if (!activeDocument?.courseId) return;
+
+  const toSave: Record<string, unknown> = {};
+  for (const key of PERSISTED_KEYS) {
+    if (key in state) {
+      if (key === 'document' && state.document) {
+        toSave[key] = {
+          ...state.document,
+          pages: state.document.pages.map(p => stripPreviews(p)),
+        };
+      } else {
+        toSave[key] = state[key];
       }
     }
-    // 如果 job 是 running，保存时降级为 idle（刷新后不恢复 running 状态）
-    if (toSave.jobStatus === 'running') {
-      toSave.job = null;
-      toSave.jobStatus = 'idle';
-    }
+  }
+  // 运行中的任务刷新后不恢复为 running
+  if (toSave.jobStatus === 'running') {
+    toSave.job = null;
+    toSave.jobStatus = 'idle';
+  }
 
-    const activeDocument = state.document;
-    if (activeDocument?.courseId) {
-      const updatedAt = Date.now();
-      void Promise.all([
-        upsertLibraryDocument({
-          id: activeDocument.id,
-          courseId: activeDocument.courseId,
-          title: activeDocument.title,
-          fileName: activeDocument.fileName,
-          fileType: activeDocument.fileType ?? 'markdown',
-          pageCount: activeDocument.pages.length,
-          stage: state.stage ?? 'upload',
-          status: state.jobStatus === 'failed'
-            ? 'failed'
-            : state.jobStatus === 'running'
-              ? 'processing'
-              : state.stage === 'cards' || state.stage === 'notes'
-                ? 'ready'
-                : 'new',
-          uploadedAt: activeDocument.uploadedAt,
-          updatedAt,
-          cardCount: state.knowledgeCards?.length ?? 0,
-        }),
-        saveLibraryProjectSnapshot(
-          activeDocument.courseId,
-          activeDocument.id,
-          toSave as Partial<ProjectState>,
-        ),
-        replaceDocumentRetrievalRecords(
-          activeDocument.id,
-          buildRetrievalRecords(state.knowledgeCards ?? [], activeDocument.id, activeDocument.courseId),
-        ),
-      ]).catch(error => console.warn('Unable to mirror project into course library:', error));
-    }
+  const updatedAt = Date.now();
+  await Promise.all([
+    upsertLibraryDocument({
+      id: activeDocument.id,
+      courseId: activeDocument.courseId,
+      title: activeDocument.title,
+      fileName: activeDocument.fileName,
+      fileType: activeDocument.fileType ?? 'markdown',
+      pageCount: activeDocument.pages.length,
+      stage: state.stage ?? 'upload',
+      status: state.jobStatus === 'failed'
+        ? 'failed'
+        : state.jobStatus === 'running'
+          ? 'processing'
+          : state.stage === 'cards' || state.stage === 'notes'
+            ? 'ready'
+            : 'new',
+      uploadedAt: activeDocument.uploadedAt,
+      updatedAt,
+      cardCount: state.knowledgeCards?.length ?? 0,
+    }),
+    saveLibraryProjectSnapshot(
+      activeDocument.courseId,
+      activeDocument.id,
+      toSave as Partial<ProjectState>,
+    ),
+    replaceDocumentRetrievalRecords(
+      activeDocument.id,
+      buildRetrievalRecords(state.knowledgeCards ?? [], activeDocument.id, activeDocument.courseId),
+    ),
+  ]);
+}
 
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(toSave));
-  } catch (error) {
-    console.warn('Failed to save state:', error);
+// ============== 防抖镜像 ==============
+// 生成过程会连续触发多次保存；全量快照序列化较重，合并为最后一次状态的单次写入。
+
+let pendingState: Partial<ProjectState> | null = null;
+let mirrorTimer: ReturnType<typeof setTimeout> | null = null;
+let flushing: Promise<void> | null = null;
+
+function scheduleMirror(state: Partial<ProjectState>): void {
+  pendingState = state;
+  if (mirrorTimer !== null) return;
+  mirrorTimer = setTimeout(() => {
+    mirrorTimer = null;
+    void flushPendingSaves();
+  }, MIRROR_DEBOUNCE_MS);
+}
+
+/** 立即执行待写的镜像（也用于 beforeunload / 测试断言前）。 */
+export async function flushPendingSaves(): Promise<void> {
+  if (flushing) return flushing;
+  const state = pendingState;
+  pendingState = null;
+  flushing = mirrorToLibrary(state ?? {}).finally(() => {
+    flushing = null;
+  });
+  return flushing;
+}
+
+/** 丢弃未写入的镜像（重置时避免把旧状态写回课程库）。 */
+export function cancelPendingSaves(): void {
+  pendingState = null;
+  if (mirrorTimer !== null) {
+    clearTimeout(mirrorTimer);
+    mirrorTimer = null;
   }
 }
 
-function applyDefaults(result: Partial<ProjectState>): Partial<ProjectState> {
-  if (result.job === undefined) result.job = null;
-  if (result.jobStatus === undefined) result.jobStatus = 'idle';
-  if (result.staleMarker === undefined) result.staleMarker = null;
-  if (result.structureExtractionStatus === undefined) result.structureExtractionStatus = 'idle';
-  if (!result.extractionErrors) result.extractionErrors = [];
-  if (!result.sourceDocuments) result.sourceDocuments = [];
-  if (!result.knowledgeTopics) result.knowledgeTopics = [];
-  if (!result.topicRelations) result.topicRelations = [];
-  if (!result.teachingBlocks) result.teachingBlocks = [];
-  if (!result.teachingRelations) result.teachingRelations = [];
-  if (result.courseLearningPath === undefined) result.courseLearningPath = null;
-  if (!result.narrativePaths) result.narrativePaths = {};
-  if (!result.knowledgeCards) result.knowledgeCards = [];
-  if (!result.topicNotes) result.topicNotes = [];
-  if (!result.topicSyntheses) result.topicSyntheses = [];
-  if (!result.chapterPlan) result.chapterPlan = [];
-  if (!result.chapterNotes) result.chapterNotes = [];
-  if (result.courseMasterNote === undefined) result.courseMasterNote = null;
-  if (!result.glossary) result.glossary = [];
-  if (!result.formulaCards) result.formulaCards = [];
-  if (!result.unassignedBlocks) result.unassignedBlocks = [];
-  if (!result.knowledgeBaseVersions) {
-    result.knowledgeBaseVersions = {
-      source: 0, normalization: 0, topicStructure: 0,
-      teachingStructure: 0, ordering: 0, cards: 0, notes: 0, embeddings: 0,
-    };
-  }
-  if (!result.knowledgePipelineStatus) result.knowledgePipelineStatus = 'idle';
-  if (result.mineruParseResult === undefined) result.mineruParseResult = null;
-  return result;
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    if (pendingState) void flushPendingSaves();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && pendingState) void flushPendingSaves();
+  });
 }
 
-// 从localStorage加载状态
-export function loadState(): Partial<ProjectState> | null {
-  try {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return null;
-
-    const parsed = JSON.parse(saved) as Record<string, unknown> & { schemaVersion?: number };
-    // v9 之前的持久化数据包含已删除的 v1/v2-5 结构，直接丢弃。
-    if ((parsed.schemaVersion as number | undefined) !== 9) {
-      return null;
-    }
-
-    const stage = parsed.stage as ProductStage | undefined;
-    if (stage && !['upload', 'document', 'mineru', 'structure', 'cards', 'notes'].includes(stage)) {
-      return null;
-    }
-
-    // 只接受白名单字段，未知遗留字段一律忽略
-    const result: Record<string, unknown> = {};
-    for (const key of PERSISTED_KEYS) {
-      if (key in parsed) result[key] = parsed[key];
-    }
-
-    // running 状态在刷新后不恢复
-    if (result.jobStatus === 'running') {
-      result.job = null;
-      result.jobStatus = 'idle';
-    }
-
-    return applyDefaults(result as Partial<ProjectState>);
-  } catch (error) {
-    console.warn('Failed to load state:', error);
-    return null;
+/**
+ * 保存工作区状态：写轻量指针 + 防抖镜像到 IndexedDB 课程库。
+ * 项目数据不再进入 localStorage。
+ */
+export function saveState(state: Partial<ProjectState>): void {
+  const activeDocument = state.document;
+  if (activeDocument?.courseId) {
+    writeWorkspacePointer(activeDocument.id, activeDocument.courseId);
+    scheduleMirror(state);
+  } else {
+    clearWorkspacePointer();
   }
 }
 
-// 清除状态
+// 清除指针（课程库中的快照仍保留，可随时重新打开）
 export function clearState(): void {
-  try {
-    localStorage.removeItem(STORAGE_KEY);
-  } catch (error) {
-    console.warn('Failed to clear state:', error);
-  }
-}
-
-// 重置项目
-export function resetProject(): void {
-  clearState();
+  cancelPendingSaves();
+  clearWorkspacePointer();
 }

@@ -42,6 +42,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const jobStatus = useStore(state => state.jobStatus);
   const pipelineProgress = useStore(state => state.pipelineProgress);
   const navigateToStage = useStore(state => state.navigateToStage);
+  const staleMarker = useStore(state => state.staleMarker);
 
   const [expandedTopicId, setExpandedTopicId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -71,6 +72,10 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
         )
       : { nodes: [], edges: [], pathEdges: [], warnings: [] },
     [expandedTopicId, narrativePaths, teachingBlocks, teachingRelations],
+  );
+  const staleNodeIds = useMemo(
+    () => new Set(staleMarker?.affectedTopicIds ?? []),
+    [staleMarker],
   );
   const currentNetwork: KnowledgeNetworkModel = useMemo(
     () => expandedTopicId ? teachingNetwork : courseNetwork,
@@ -173,6 +178,11 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
             </div>
             <p className="mt-1 text-xs text-space-muted">
               {courseNetwork.nodes.length} 个核心知识 · {courseNetwork.edges.length} 个课程关系
+              {staleMarker?.reason === 'source-reparsed' && staleNodeIds.size > 0 && (
+                <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[11px] text-amber-300">
+                  重解析：{staleNodeIds.size} 个知识点需更新
+                </span>
+              )}
               {expandedTopicId && ` · ${teachingNetwork.nodes.length} 个二级节点`}
             </p>
           </div>
@@ -230,6 +240,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
             onSelect={selectNode}
             search={search}
             relationTypes={relationType === 'all' ? undefined : [relationType]}
+            staleNodeIds={staleNodeIds}
           />
           {expandedTopicId && teachingNetwork.nodes.length === 0 && <NetworkEmptyState onBack={collapseTeachingNetwork} />}
         </main>

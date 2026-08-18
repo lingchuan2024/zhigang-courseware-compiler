@@ -1,7 +1,26 @@
 # 知纲收敛与下阶段计划
 
 日期：2026-08-17
-状态：Phase 0 已完成（分支 `phase-0-cleanup`，9 个提交）；Phase 1/2 待启动
+状态：Phase 0 已完成（PR #2 已合并）；Phase 1 已完成（分支 `feat/persistence-and-incremental`：T1 持久化单一真相源、T2 重解析增量标记、T3 模型调用健壮性）
+
+> **Phase 1 / T2 执行结果（2026-08-17）**：重跑 MinerU 不再清空知识产物——按纯内容哈希对齐新旧文档块，
+> 未受影响的主题/讲解块/卡片仅重映射引用（含 documentId 变化），引用内容变化的主题标 stale
+> （卡片 status='stale'、覆盖章节降级、母笔记重组为 partial，可按章重试）；新增未被覆盖的内容块计入
+> 提示。Sidebar 横幅与知识网节点"需更新"徽章接入真实 staleMarker。设计结论：主题级局部重提取在
+> 内容变化语义下不成立（主题划分来自全局合并），结构重提取保持全量，由 store 集成测试
+> （mock MinerU）与视图测试覆盖。
+
+> **Phase 1 / T3 执行结果（2026-08-18）**：callChatCompletion 对 429/5xx/网络中断增加指数退避重试
+> （1s/2s，尊重 Retry-After，上限 30s），与既有结构化 JSON 重试分层；HTTP/超时错误消息统一中文。
+> 模型用量改为按任务累计并持久化到本机（`zhigang_model_usage`，仅聚合计数不含内容），服务配置面板
+> 新增"模型用量"区块（调用次数/tokens/耗时 + 清空统计）。
+
+> **Phase 1 / T1 执行结果（2026-08-17）**：localStorage 只保留约 100 字节的工作区指针（schema v10），
+> 项目数据唯一真相源为 IndexedDB 课程库快照；全量快照镜像改为 500ms 防抖合并写（flush 于
+> beforeunload/visibilitychange），启动不再有同步恢复路径，模型配置仍在独立 key。删除了
+> loadState/initializeFromStorage/migrateLegacyProjectToLibrary 等旧恢复链路。
+> 验收：单元测试断言 localStorage 无项目数据；浏览器实测两份课件并存、刷新存活、
+> 从课件库恢复工作区。决策点落地：维持"刷新回首页"，"原地停留"作为独立小改进留待后续。
 
 > **Phase 0 执行结果（2026-08-17）**：仓库 −38,304 行 / +1,227 行（含 5 个遗留目录约 5MB）；
 > src 非测试代码 35,849 → 21,440 行（−40%）；测试 81 文件 999 用例 → 56 文件 451 用例

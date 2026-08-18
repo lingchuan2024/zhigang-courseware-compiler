@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import type { MinerUConfig, ModelConfig } from '../types';
 import { validateModelConfig } from '../lib/model';
+import { getUsageSummaryByTask, resetUsageStats, type TaskUsageSummary } from '../lib/model-usage';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -33,12 +34,14 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
   const [mineru, setMineru] = useState<MinerUConfig>(DEFAULT_MINERU);
   const [model, setModel] = useState<ModelConfig>(DEFAULT_MODEL);
   const [mineruError, setMineruError] = useState('');
+  const [usage, setUsage] = useState<TaskUsageSummary[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
     setMineru(storedMinerU ?? DEFAULT_MINERU);
     setModel(storedModel ?? DEFAULT_MODEL);
     setMineruError('');
+    setUsage(getUsageSummaryByTask());
   }, [isOpen, storedMinerU, storedModel]);
 
   if (!isOpen) return null;
@@ -154,6 +157,36 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
             {model.apiKey && !modelValidation.valid && modelValidation.message && (
               <p className="mt-3 rounded-lg border border-cinnabar/25 bg-cinnabar/10 px-3 py-2 text-sm text-cinnabar-light">{modelValidation.message}</p>
             )}
+
+            <div className="mt-5 rounded-lg border border-space-border bg-space-850/60 p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold tracking-wide text-ink-light">模型用量（本机累计）</p>
+                {usage.length > 0 && (
+                  <button
+                    type="button"
+                    className="text-xs text-space-muted hover:text-cinnabar"
+                    onClick={() => { resetUsageStats(); setUsage([]); }}
+                    data-testid="reset-usage"
+                  >
+                    清空统计
+                  </button>
+                )}
+              </div>
+              {usage.length === 0 ? (
+                <p className="mt-2 text-xs text-space-faint">尚无调用记录。生成知识结构与笔记后，这里会按任务统计 tokens 与耗时。</p>
+              ) : (
+                <ul className="mt-2 space-y-1.5" data-testid="usage-list">
+                  {usage.map(item => (
+                    <li key={`${item.taskType}-${item.callCount}`} className="flex items-baseline justify-between gap-3 text-xs">
+                      <span className="text-space-muted">{TASK_LABELS[item.taskType] ?? item.taskType} · {item.callCount} 次</span>
+                      <span className="font-mono text-space-faint">
+                        {(item.totalPromptTokens + item.totalCompletionTokens).toLocaleString()} tokens · {(item.totalDurationMs / 1000).toFixed(1)}s
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </section>
 
           <p className="text-xs leading-5 text-space-muted">
@@ -172,6 +205,19 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
     </div>
   );
 }
+
+const TASK_LABELS: Record<string, string> = {
+  'topic-extraction': '主题提取',
+  'topic-repair': '主题修复',
+  'relation-extraction': '关系提取',
+  'internal-structure': '内部结构',
+  'note-generation': '笔记生成',
+  'note-repair': '笔记重试',
+  'topic-merge': '主题合并',
+  'topic-candidate-extraction': '候选提取',
+  'topic-granularity-judgment': '粒度判定',
+  'topic-quality-repair': '质量修复',
+};
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (

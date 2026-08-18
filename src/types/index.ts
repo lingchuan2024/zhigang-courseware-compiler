@@ -433,13 +433,16 @@ export type StaleReason =
   | 'evidence-edited'
   | 'structure-edited'
   | 'topic-edited'
-  | 'evidence-deleted';
+  | 'evidence-deleted'
+  | 'source-reparsed';
 
 export interface StaleMarker {
   reason: StaleReason;
   affectedTopicIds: string[];
   affectedPackageIds: string[];
   timestamp: number;
+  /** 面向用户的一句话说明（如重解析的影响摘要）。 */
+  summary?: string;
 }
 
 // ============== 导航守卫 ==============
@@ -495,39 +498,6 @@ export interface ProductStateSnapshot {
 
 // ============== 持久化Schema ==============
 
-export const SCHEMA_VERSION = 9;
-
-export interface PersistedState {
-  schemaVersion: number;
-  stage: ProductStage;
-  job: BackgroundJob;
-  jobStatus: JobStatus;
-  document: CourseDocument | null;
-  structureExtractionStatus?: StructureExtractionStatus;
-  extractionErrors?: string[];
-  pipelineProgress?: PipelineProgress;
-  staleMarker?: StaleMarker | null;
-  // v6 Markdown 架构
-  sourceDocuments?: SourceDocument[];
-  knowledgeTopics?: KnowledgeTopic[];
-  topicRelations?: TopicRelation[];
-  teachingBlocks?: TeachingBlock[];
-  teachingRelations?: TeachingRelation[];
-  courseLearningPath?: CourseLearningPath | null;
-  narrativePaths?: Record<string, TopicNarrativePath>;
-  knowledgeCards?: KnowledgeCard[];
-  topicNotes?: TopicNote[];
-  topicSyntheses?: TopicSynthesis[];
-  chapterPlan?: ChapterPlanItem[];
-  chapterNotes?: ChapterNote[];
-  courseMasterNote?: CourseMasterNote | null;
-  glossary?: GlossaryItem[];
-  formulaCards?: FormulaCard[];
-  unassignedBlocks?: string[];
-  knowledgeBaseVersions?: KnowledgeBaseVersions;
-  knowledgePipelineStatus?: KnowledgePipelineStatus;
-  mineruParseResult?: MinerUParseResult | null;
-}
 
 // ============== 完整项目状态（运行时） ==============
 
