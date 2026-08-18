@@ -1,0 +1,34 @@
+src/components/KnowledgeQaView.tsx
+  h_da6fd0bc394304 414-419
+src/components/SettingsModal.tsx
+  h_da6fd0bc394304 220
+src/components/__tests__/KnowledgeQaView.test.tsx
+  h_da6fd0bc394304 19-27
+src/lib/__tests__/query-rewrite.test.ts
+  h_da6fd0bc394304 1-126
+src/lib/card-retrieval.ts
+  h_da6fd0bc394304 96-102,153,162-174,178-190
+src/lib/model-usage.ts
+  h_da6fd0bc394304 13-14
+src/lib/query-rewrite.ts
+  h_da6fd0bc394304 1-110
+src/store/__tests__/useQaStore-rewrite.test.ts
+  h_da6fd0bc394304 1-133
+src/store/__tests__/useQaStore.test.ts
+  h_da6fd0bc394304 28-36
+src/store/useQaStore.ts
+  h_da6fd0bc394304 12,15,356-358,360-364,383
+src/types/index.ts
+  h_da6fd0bc394304 316-317
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.22",
+  "base_commit_sha": "5ca238da426926d3edd9fc75a730969cdb2084c3",
+  "prompts": {},
+  "humans": {
+    "h_da6fd0bc394304": {
+      "author": "Yuxuan Du <duyuxuan@ruc.edu.cn>"
+    }
+  }
+}
