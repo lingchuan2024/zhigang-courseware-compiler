@@ -5,10 +5,11 @@ import {
   findModelProviderByEndpoint,
 } from '../model-providers';
 
-if (false) {
+const assertProviderPresetsAreImmutable = (): void => {
   // @ts-expect-error provider presets are immutable
   MODEL_PROVIDER_PRESETS[0].endpoint = 'https://mutated.example.com';
-}
+};
+void assertProviderPresetsAreImmutable;
 
 const approvedPresets = [
   {
