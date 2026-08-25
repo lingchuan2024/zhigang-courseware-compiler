@@ -3,6 +3,12 @@ import { useStore } from '../store/useStore';
 import type { MinerUConfig, ModelConfig } from '../types';
 import { validateModelConfig } from '../lib/model';
 import { getUsageSummaryByTask, resetUsageStats, type TaskUsageSummary } from '../lib/model-usage';
+import {
+  CUSTOM_MODEL_PROVIDER_ID,
+  findModelProviderByEndpoint,
+  MODEL_PROVIDER_PRESETS,
+  type ModelProviderSelection,
+} from '../lib/model-providers';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -20,11 +26,15 @@ const DEFAULT_MINERU: MinerUConfig = {
   enableTable: true,
 };
 
+const DEFAULT_PROVIDER = MODEL_PROVIDER_PRESETS[0];
+
 const DEFAULT_MODEL: ModelConfig = {
-  endpoint: 'https://api.deepseek.com',
-  model: 'deepseek-chat',
+  endpoint: DEFAULT_PROVIDER.endpoint,
+  model: DEFAULT_PROVIDER.defaultModel,
   apiKey: '',
 };
+
+const CUSTOM_PROVIDER_HINT = '使用任意 OpenAI-compatible 服务，并手动填写地址与模型名称。';
 
 export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: SettingsModalProps) {
   const storedMinerU = useStore(state => state.mineruConfig);
@@ -33,13 +43,16 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
   const setModelConfig = useStore(state => state.setModelConfig);
   const [mineru, setMineru] = useState<MinerUConfig>(DEFAULT_MINERU);
   const [model, setModel] = useState<ModelConfig>(DEFAULT_MODEL);
+  const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderSelection>(DEFAULT_PROVIDER.id);
   const [mineruError, setMineruError] = useState('');
   const [usage, setUsage] = useState<TaskUsageSummary[]>([]);
 
   useEffect(() => {
     if (!isOpen) return;
     setMineru(storedMinerU ?? DEFAULT_MINERU);
-    setModel(storedModel ?? DEFAULT_MODEL);
+    const nextModel = storedModel ?? DEFAULT_MODEL;
+    setModel(nextModel);
+    setSelectedProviderId(findModelProviderByEndpoint(nextModel.endpoint)?.id ?? CUSTOM_MODEL_PROVIDER_ID);
     setMineruError('');
     setUsage(getUsageSummaryByTask());
   }, [isOpen, storedMinerU, storedModel]);
@@ -48,6 +61,14 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
 
   const modelValidation = validateModelConfig(model.apiKey ? model : null);
   const mineruValid = Boolean(mineru.endpoint.trim() && mineru.apiKey.trim());
+  const selectedProvider = MODEL_PROVIDER_PRESETS.find(provider => provider.id === selectedProviderId);
+
+  const selectProvider = (providerId: ModelProviderSelection) => {
+    setSelectedProviderId(providerId);
+    if (providerId === CUSTOM_MODEL_PROVIDER_ID) return;
+    const provider = MODEL_PROVIDER_PRESETS.find(item => item.id === providerId)!;
+    setModel(current => ({ ...current, endpoint: provider.endpoint, model: provider.defaultModel }));
+  };
 
   const save = () => {
     const endpoint = mineru.endpoint.trim();
@@ -142,16 +163,56 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
               </span>
             </div>
             <div className="grid sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <Field label="API 平台">
+                  <select
+                    className="config-input"
+                    aria-label="API 平台"
+                    value={selectedProviderId}
+                    onChange={event => selectProvider(event.target.value as ModelProviderSelection)}
+                  >
+                    {MODEL_PROVIDER_PRESETS.map(provider => (
+                      <option key={provider.id} value={provider.id}>{provider.label}</option>
+                    ))}
+                    <option value={CUSTOM_MODEL_PROVIDER_ID}>自定义</option>
+                  </select>
+                </Field>
+                <p className="mt-1.5 text-xs text-space-muted">{selectedProvider?.hint ?? CUSTOM_PROVIDER_HINT}</p>
+              </div>
               <Field label="API 地址">
-                <input className="config-input" value={model.endpoint} onChange={event => setModel({ ...model, endpoint: event.target.value })} placeholder="https://api.deepseek.com" />
+                <input
+                  className="config-input"
+                  aria-label="知识生成 API 地址"
+                  value={model.endpoint}
+                  onChange={event => {
+                    const endpoint = event.target.value;
+                    setModel({ ...model, endpoint });
+                    setSelectedProviderId(findModelProviderByEndpoint(endpoint)?.id ?? CUSTOM_MODEL_PROVIDER_ID);
+                  }}
+                  placeholder="https://api.deepseek.com"
+                />
               </Field>
               <Field label="模型名称">
-                <input className="config-input" value={model.model} onChange={event => setModel({ ...model, model: event.target.value })} placeholder="deepseek-chat" />
+                <input className="config-input" aria-label="知识生成模型名称" value={model.model} onChange={event => setModel({ ...model, model: event.target.value })} placeholder="deepseek-chat" />
               </Field>
               <div className="sm:col-span-2">
-                <Field label="API Key">
-                  <input className="config-input" type="password" value={model.apiKey} onChange={event => setModel({ ...model, apiKey: event.target.value })} placeholder="sk-..." autoComplete="off" />
-                </Field>
+                <div className="mb-1.5 flex items-center justify-between gap-3">
+                  <label htmlFor="knowledge-model-api-key" className="text-xs font-medium text-ink-light">API Key</label>
+                  {selectedProvider ? (
+                    <a
+                      href={selectedProvider.apiKeyUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      data-testid="model-api-key-link"
+                      className="text-xs font-medium text-celadon-light underline decoration-celadon/40 underline-offset-4 hover:text-celadon"
+                    >
+                      前往{selectedProvider.label}获取 API Key ↗
+                    </a>
+                  ) : (
+                    <span className="text-xs text-space-muted">请前往服务商控制台获取 API Key</span>
+                  )}
+                </div>
+                <input id="knowledge-model-api-key" className="config-input" type="password" value={model.apiKey} onChange={event => setModel({ ...model, apiKey: event.target.value })} placeholder="sk-..." autoComplete="off" />
               </div>
             </div>
             {model.apiKey && !modelValidation.valid && modelValidation.message && (
@@ -195,7 +256,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
         </div>
 
         <footer className="sticky bottom-0 flex justify-between gap-3 border-t border-space-border bg-space-850/95 px-6 py-4 backdrop-blur-xl">
-          <button className="text-sm text-cinnabar hover:underline" onClick={() => { setMinerUConfig(null); setModelConfig(null); setMineru(DEFAULT_MINERU); setModel(DEFAULT_MODEL); }}>清除全部配置</button>
+          <button className="text-sm text-cinnabar hover:underline" onClick={() => { setMinerUConfig(null); setModelConfig(null); setMineru(DEFAULT_MINERU); setModel(DEFAULT_MODEL); setSelectedProviderId(DEFAULT_PROVIDER.id); }}>清除全部配置</button>
           <div className="flex gap-3">
             <button className="btn-outline" onClick={onClose}>取消</button>
             <button className="btn-primary" onClick={save}>{mode === 'resume-mineru' ? '保存并开始解析' : '保存配置'}</button>

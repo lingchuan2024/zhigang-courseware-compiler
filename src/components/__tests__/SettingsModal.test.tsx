@@ -53,6 +53,14 @@ function setInput(input: HTMLInputElement, value: string) {
   });
 }
 
+function setSelect(select: HTMLSelectElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')!.set!;
+  act(() => {
+    setter.call(select, value);
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 describe('SettingsModal MinerU continuation', () => {
   it('links to the official MinerU token page and describes the free quota accurately', () => {
     const { container } = renderModal();
@@ -86,5 +94,87 @@ describe('SettingsModal MinerU continuation', () => {
     expect(useStore.getState().mineruConfig?.apiKey).toBe('token');
     expect(onSaved).toHaveBeenCalledWith({ mineruConfigured: true });
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('SettingsModal model provider presets', () => {
+  it('renders the provider presets with DeepSeek defaults', () => {
+    const { container } = renderModal({ mode: 'default' });
+    const provider = container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]');
+
+    expect(provider).not.toBeNull();
+    expect(Array.from(provider!.options, option => option.textContent)).toEqual([
+      'DeepSeek',
+      '阿里云百炼',
+      '模力方舟（Gitee AI）',
+      '智谱 BigModel',
+      'Kimi',
+      '火山方舟',
+      '硅基流动',
+      'OpenAI',
+      'OpenRouter',
+      '自定义',
+    ]);
+    expect(provider!.value).toBe('deepseek');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')?.value).toBe('https://api.deepseek.com');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')?.value).toBe('deepseek-v4-flash');
+  });
+
+  it('applies modelark values while retaining the key and shows its official key link', () => {
+    const { container } = renderModal({ mode: 'default' });
+    const apiKey = container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!;
+    const provider = container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!;
+    setInput(apiKey, 'modelark-key');
+    setSelect(provider, 'modelark');
+
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')?.value).toBe('https://ai.gitee.com/v1');
+    const model = container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')!;
+    expect(model.value).toBe('GLM-5');
+    expect(apiKey.value).toBe('modelark-key');
+    setInput(model, 'Qwen3.8-Plus');
+    expect(provider.value).toBe('modelark');
+
+    const link = container.querySelector<HTMLAnchorElement>('[data-testid="model-api-key-link"]')!;
+    expect(link.textContent).toContain('模力方舟（Gitee AI）');
+    expect(link.href).toBe('https://ai.gitee.com/products/apis');
+    expect(link.target).toBe('_blank');
+    expect(link.rel).toContain('noopener');
+    expect(link.rel).toContain('noreferrer');
+  });
+
+  it('switches to custom when the endpoint does not match a preset', () => {
+    const { container } = renderModal({ mode: 'default' });
+    const endpoint = container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')!;
+    setInput(endpoint, 'https://models.example.com/v1');
+
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')?.value).toBe('custom');
+    expect(container.querySelector('[data-testid="model-api-key-link"]')).toBeNull();
+    expect(container.textContent).toContain('使用任意 OpenAI-compatible 服务，并手动填写地址与模型名称。');
+  });
+
+  it('recognizes a stored Kimi endpoint with a trailing slash', () => {
+    act(() => useStore.setState({
+      modelConfig: { endpoint: 'https://api.moonshot.cn/v1/', model: 'kimi-k2.6', apiKey: 'kimi-key' },
+    }));
+    const { container } = renderModal({ mode: 'default' });
+
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')?.value).toBe('kimi');
+    expect(container.querySelector<HTMLAnchorElement>('[data-testid="model-api-key-link"]')?.href)
+      .toBe('https://platform.kimi.com/console/api-keys');
+  });
+
+  it('saves only the existing three model configuration fields', () => {
+    const { container } = renderModal({ mode: 'default' });
+    setSelect(container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!, 'modelark');
+    setInput(container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!, 'modelark-key');
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    act(() => save.click());
+
+    expect(useStore.getState().modelConfig).toStrictEqual({
+      endpoint: 'https://ai.gitee.com/v1',
+      model: 'GLM-5',
+      apiKey: 'modelark-key',
+    });
   });
 });
