@@ -14,12 +14,12 @@ export const CUSTOM_MODEL_PROVIDER_ID = 'custom' as const;
 export type ModelProviderSelection = ModelProviderId | typeof CUSTOM_MODEL_PROVIDER_ID;
 
 export interface ModelProviderPreset {
-  id: ModelProviderId;
-  label: string;
-  endpoint: string;
-  defaultModel: string;
-  apiKeyUrl: string;
-  hint: string;
+  readonly id: ModelProviderId;
+  readonly label: string;
+  readonly endpoint: string;
+  readonly defaultModel: string;
+  readonly apiKeyUrl: string;
+  readonly hint: string;
 }
 
 export const MODEL_PROVIDER_PRESETS: readonly ModelProviderPreset[] = [
