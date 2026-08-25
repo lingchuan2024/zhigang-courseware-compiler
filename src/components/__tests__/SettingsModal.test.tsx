@@ -152,6 +152,36 @@ describe('SettingsModal model provider presets', () => {
     expect(container.textContent).toContain('使用任意 OpenAI-compatible 服务，并手动填写地址与模型名称。');
   });
 
+  it('keeps custom configuration when custom is explicitly selected and describes its hint', () => {
+    const { container } = renderModal({ mode: 'default' });
+    const provider = container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!;
+    const endpoint = container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')!;
+    const model = container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')!;
+    const apiKey = container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!;
+    setInput(endpoint, 'https://models.example.com/v1');
+    setInput(model, 'custom-model');
+    setInput(apiKey, 'custom-key');
+    setSelect(provider, 'custom');
+
+    expect(endpoint.value).toBe('https://models.example.com/v1');
+    expect(model.value).toBe('custom-model');
+    expect(apiKey.value).toBe('custom-key');
+    expect(provider.getAttribute('aria-describedby')).toBe('model-provider-hint');
+    expect(container.querySelector('#model-provider-hint')).not.toBeNull();
+  });
+
+  it('recognizes DeepSeek again when its endpoint is restored after an unknown endpoint', () => {
+    const { container } = renderModal({ mode: 'default' });
+    const endpoint = container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')!;
+    setInput(endpoint, 'https://models.example.com/v1');
+    setInput(endpoint, 'https://api.deepseek.com/');
+
+    expect(container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')?.value).toBe('deepseek');
+    expect(container.querySelector('#model-provider-hint')?.textContent).toContain('默认使用 DeepSeek V4 Flash');
+    expect(container.querySelector<HTMLAnchorElement>('[data-testid="model-api-key-link"]')?.href)
+      .toBe('https://platform.deepseek.com/api_keys');
+  });
+
   it('recognizes a stored Kimi endpoint with a trailing slash', () => {
     act(() => useStore.setState({
       modelConfig: { endpoint: 'https://api.moonshot.cn/v1/', model: 'kimi-k2.6', apiKey: 'kimi-key' },

@@ -66,7 +66,8 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
   const selectProvider = (providerId: ModelProviderSelection) => {
     setSelectedProviderId(providerId);
     if (providerId === CUSTOM_MODEL_PROVIDER_ID) return;
-    const provider = MODEL_PROVIDER_PRESETS.find(item => item.id === providerId)!;
+    const provider = MODEL_PROVIDER_PRESETS.find(item => item.id === providerId);
+    if (!provider) return;
     setModel(current => ({ ...current, endpoint: provider.endpoint, model: provider.defaultModel }));
   };
 
@@ -168,6 +169,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                   <select
                     className="config-input"
                     aria-label="API 平台"
+                    aria-describedby="model-provider-hint"
                     value={selectedProviderId}
                     onChange={event => selectProvider(event.target.value as ModelProviderSelection)}
                   >
@@ -177,7 +179,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                     <option value={CUSTOM_MODEL_PROVIDER_ID}>自定义</option>
                   </select>
                 </Field>
-                <p className="mt-1.5 text-xs text-space-muted">{selectedProvider?.hint ?? CUSTOM_PROVIDER_HINT}</p>
+                <p id="model-provider-hint" className="mt-1.5 text-xs text-space-muted">{selectedProvider?.hint ?? CUSTOM_PROVIDER_HINT}</p>
               </div>
               <Field label="API 地址">
                 <input
@@ -196,7 +198,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                 <input className="config-input" aria-label="知识生成模型名称" value={model.model} onChange={event => setModel({ ...model, model: event.target.value })} placeholder="deepseek-chat" />
               </Field>
               <div className="sm:col-span-2">
-                <div className="mb-1.5 flex items-center justify-between gap-3">
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
                   <label htmlFor="knowledge-model-api-key" className="text-xs font-medium text-ink-light">API Key</label>
                   {selectedProvider ? (
                     <a
