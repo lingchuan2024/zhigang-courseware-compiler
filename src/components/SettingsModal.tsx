@@ -195,7 +195,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                 />
               </Field>
               <Field label="模型名称">
-                <input className="config-input" aria-label="知识生成模型名称" value={model.model} onChange={event => setModel({ ...model, model: event.target.value })} placeholder="deepseek-chat" />
+                <input className="config-input" aria-label="知识生成模型名称" value={model.model} onChange={event => setModel({ ...model, model: event.target.value })} placeholder="deepseek-v4-flash" />
               </Field>
               <div className="sm:col-span-2">
                 <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">

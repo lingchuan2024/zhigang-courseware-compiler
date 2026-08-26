@@ -118,6 +118,7 @@ describe('SettingsModal model provider presets', () => {
     expect(provider!.value).toBe('deepseek');
     expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')?.value).toBe('https://api.deepseek.com');
     expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')?.value).toBe('deepseek-v4-flash');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')?.placeholder).toBe('deepseek-v4-flash');
   });
 
   it('applies modelark values while retaining the key and shows its official key link', () => {
