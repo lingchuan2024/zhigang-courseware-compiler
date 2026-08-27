@@ -10,6 +10,7 @@ import {
   saveLibraryProjectSnapshot,
   upsertLibraryDocument,
 } from '../../lib/library-repository';
+import { writeWorkspacePointer } from '../../lib/persistence';
 import { useLibraryStore } from '../../store/useLibraryStore';
 import { useStore } from '../../store/useStore';
 
@@ -319,5 +320,45 @@ describe('multi-course library navigation', () => {
     expect(startMinerUParse).toHaveBeenCalledTimes(1);
     expect(container!.textContent).toContain('network failed');
     expect(container!.textContent).toContain('重新解析');
+  });
+
+  it('restores the last opened workspace instead of the start page after a reload', async () => {
+    const course = await createLibraryCourse({ name: '机器学习' });
+    await upsertLibraryDocument({
+      id: 'resume-doc', courseId: course.id, title: '第三讲', fileName: 'lecture3.pdf',
+      fileType: 'pdf', pageCount: 3, stage: 'structure', status: 'processing', uploadedAt: 1, updatedAt: 2,
+    });
+    await saveLibraryProjectSnapshot(course.id, 'resume-doc', {
+      stage: 'structure',
+      jobStatus: 'idle',
+      document: {
+        id: 'resume-doc', courseId: course.id, title: '第三讲', fileName: 'lecture3.pdf',
+        fileType: 'pdf', uploadedAt: 1, pages: [{ pageNumber: 1, text: 'page', preview: 'data:image/png;base64,a' }],
+      },
+      sourceDocuments: [],
+      knowledgeTopics: [],
+      structureExtractionStatus: 'idle',
+    });
+    writeWorkspacePointer('resume-doc', course.id);
+
+    await act(async () => root!.render(createElement(App)));
+    await act(async () => {});
+
+    expect(useLibraryStore.getState().screen).toBe('workspace');
+    expect(useStore.getState().stage).toBe('structure');
+    expect(useStore.getState().document?.id).toBe('resume-doc');
+    expect(useStore.getState().jobStatus).toBe('idle');
+  });
+
+  it('falls back to the start page when the workspace pointer is stale', async () => {
+    const course = await createLibraryCourse({ name: '统计学习' });
+    writeWorkspacePointer('deleted-doc', course.id);
+
+    await act(async () => root!.render(createElement(App)));
+    await act(async () => {});
+
+    expect(useLibraryStore.getState().screen).toBe('home');
+    expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(useLibraryStore.getState().error).toBeNull();
   });
 });

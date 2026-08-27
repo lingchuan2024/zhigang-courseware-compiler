@@ -62,6 +62,25 @@ export function writeWorkspacePointer(documentId: string, courseId: string): voi
   }
 }
 
+/** 读取工作区指针（刷新后恢复工作区用）；不存在或损坏时返回 null。 */
+export function readWorkspacePointer(): WorkspacePointer | null {
+  try {
+    const raw = localStorage.getItem(POINTER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<WorkspacePointer>;
+    if (
+      parsed.schemaVersion === 10 &&
+      typeof parsed.documentId === 'string' && parsed.documentId &&
+      typeof parsed.courseId === 'string' && parsed.courseId
+    ) {
+      return { schemaVersion: 10, documentId: parsed.documentId, courseId: parsed.courseId };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 function clearWorkspacePointer(): void {
   try {
     localStorage.removeItem(POINTER_KEY);

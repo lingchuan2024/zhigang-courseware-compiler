@@ -10,7 +10,7 @@ import {
   loadLibraryProjectSnapshot,
 } from '../lib/library-repository';
 import { useStore } from './useStore';
-import { cleanupLegacyStorage, pickPersistedFields, writeWorkspacePointer } from '../lib/persistence';
+import { cleanupLegacyStorage, pickPersistedFields, readWorkspacePointer, writeWorkspacePointer } from '../lib/persistence';
 
 export type LibraryScreen = 'home' | 'library' | 'workspace' | 'qa';
 
@@ -66,6 +66,15 @@ export const useLibraryStore = create<LibraryState>((set, get) => ({
         ? get().activeCourseId
         : data.courses[0]?.id ?? null;
       set({ ...data, activeCourseId, initialized: true, loading: false });
+      // 原地停留：刷新/重开后若存在工作区指针，直接恢复到最近打开的课件与其阶段，
+      // 而不是落回首页（运行中的任务不跨刷新存活，恢复为最近一次已保存状态）。
+      const pointer = readWorkspacePointer();
+      if (pointer && data.documents.some(document => document.id === pointer.documentId)) {
+        await get().openDocument(pointer.documentId);
+        if (get().screen !== 'workspace') {
+          set({ error: null, screen: 'home' });
+        }
+      }
     } catch (error) {
       set({ initialized: true, loading: false, error: error instanceof Error ? error.message : String(error) });
     }
