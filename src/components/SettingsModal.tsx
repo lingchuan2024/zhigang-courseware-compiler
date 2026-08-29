@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store/useStore';
 import type { MinerUConfig, ModelConfig } from '../types';
 import { validateModelConfig } from '../lib/model';
+import { verifyModelConfig } from '../lib/model-v2';
 import { getUsageSummaryByTask, resetUsageStats, type TaskUsageSummary } from '../lib/model-usage';
 import {
   CUSTOM_MODEL_PROVIDER_ID,
@@ -45,6 +46,8 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
   const [model, setModel] = useState<ModelConfig>(DEFAULT_MODEL);
   const [selectedProviderId, setSelectedProviderId] = useState<ModelProviderSelection>(DEFAULT_PROVIDER.id);
   const [mineruError, setMineruError] = useState('');
+  const [modelError, setModelError] = useState('');
+  const [verifying, setVerifying] = useState(false);
   const [usage, setUsage] = useState<TaskUsageSummary[]>([]);
 
   useEffect(() => {
@@ -54,6 +57,8 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
     setModel(nextModel);
     setSelectedProviderId(findModelProviderByEndpoint(nextModel.endpoint)?.id ?? CUSTOM_MODEL_PROVIDER_ID);
     setMineruError('');
+    setModelError('');
+    setVerifying(false);
     setUsage(getUsageSummaryByTask());
   }, [isOpen, storedMinerU, storedModel]);
 
@@ -71,7 +76,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
     setModel(current => ({ ...current, endpoint: provider.endpoint, model: provider.defaultModel }));
   };
 
-  const save = () => {
+  const save = async () => {
     const endpoint = mineru.endpoint.trim();
     const apiKey = mineru.apiKey.trim();
     const nextMinerU = endpoint && apiKey ? { ...mineru, endpoint, apiKey } : null;
@@ -79,8 +84,23 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
       setMineruError('请填写 MinerU API 地址和 Token');
       return;
     }
+    const nextModel = model.apiKey.trim()
+      ? { ...model, endpoint: model.endpoint.trim(), model: model.model.trim(), apiKey: model.apiKey.trim() }
+      : null;
+    // 保存前验证模型连通性：坏 Key 到提取阶段才暴露的代价太高（一次全量重跑），
+    // 这里发一次最小请求把 401/404/网络错误挡在保存动作之前。
+    if (nextModel) {
+      setVerifying(true);
+      setModelError('');
+      const verification = await verifyModelConfig(nextModel);
+      setVerifying(false);
+      if (!verification.ok) {
+        setModelError(verification.error ?? 'API 验证失败，请检查地址、模型名称与密钥');
+        return;
+      }
+    }
     setMinerUConfig(nextMinerU);
-    setModelConfig(model.apiKey.trim() ? { ...model, endpoint: model.endpoint.trim(), model: model.model.trim(), apiKey: model.apiKey.trim() } : null);
+    setModelConfig(nextModel);
     onSaved?.({ mineruConfigured: Boolean(nextMinerU) });
     onClose();
   };
@@ -190,12 +210,13 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                     const endpoint = event.target.value;
                     setModel({ ...model, endpoint });
                     setSelectedProviderId(findModelProviderByEndpoint(endpoint)?.id ?? CUSTOM_MODEL_PROVIDER_ID);
+                    setModelError('');
                   }}
                   placeholder="https://api.deepseek.com"
                 />
               </Field>
               <Field label="模型名称">
-                <input className="config-input" aria-label="知识生成模型名称" value={model.model} onChange={event => setModel({ ...model, model: event.target.value })} placeholder="deepseek-v4-flash" />
+                <input className="config-input" aria-label="知识生成模型名称" value={model.model} onChange={event => { setModel({ ...model, model: event.target.value }); setModelError(''); }} placeholder="deepseek-v4-flash" />
               </Field>
               <div className="sm:col-span-2">
                 <div className="mb-1.5 flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
@@ -214,12 +235,18 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                     <span className="text-xs text-space-muted">请前往服务商控制台获取 API Key</span>
                   )}
                 </div>
-                <input id="knowledge-model-api-key" className="config-input" type="password" value={model.apiKey} onChange={event => setModel({ ...model, apiKey: event.target.value })} placeholder="sk-..." autoComplete="off" />
+                <input id="knowledge-model-api-key" className="config-input" type="password" value={model.apiKey} onChange={event => { setModel({ ...model, apiKey: event.target.value }); setModelError(''); }} placeholder="sk-..." autoComplete="off" />
               </div>
             </div>
             {model.apiKey && !modelValidation.valid && modelValidation.message && (
               <p className="mt-3 rounded-lg border border-cinnabar/25 bg-cinnabar/10 px-3 py-2 text-sm text-cinnabar-light">{modelValidation.message}</p>
             )}
+            {modelError && (
+              <p role="alert" data-testid="model-verify-error" className="mt-3 rounded-lg border border-cinnabar/25 bg-cinnabar/10 px-3 py-2 text-sm text-cinnabar-light">
+                {modelError}
+              </p>
+            )}
+            <p className="mt-3 text-xs leading-5 text-space-muted">保存时将向模型服务发送一次最小请求，验证 API 地址与密钥可用后才会写入配置。</p>
 
             <div className="mt-5 rounded-lg border border-space-border bg-space-850/60 p-4">
               <div className="flex items-center justify-between">
@@ -258,10 +285,12 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
         </div>
 
         <footer className="sticky bottom-0 flex justify-between gap-3 border-t border-space-border bg-space-850/95 px-6 py-4 backdrop-blur-xl">
-          <button className="text-sm text-cinnabar hover:underline" onClick={() => { setMinerUConfig(null); setModelConfig(null); setMineru(DEFAULT_MINERU); setModel(DEFAULT_MODEL); setSelectedProviderId(DEFAULT_PROVIDER.id); }}>清除全部配置</button>
+          <button className="text-sm text-cinnabar hover:underline" onClick={() => { setMinerUConfig(null); setModelConfig(null); setMineru(DEFAULT_MINERU); setModel(DEFAULT_MODEL); setSelectedProviderId(DEFAULT_PROVIDER.id); setModelError(''); }}>清除全部配置</button>
           <div className="flex gap-3">
-            <button className="btn-outline" onClick={onClose}>取消</button>
-            <button className="btn-primary" onClick={save}>{mode === 'resume-mineru' ? '保存并开始解析' : '保存配置'}</button>
+            <button className="btn-outline" onClick={onClose} disabled={verifying}>取消</button>
+            <button className="btn-primary" onClick={() => void save()} disabled={verifying}>
+              {verifying ? '验证 API 中…' : mode === 'resume-mineru' ? '保存并开始解析' : '保存配置'}
+            </button>
           </div>
         </footer>
       </div>

@@ -179,3 +179,63 @@ export async function callChatCompletion<T>(
 }
 
 export { validateModelConfig } from './model';
+
+// ========== 保存前连通性验证 ==========
+
+export interface ModelVerificationResult {
+  ok: boolean;
+  error?: string;
+}
+
+/**
+ * 保存配置前验证模型可用性：发送一次最小 chat 请求，只看 HTTP 状态，不解析内容。
+ * - 200 / 429（限流=认证已通过）视为可用
+ * - 401/403 判定 Key 无效；404 多为地址或模型名错误；其余按服务端错误提示
+ * - 网络失败/超时给出针对性排查提示
+ */
+export async function verifyModelConfig(
+  config: ModelConfig,
+  timeoutMs = 15000,
+): Promise<ModelVerificationResult> {
+  const endpoint = config.endpoint.trim().replace(/\/+$/, '');
+  const model = config.model.trim();
+  const apiKey = config.apiKey.trim();
+  if (!endpoint || !model || !apiKey) {
+    return { ok: false, error: '请完整填写 API 地址、模型名称和 API Key' };
+  }
+  const url = endpoint.endsWith('/chat/completions')
+    ? endpoint
+    : `${endpoint}/chat/completions`;
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 8,
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (response.ok || response.status === 429) {
+      return { ok: true };
+    }
+    const body = await response.text().catch(() => '');
+    const detail = body ? `（${body.substring(0, 120)}）` : '';
+    if (response.status === 401 || response.status === 403) {
+      return { ok: false, error: `API Key 无效或被服务端拒绝（HTTP ${response.status}）${detail}` };
+    }
+    if (response.status === 404) {
+      return { ok: false, error: `接口不存在或模型名错误（HTTP 404）${detail}，请检查 API 地址与模型名称` };
+    }
+    return { ok: false, error: `模型服务返回 HTTP ${response.status}${detail}` };
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'TimeoutError') {
+      return { ok: false, error: `连接超时（${Math.round(timeoutMs / 1000)} 秒），请检查 API 地址是否可达` };
+    }
+    return { ok: false, error: `无法连接模型服务：${error instanceof Error ? error.message : String(error)}` };
+  }
+}
