@@ -465,17 +465,19 @@ export async function extractCandidatesFromAllWindows(
   analyses: ContentWindowAnalysis[];
   windowCount: number;
   failedWindows: number[];
+  windowErrors: string[];
 }> {
   // 1. 切分窗口
   const windows = splitIntoWindows(blocks);
   const total = windows.length;
 
   if (total === 0) {
-    return { analyses: [], windowCount: 0, failedWindows: [] };
+    return { analyses: [], windowCount: 0, failedWindows: [], windowErrors: [] };
   }
 
   let completed = 0;
   const failedWindows: number[] = [];
+  const windowErrors: string[] = [];
 
   // 2. 构建任务
   interface WindowTaskResult {
@@ -517,6 +519,9 @@ export async function extractCandidatesFromAllWindows(
         lastError,
       );
       failedWindows.push(index);
+      windowErrors.push(
+        lastError instanceof Error ? lastError.message : String(lastError),
+      );
 
       completed++;
       onProgress?.(completed, total);
@@ -543,5 +548,6 @@ export async function extractCandidatesFromAllWindows(
     analyses,
     windowCount: total,
     failedWindows,
+    windowErrors,
   };
 }

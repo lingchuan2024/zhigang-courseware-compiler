@@ -28,6 +28,7 @@ vi.mock('../topic-extraction-v2', () => ({
     }],
     windowCount: 1,
     failedWindows: [],
+    windowErrors: [],
   })),
 }));
 

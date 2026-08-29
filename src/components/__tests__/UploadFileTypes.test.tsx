@@ -30,11 +30,12 @@ describe('courseware upload formats', () => {
     expect(input?.accept).toContain('.pptx');
   });
 
-  it('不再显示 Markdown 文本或 Markdown 文件入口', () => {
+  it('不提供 Markdown 文本粘贴入口，但文件选择器接受 .md 文件', () => {
     const container = render(createElement(UploadView));
     expect(container.textContent).not.toContain('Markdown 文本');
     expect(container.querySelector('textarea')).toBeNull();
     const input = container.querySelector<HTMLInputElement>('input[type="file"]');
-    expect(input?.accept).not.toContain('.md');
+    expect(input?.accept).toContain('.md');
+    expect(input?.accept).toContain('.markdown');
   });
 });

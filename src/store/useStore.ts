@@ -338,8 +338,23 @@ export const useStore = create<AppState>((set, get) => ({
     const { document, mineruConfig } = get();
     if (!document) return;
 
-    if (document.fileType === 'markdown' && get().sourceDocuments.length > 0) {
-      set({ stage: 'mineru' });
+    if (document.fileType === 'markdown') {
+      if (get().sourceDocuments.length === 0) {
+        // 异常状态（上传后源文档丢失）：从 document.pages 重建，保证流程可继续
+        const markdown = document.pages.map(page => page.text).join('\n\n');
+        const doc = createSourceDocument(markdown, document.courseId ?? document.id, document.title);
+        set({ sourceDocuments: [doc] });
+      }
+      const first = get().sourceDocuments[0];
+      // 「确认 Markdown」必须把解析结果置为 completed，
+      // 否则「确认并提取知识结构」按钮（依赖 isCompleted）永远不会出现。
+      set({
+        stage: 'mineru',
+        mineruParseResult: {
+          status: 'completed', progress: 100, markdown: first?.markdown ?? '',
+          assets: [], sourceFileName: document.fileName, completedAt: Date.now(),
+        },
+      });
       saveState(get());
       return;
     }

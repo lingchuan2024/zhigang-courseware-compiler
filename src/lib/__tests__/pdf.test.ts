@@ -44,4 +44,15 @@ describe('pdf validation', () => {
     expect(result.valid).toBe(false);
     expect(result.error).toContain('PPTX');
   });
+
+  it('should accept .md and .markdown files', () => {
+    const md = new File(['# 标题'], 'lecture.md', { type: 'text/markdown' });
+    expect(validateFile(md).valid).toBe(true);
+
+    const markdown = new File(['# 标题'], 'lecture.markdown', { type: '' });
+    expect(validateFile(markdown).valid).toBe(true);
+
+    const mdNoMime = new File(['# 标题'], 'lecture.md', { type: '' });
+    expect(validateFile(mdNoMime).valid).toBe(true);
+  });
 });

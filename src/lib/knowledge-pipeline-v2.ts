@@ -55,6 +55,24 @@ export interface PipelineOptionsV2 {
   onNoteProgress?: (current: number, total: number) => void;
 }
 
+/** 认证类错误（401 等）的附加提示。 */
+const AUTH_ERROR_HINT = ' —— API Key 无效或被服务端拒绝，请在「服务配置」中检查知识生成模型密钥';
+
+/** 把窗口提取的真实失败原因转成面向用户的错误行（去重、限量、附加认证提示）。 */
+function describeWindowFailures(windowErrors: string[]): string[] {
+  const unique = [...new Set(windowErrors)];
+  const lines = unique.slice(0, 3).map(message => {
+    const hint = /401|Unauthorized|invalid[_ ]?api[_ ]?key|Incorrect API key|api key not valid/i.test(message)
+      ? AUTH_ERROR_HINT
+      : '';
+    return `候选知识点提取失败：${message}${hint}`;
+  });
+  if (unique.length > 3) {
+    lines.push(`…另有 ${unique.length - 3} 个窗口同样失败`);
+  }
+  return lines;
+}
+
 // ========== 管线结果 ==========
 
 export interface PipelineResultV2 {
@@ -128,7 +146,7 @@ export async function runKnowledgePipeline(
   // ========== 阶段 2 + 3: Window Understanding + Topic Extraction ==========
 
   options.onStatusChange?.('window-analysis');
-  const { analyses, windowCount, failedWindows } =
+  const { analyses, windowCount, failedWindows, windowErrors } =
     await extractCandidatesFromAllWindows(
       config,
       allBlocks,
@@ -143,7 +161,13 @@ export async function runKnowledgePipeline(
   const allCandidates = analyses.flatMap(a => a.candidateTopics);
 
   if (allCandidates.length === 0) {
-    errors.push('候选知识点提取为空');
+    // 候选为空几乎总是模型调用失败导致：把窗口的真实错误（如 401/超时）透出到 UI，
+    // 而不是只给一句无信息量的"提取为空"。
+    if (windowErrors.length > 0) {
+      errors.push(...describeWindowFailures(windowErrors));
+    } else {
+      errors.push('候选知识点提取为空（未产生失败窗口，请检查课件内容是否为空）');
+    }
     return createEmptyResult(sourceDocuments, allBlocks, warnings, errors, 'failed');
   }
 
