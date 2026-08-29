@@ -443,6 +443,9 @@ export const useStore = create<AppState>((set, get) => ({
         isEstimated: true,
       },
     });
+    // 立即落盘：提取中途刷新/中断时，工作区应恢复到 structure 阶段（含 running→idle 降级），
+    // 而不是退回 mineru 阶段重看解析结果。
+    saveState(get());
     startProgressTimer();
 
     try {
