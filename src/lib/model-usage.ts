@@ -184,6 +184,8 @@ export function extractUsage(
     usage?: {
       prompt_tokens?: number;
       completion_tokens?: number;
+      input_tokens?: number;
+      output_tokens?: number;
       total_tokens?: number;
       prompt_cache_hit_tokens?: number;
       prompt_cache_miss_tokens?: number;
@@ -192,8 +194,8 @@ export function extractUsage(
 
   const usage = data?.usage;
 
-  const promptTokens = usage?.prompt_tokens;
-  const completionTokens = usage?.completion_tokens;
+  const promptTokens = usage?.prompt_tokens ?? usage?.input_tokens;
+  const completionTokens = usage?.completion_tokens ?? usage?.output_tokens;
   const totalTokens = usage?.total_tokens;
   const promptCacheHitTokens = usage?.prompt_cache_hit_tokens;
   const promptCacheMissTokens = usage?.prompt_cache_miss_tokens;

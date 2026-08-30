@@ -141,10 +141,14 @@ export interface CoursePage {
 
 
 // 模型配置
+export type ModelApiMode = 'chat-completions' | 'responses';
+
 export interface ModelConfig {
   endpoint: string;
   model: string;
   apiKey: string;
+  /** Missing on legacy saved configs; callers must default it to chat-completions. */
+  apiMode?: ModelApiMode;
 }
 
 /** MinerU 精准解析 API 配置。与知识生成模型配置完全独立。 */

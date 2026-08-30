@@ -33,6 +33,7 @@ const DEFAULT_MODEL: ModelConfig = {
   endpoint: DEFAULT_PROVIDER.endpoint,
   model: DEFAULT_PROVIDER.defaultModel,
   apiKey: '',
+  apiMode: DEFAULT_PROVIDER.apiMode,
 };
 
 const CUSTOM_PROVIDER_HINT = '使用任意 OpenAI-compatible 服务，并手动填写地址与模型名称。';
@@ -53,7 +54,8 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
   useEffect(() => {
     if (!isOpen) return;
     setMineru(storedMinerU ?? DEFAULT_MINERU);
-    const nextModel = storedModel ?? DEFAULT_MODEL;
+    const sourceModel = storedModel ?? DEFAULT_MODEL;
+    const nextModel = { ...sourceModel, apiMode: sourceModel.apiMode ?? 'chat-completions' } as ModelConfig;
     setModel(nextModel);
     setSelectedProviderId(findModelProviderByEndpoint(nextModel.endpoint)?.id ?? CUSTOM_MODEL_PROVIDER_ID);
     setMineruError('');
@@ -70,10 +72,18 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
 
   const selectProvider = (providerId: ModelProviderSelection) => {
     setSelectedProviderId(providerId);
-    if (providerId === CUSTOM_MODEL_PROVIDER_ID) return;
+    if (providerId === CUSTOM_MODEL_PROVIDER_ID) {
+      setModel(current => ({ ...current, apiMode: 'chat-completions' }));
+      return;
+    }
     const provider = MODEL_PROVIDER_PRESETS.find(item => item.id === providerId);
     if (!provider) return;
-    setModel(current => ({ ...current, endpoint: provider.endpoint, model: provider.defaultModel }));
+    setModel(current => ({
+      ...current,
+      endpoint: provider.endpoint,
+      model: provider.defaultModel,
+      apiMode: provider.apiMode,
+    }));
   };
 
   const save = async () => {
@@ -176,7 +186,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
             <div className="flex items-start justify-between mb-5">
               <div>
                 <p className="text-xs uppercase tracking-wider text-cinnabar font-semibold">02 · 知识生成</p>
-                <h3 className="font-song text-lg font-bold text-ink mt-1">OpenAI-compatible 模型</h3>
+                <h3 className="font-song text-lg font-bold text-ink mt-1">知识生成模型</h3>
                 <p className="mt-1 text-xs text-space-muted">用于主题提取、结构合并、学习顺序与笔记生成。</p>
               </div>
               <span className={`rounded-full border px-2 py-1 text-xs ${model.apiKey && modelValidation.valid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-300'}`}>
@@ -208,8 +218,9 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                   value={model.endpoint}
                   onChange={event => {
                     const endpoint = event.target.value;
-                    setModel({ ...model, endpoint });
-                    setSelectedProviderId(findModelProviderByEndpoint(endpoint)?.id ?? CUSTOM_MODEL_PROVIDER_ID);
+                    const provider = findModelProviderByEndpoint(endpoint);
+                    setModel({ ...model, endpoint, apiMode: provider?.apiMode ?? 'chat-completions' });
+                    setSelectedProviderId(provider?.id ?? CUSTOM_MODEL_PROVIDER_ID);
                     setModelError('');
                   }}
                   placeholder="https://api.deepseek.com"

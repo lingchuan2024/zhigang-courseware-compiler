@@ -1,4 +1,4 @@
-import { ModelConfig } from '../types';
+import { ModelConfig, type ModelApiMode } from '../types';
 import { type CompiledPrompt } from './prompt-builder';
 import {
   type ModelTaskType,
@@ -47,6 +47,66 @@ function isTransientStatus(status: number): boolean {
 
 const defaultSleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
+function getApiMode(config: ModelConfig): ModelApiMode {
+  return config.apiMode ?? 'chat-completions';
+}
+
+function buildRequestUrl(config: ModelConfig): string {
+  const endpoint = config.endpoint.trim().replace(/\/+$/, '');
+  const suffix = getApiMode(config) === 'responses' ? '/responses' : '/chat/completions';
+  return endpoint.endsWith(suffix) ? endpoint : `${endpoint}${suffix}`;
+}
+
+function buildCompletionBody(config: ModelConfig, compiled: CompiledPrompt): Record<string, unknown> {
+  if (getApiMode(config) === 'responses') {
+    return {
+      model: config.model,
+      input: compiled.messages,
+      max_output_tokens: 8192,
+      text: { format: { type: 'json_object' } },
+    };
+  }
+  return {
+    model: config.model,
+    messages: compiled.messages,
+    temperature: 0.2,
+    max_tokens: 8192,
+    response_format: { type: 'json_object' },
+  };
+}
+
+function extractResponsePayload(
+  rawData: unknown,
+  apiMode: ModelApiMode,
+): { content: string; truncated: boolean } {
+  if (apiMode === 'chat-completions') {
+    const data = rawData as {
+      choices?: Array<{ finish_reason?: string; message?: { content?: string } }>;
+    };
+    const choice = data.choices?.[0];
+    return {
+      content: choice?.message?.content ?? '',
+      truncated: choice?.finish_reason === 'length',
+    };
+  }
+
+  const data = rawData as {
+    status?: string;
+    output_text?: string;
+    output?: Array<{
+      type?: string;
+      content?: Array<{ type?: string; text?: string }>;
+    }>;
+  };
+  const content = data.output_text ?? data.output
+    ?.filter(item => item.type === 'message')
+    .flatMap(item => item.content ?? [])
+    .filter(item => item.type === 'output_text' && typeof item.text === 'string')
+    .map(item => item.text)
+    .join('') ?? '';
+  return { content, truncated: data.status === 'incomplete' };
+}
+
 async function fetchWithTransientRetry(
   url: string,
   config: ModelConfig,
@@ -72,13 +132,7 @@ async function fetchWithTransientRetry(
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${config.apiKey}`,
         },
-        body: JSON.stringify({
-          model: config.model,
-          messages: compiled.messages,
-          temperature: 0.2,
-          max_tokens: 8192,
-          response_format: { type: 'json_object' },
-        }),
+        body: JSON.stringify(buildCompletionBody(config, compiled)),
         signal: AbortSignal.timeout(timeout),
       });
     } catch (e) {
@@ -126,10 +180,8 @@ export async function callChatCompletion<T>(
   stage?: ExtractionStage,
   sleep: (ms: number) => Promise<void> = defaultSleep,
 ): Promise<CompletionResult<T>> {
-  const endpoint = config.endpoint.replace(/\/$/, '');
-  const url = endpoint.endsWith('/chat/completions')
-    ? endpoint
-    : `${endpoint}/chat/completions`;
+  const apiMode = getApiMode(config);
+  const url = buildRequestUrl(config);
 
   const startedAt = Date.now();
   const maxStructuredAttempts = 2;
@@ -139,9 +191,9 @@ export async function callChatCompletion<T>(
     const response = await fetchWithTransientRetry(url, config, compiled, timeout, stage, sleep);
 
     const rawData = await response.json();
-    const choice = rawData.choices?.[0];
-    const rawContent: string = choice?.message?.content || '';
-    const wasTruncated = choice?.finish_reason === 'length';
+    const payload = extractResponsePayload(rawData, apiMode);
+    const rawContent = payload.content;
+    const wasTruncated = payload.truncated;
     const parsed = rawContent ? parseJsonFromResponse(rawContent) : null;
 
     if (!wasTruncated && parsed !== null) {
@@ -159,7 +211,9 @@ export async function callChatCompletion<T>(
 
     const code = wasTruncated || !rawContent ? 'response-truncated' : 'json-parse-failed';
     const message = !rawContent
-      ? 'API 返回的 choices[0].message.content 为空'
+      ? apiMode === 'responses'
+        ? 'API 返回的 output_text 为空'
+        : 'API 返回的 choices[0].message.content 为空'
       : wasTruncated
         ? `模型输出达到长度上限，JSON 未完成（前 200 字符：${rawContent.substring(0, 200)}）`
         : `模型输出不是合法 JSON（前 200 字符：${rawContent.substring(0, 200)}）`;
@@ -188,7 +242,7 @@ export interface ModelVerificationResult {
 }
 
 /**
- * 保存配置前验证模型可用性：发送一次最小 chat 请求，只看 HTTP 状态，不解析内容。
+ * 保存配置前验证模型可用性：按配置发送一次最小请求，只看 HTTP 状态，不解析内容。
  * - 200 / 429（限流=认证已通过）视为可用
  * - 401/403 判定 Key 无效；404 多为地址或模型名错误；其余按服务端错误提示
  * - 网络失败/超时给出针对性排查提示
@@ -203,9 +257,8 @@ export async function verifyModelConfig(
   if (!endpoint || !model || !apiKey) {
     return { ok: false, error: '请完整填写 API 地址、模型名称和 API Key' };
   }
-  const url = endpoint.endsWith('/chat/completions')
-    ? endpoint
-    : `${endpoint}/chat/completions`;
+  const apiMode = getApiMode(config);
+  const url = buildRequestUrl({ ...config, endpoint, model, apiKey });
   try {
     const response = await fetch(url, {
       method: 'POST',
@@ -213,11 +266,9 @@ export async function verifyModelConfig(
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: 'user', content: 'ping' }],
-        max_tokens: 8,
-      }),
+      body: JSON.stringify(apiMode === 'responses'
+        ? { model, input: 'ping', max_output_tokens: 64 }
+        : { model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 8 }),
       signal: AbortSignal.timeout(timeoutMs),
     });
     if (response.ok || response.status === 429) {

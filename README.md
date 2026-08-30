@@ -10,7 +10,7 @@ MinerU Markdown → 稳定证据片段 → 章节统一编译 → 课程知识�
 ```
 
 纯前端应用：解析、结构化、笔记生成和问答全部在浏览器本地完成，AI 能力通过用户自备的
-OpenAI 兼容接口（BYOK）接入，API Key 只保存在页面内存中。
+OpenAI-compatible 与 Agent Plan（BYOK）接入，API Key 只保存在当前浏览器本地。
 
 ## 核心原则
 
@@ -48,7 +48,7 @@ OpenAI 兼容接口（BYOK）接入，API Key 只保存在页面内存中。
 
 ```bash
 pnpm install
-pnpm dev        # 开发模式（内置 /api/mineru 本地代理，解决开发期 CORS）
+pnpm dev        # 开发模式（内置 MinerU 与 Agent Plan 同源代理）
 pnpm test       # 测试
 pnpm check      # TypeScript 类型检查
 pnpm lint       # ESLint
@@ -62,19 +62,23 @@ pnpm build      # 生产构建（tsc -b && vite build）
 
 ### 配置 AI（可选）
 
-侧栏"模型设置"填入 OpenAI 兼容接口（endpoint + model + apiKey，支持 OpenAI、DeepSeek、
-本地 Ollama 等）。配置后章节结构编译、课程级审查、卡片深化与章节笔记由模型生成；MinerU 解析
-需要在设置中单独配置 MinerU API（mineru.net）。
+侧栏"模型设置"可选 OpenAI-compatible 供应商（OpenAI、DeepSeek 等），也可直接选
+"火山方舟 Agent Plan"。Agent Plan 预设使用 Responses API、模型 `glm-5-3-flash-260901`
+与同源代理地址 `/api/ark-agent-plan/v3`；填入 Agent Plan 专属 Token 后保存即可。不要把 Token
+写入源码、`.env` 或 Nginx 配置。MinerU 解析需要在设置中单独配置 MinerU API。
 
 ## 部署
 
-静态站点，`pnpm build` 后将 `dist/` 部署到任意静态服务器。生产环境需要反向代理两条路径
-（等价于 `vite/mineru-proxy.ts` 在开发期提供的能力）：
+静态站点，`pnpm build` 后将 `dist/` 部署到任意静态服务器。生产环境需要反向代理三类路径
+（开发和 `vite preview` 由 `vite/mineru-proxy.ts` 与 `vite/ark-agent-plan-proxy.ts` 自动提供）：
 
 - `/api/mineru/v4/*` → `https://mineru.net`
 - `/api/mineru/resource/*` → MinerU 结果文件所在的白名单域
+- `/api/ark-agent-plan/v3/responses` → `https://ark.cn-beijing.volces.com/api/plan/v3/responses`
 
-参考 `deploy.sh`（rsync 到 Nginx 静态目录）。
+参考 `deploy.sh`（rsync 到 Nginx 静态目录）与 `deploy/nginx-agent-plan.conf.example`。
+Agent Plan 代理必须保留浏览器传入的 `Authorization` 请求头，并启用上游 TLS SNI；
+不应记录请求头或请求体。
 
 ## 技术栈
 
@@ -89,7 +93,7 @@ pnpm build      # 生产构建（tsc -b && vite build）
 
 - 课件解析、结构组织、笔记渲染全部在浏览器本地完成
 - 只有用户主动配置模型/MinerU 后，相关内容才会发送到对应 API
-- API Key 仅保存在页面内存，刷新后需重新输入
+- API Key 仅保存在当前浏览器的本地配置中，不进入项目导出或 Git
 - **持久化（v10）**：项目数据唯一真相源是 IndexedDB 课程库（快照、原始文件、检索记录、问答会话）；localStorage 只存一个约 100 字节的工作区指针和模型/MinerU 配置，项目数据不再进入 localStorage，多课件并存不再受 5MB 配额限制
 - 刷新后回到首页，从课件库打开课件即可恢复到离开时的阶段
 
@@ -97,7 +101,7 @@ pnpm build      # 生产构建（tsc -b && vite build）
 
 - 检索为词法匹配（bigram + token 加权）+ 提问前的一次查询改写（把问题转写为卡片术语词表内的检索词，失败自动回退原问题）；无语义向量召回
 - 重跑 MinerU 采用内容级增量：未变化章节复用编译 checkpoint，不发生结构提取调用；人工修正且证据仍有效的主题与顺序约束会被保留
-- 仅支持 OpenAI 兼容单一协议，无多供应商适配（限流/5xx 已有指数退避与 Retry-After 支持，用量统计在本机累计并在服务配置中查看）
+- 支持 OpenAI-compatible Chat Completions 与火山方舟 Agent Plan Responses；其他非兼容协议仍需单独适配
 - 知识网只读浏览（不支持拖节点/手动加删边）
 - 跨课件统一笔记未实现（数据基础已预留，见下阶段计划）
 

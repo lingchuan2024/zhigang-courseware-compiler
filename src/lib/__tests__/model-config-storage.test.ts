@@ -37,7 +37,34 @@ describe('local model configuration storage', () => {
       endpoint: 'https://api.example.com',
       model: 'example-chat',
       apiKey: 'test-secret',
+      apiMode: 'chat-completions',
     });
+  });
+
+  it('round-trips a Responses configuration', () => {
+    saveStoredModelConfig({
+      endpoint: '/api/ark-agent-plan/v3',
+      model: 'glm-5-3-flash-260901',
+      apiKey: 'test-secret',
+      apiMode: 'responses',
+    });
+
+    expect(loadStoredModelConfig()).toEqual({
+      endpoint: '/api/ark-agent-plan/v3',
+      model: 'glm-5-3-flash-260901',
+      apiKey: 'test-secret',
+      apiMode: 'responses',
+    });
+  });
+
+  it('rejects an unknown API mode', () => {
+    localStorage.setItem('zhigang_model_config', JSON.stringify({
+      endpoint: 'https://api.example.com',
+      model: 'example-chat',
+      apiKey: 'test-secret',
+      apiMode: 'unknown',
+    }));
+    expect(loadStoredModelConfig()).toBeNull();
   });
 
   it('removes the saved configuration only when explicitly cleared', () => {

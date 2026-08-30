@@ -118,6 +118,7 @@ describe('SettingsModal model provider presets', () => {
       '智谱 BigModel',
       'Kimi',
       '火山方舟',
+      '火山方舟 Agent Plan',
       '硅基流动',
       'OpenAI',
       'OpenRouter',
@@ -202,7 +203,7 @@ describe('SettingsModal model provider presets', () => {
       .toBe('https://platform.kimi.com/console/api-keys');
   });
 
-  it('saves only the existing three model configuration fields', async () => {
+  it('saves chat-completions mode with an existing provider', async () => {
     const { container } = renderModal({ mode: 'default' });
     setSelect(container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!, 'modelark');
     setInput(container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!, 'modelark-key');
@@ -219,6 +220,33 @@ describe('SettingsModal model provider presets', () => {
       endpoint: 'https://ai.gitee.com/v1',
       model: 'GLM-5',
       apiKey: 'modelark-key',
+      apiMode: 'chat-completions',
+    });
+  });
+
+  it('selects Agent Plan as a Responses provider with its exact model id', async () => {
+    const { container } = renderModal({ mode: 'default' });
+    setSelect(
+      container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!,
+      'volcengine-agent-plan',
+    );
+    setInput(container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!, 'agent-plan-test-key');
+
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')?.value)
+      .toBe('/api/ark-agent-plan/v3');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')?.value)
+      .toBe('glm-5-3-flash-260901');
+    expect(container.querySelector('#model-provider-hint')?.textContent).toContain('Responses');
+
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    await act(async () => save.click());
+
+    expect(verifyMock).toHaveBeenCalledWith({
+      endpoint: '/api/ark-agent-plan/v3',
+      model: 'glm-5-3-flash-260901',
+      apiKey: 'agent-plan-test-key',
+      apiMode: 'responses',
     });
   });
 });
