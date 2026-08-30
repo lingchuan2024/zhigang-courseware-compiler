@@ -95,6 +95,8 @@ export type CourseStructureIssueCode =
   | 'UNKNOWN_TOPIC'
   | 'HARD_ORDER_CYCLE'
   | 'FAILED_SECTION_BATCH'
+  | 'CURRICULUM_REVIEW_FAILED'
+  | 'UNRESOLVED_REFERENCE'
   | 'LOW_COVERAGE';
 
 export interface CourseStructureIssue {
