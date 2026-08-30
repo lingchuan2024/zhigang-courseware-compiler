@@ -7,3 +7,5 @@ export * from './section-batching';
 export * from './section-compiler';
 export * from './candidate-normalizer';
 export * from './curriculum-review';
+export * from './validator';
+export * from './legacy-adapter';
