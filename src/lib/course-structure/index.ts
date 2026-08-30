@@ -4,3 +4,4 @@ export * from './evidence-span';
 export * from './course-scheduler';
 export * from './teaching-path-compiler';
 export * from './section-batching';
+export * from './section-compiler';

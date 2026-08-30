@@ -11,6 +11,8 @@ export type ModelTaskType =
   | 'topic-candidate-extraction'
   | 'topic-granularity-judgment'
   | 'topic-quality-repair'
+  | 'course-section-compile'
+  | 'course-curriculum-review'
   | 'query-rewrite';
 
 export interface ModelUsage {

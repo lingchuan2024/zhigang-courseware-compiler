@@ -25,6 +25,8 @@ export type ExtractionStage =
   | 'targeted-repair'
   | 'relation-extraction'
   | 'internal-structure'
+  | 'section-compile'
+  | 'curriculum-review'
   | 'note-generation'
   | 'unknown';
 
@@ -70,6 +72,8 @@ export class ExtractionError extends Error {
       'targeted-repair': '定向修复',
       'relation-extraction': '关系提取',
       'internal-structure': '内部结构生成',
+      'section-compile': '章节课程结构编译',
+      'curriculum-review': '课程结构审查',
       'note-generation': '笔记生成',
       'unknown': '处理',
     };
