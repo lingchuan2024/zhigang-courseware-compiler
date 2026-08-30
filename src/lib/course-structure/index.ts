@@ -6,3 +6,4 @@ export * from './teaching-path-compiler';
 export * from './section-batching';
 export * from './section-compiler';
 export * from './candidate-normalizer';
+export * from './curriculum-review';
