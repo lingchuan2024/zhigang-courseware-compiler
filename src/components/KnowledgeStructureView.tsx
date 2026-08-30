@@ -55,6 +55,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const isRunning = jobStatus === 'running';
   const isBlocked = knowledgePipelineStatus === 'model-required';
   const isFailed = knowledgePipelineStatus === 'failed' || structureExtractionStatus === 'failed';
+  const isDegraded = knowledgePipelineStatus === 'degraded';
 
   const courseNetwork = useMemo(
     () => buildCourseNetwork(knowledgeTopics, topicRelations, courseLearningPath),
@@ -241,6 +242,17 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
           <button type="button" onClick={() => navigateToStage('cards')} className="btn-primary">查看知识卡片</button>
         </div>
       </header>
+
+      {isDegraded && (
+        <div className="flex flex-shrink-0 items-start gap-2 border-b border-amber-400/20 bg-amber-400/10 px-5 py-2 text-xs text-amber-200" role="status">
+          <span className="font-semibold">课程结构已降级</span>
+          <span>
+            {structureQuality?.qualityIssues?.length
+              ? structureQuality.qualityIssues.join('；')
+              : '部分章节或证据未通过校验，当前可用结构已保留。'}
+          </span>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1">

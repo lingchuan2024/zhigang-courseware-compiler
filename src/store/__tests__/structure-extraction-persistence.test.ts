@@ -12,6 +12,7 @@ Object.defineProperty(globalThis, 'localStorage', { value: localStorageMock, con
 import { act } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PipelineResultV2 } from '../../lib/knowledge-pipeline-v2';
+import type { CourseLearningStructure } from '../../lib/course-structure/types';
 
 const mirrors = vi.hoisted(() => ({
   runKnowledgePipeline: vi.fn(),
@@ -60,6 +61,62 @@ beforeEach(() => {
 });
 
 describe('startKnowledgePipeline persistence', () => {
+  it('stores and mirrors a degraded canonical structure as a usable result', async () => {
+    seedExtractable();
+    const canonical: CourseLearningStructure = {
+      courseId: 'course-1', sourceVersion: 1, structureVersion: 1, compilerVersion: 'v1',
+      topics: [], teachingUnits: [], evidenceSpans: [], orderConstraints: [], orderedTopicIds: [],
+      teachingPaths: {}, status: 'degraded', checkpoints: [],
+      validation: {
+        issues: [{ code: 'FAILED_SECTION_BATCH', severity: 'error', message: '一个章节批次失败' }],
+        meaningfulBlockCount: 1, coveredMeaningfulBlockCount: 0, coverageRate: 0,
+      },
+    };
+    const result: PipelineResultV2 = {
+      sourceDocuments: useStore.getState().sourceDocuments,
+      allBlocks: [],
+      courseLearningStructure: canonical,
+      topics: [{
+        id: 'topic-1', courseId: 'course-1', name: '可用主题', aliases: [], summary: '摘要',
+        learningObjective: '学习', sourceRanges: [], childTopicIds: [], importance: 'core', difficulty: 1,
+        knowledgeGenre: 'concept', confidence: 0.8, status: 'generated',
+      }],
+      topicRelations: [], teachingBlocks: [], teachingRelations: [],
+      courseLearningPath: { orderedTopicIds: ['topic-1'], steps: [] }, narrativePaths: {},
+      knowledgeCards: [], topicNotes: [], glossary: [], formulaCards: [], unassignedBlocks: [],
+      versions: {
+        source: 1, normalization: 1, topicStructure: 1, teachingStructure: 1,
+        ordering: 1, cards: 0, notes: 0, embeddings: 0,
+      },
+      validation: {
+        errors: [{ code: 'FAILED_SECTION_BATCH', message: '一个章节批次失败', severity: 'error' }],
+        warnings: [],
+        coverage: { totalBlocks: 1, assignedBlocks: 0, unassignedBlocks: [], coverageRate: 0 },
+        topicStats: { totalTopics: 1, topicsWithTeachingBlocks: 0, avgTeachingBlocksPerTopic: 0 },
+        qualityIssues: ['一个章节批次失败'],
+      },
+      warnings: [], errors: ['一个章节批次失败'], status: 'degraded',
+    };
+    mirrors.runKnowledgePipeline.mockResolvedValueOnce(result);
+
+    await act(async () => { await useStore.getState().startKnowledgePipeline(); });
+    await act(async () => { await flushPendingSaves(); });
+
+    expect(mirrors.runKnowledgePipeline).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), 'course-1',
+      expect.objectContaining({
+        sourceDocuments: useStore.getState().sourceDocuments,
+        previousStructure: null,
+      }),
+    );
+    expect(useStore.getState().courseLearningStructure).toBe(canonical);
+    expect(useStore.getState().knowledgePipelineStatus).toBe('degraded');
+    expect(useStore.getState().jobStatus).toBe('completed');
+    expect(useStore.getState().structureQuality?.qualityIssues).toEqual(['一个章节批次失败']);
+    const mirrored = mirrors.saveLibraryProjectSnapshot.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(mirrored.courseLearningStructure).toEqual(canonical);
+  });
+
   it('persists stage=structure at extraction start so a mid-extraction reload restores the structure view', async () => {
     seedExtractable();
     let rejectPipeline!: (reason: Error) => void;

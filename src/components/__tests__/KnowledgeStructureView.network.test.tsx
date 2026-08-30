@@ -142,6 +142,24 @@ describe('KnowledgeStructureView two-layer network', () => {
     act(() => useStore.setState({ structureQuality: null }));
   });
 
+  it('keeps a degraded structure browsable and shows its quality warning', () => {
+    act(() => useStore.setState({
+      knowledgePipelineStatus: 'degraded',
+      jobStatus: 'completed',
+      structureQuality: {
+        coverageRate: 0.6, totalBlocks: 10, assignedBlocks: 6,
+        topicCount: 2, topicsWithTeachingBlocks: 1,
+        qualityIssues: ['一个章节批次失败'],
+      },
+    }));
+
+    const { container } = renderView();
+    expect(container.querySelector('[data-testid="knowledge-network-canvas"]')).not.toBeNull();
+    expect(container.textContent).toContain('课程结构已降级');
+    expect(container.textContent).toContain('一个章节批次失败');
+    expect(container.textContent).not.toContain('处理失败');
+  });
+
   it('marks reparse-affected topics with a stale badge', () => {
     act(() => useStore.setState({
       staleMarker: {

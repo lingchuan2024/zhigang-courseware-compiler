@@ -488,6 +488,8 @@ export interface StructureQuality {
   assignedBlocks: number;
   topicCount: number;
   topicsWithTeachingBlocks: number;
+  /** 编译器发现的可展示质量问题；degraded 状态下不会阻断结构浏览。 */
+  qualityIssues?: string[];
 }
 
 export interface ProductStateSnapshot {
@@ -1154,6 +1156,7 @@ export type V2PipelineStage =
   | 'note-generation'
   | 'validation'
   | 'ready'
+  | 'degraded'
   | 'failed'
   | 'model-required';
 

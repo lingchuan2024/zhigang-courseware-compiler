@@ -28,8 +28,8 @@ import {
   failProgress,
   failProgressWithStage,
   completeProgress,
-  updateCurrentItem,
   updateWindowProgress,
+  updateCompilerProgress,
   tickEstimatedProgress,
 } from '../lib/pipeline-progress';
 import {
@@ -125,6 +125,7 @@ function buildStructureQuality(validation: PipelineResultV2['validation'] | unde
     assignedBlocks: validation.coverage.assignedBlocks,
     topicCount: validation.topicStats.totalTopics,
     topicsWithTeachingBlocks: validation.topicStats.topicsWithTeachingBlocks,
+    qualityIssues: validation.qualityIssues,
   };
 }
 
@@ -411,7 +412,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   startKnowledgePipeline: async () => {
-    const { sourceDocuments, modelConfig } = get();
+    const { sourceDocuments, modelConfig, courseLearningStructure } = get();
 
     if (!modelConfig?.apiKey) {
       set({
@@ -473,40 +474,30 @@ export const useStore = create<AppState>((set, get) => ({
       const courseId = sourceDocuments[0]?.courseId ?? `course_${Date.now()}`;
 
       const result = await runKnowledgePipeline(modelConfig, markdownTexts, courseId, {
+        sourceDocuments,
+        previousStructure: courseLearningStructure,
         onStatusChange: (status) => {
           set({ knowledgePipelineStatus: status });
+        },
+        onCompilerStage: (stage) => {
+          set({ pipelineProgress: updateCompilerProgress(get().pipelineProgress, stage) });
         },
         onWindowProgress: (current, total) => {
           const p = get().pipelineProgress;
           set({ pipelineProgress: updateWindowProgress(p, current, total) });
         },
-        onTopicProgress: (current, total) => {
-          set({
-            pipelineProgress: updateCurrentItem(
-              get().pipelineProgress,
-              current,
-              total,
-              `提取讲解结构 ${current}/${total}`,
-            ),
-          });
-        },
-        onNoteProgress: (current, total) => {
-          set({
-            pipelineProgress: updateCurrentItem(
-              get().pipelineProgress,
-              current,
-              total,
-              `生成笔记 ${current}/${total}`,
-            ),
-          });
-        },
       });
 
       stopProgressTimer();
+      const usable = (result.status === 'ready' || result.status === 'degraded')
+        && result.topics.length > 0;
 
       set({
         knowledgePipelineStatus: result.status,
+        structureExtractionStatus: usable ? 'ready' : 'failed',
+        extractionErrors: result.errors,
         sourceDocuments: result.sourceDocuments,
+        courseLearningStructure: result.courseLearningStructure,
         knowledgeTopics: result.topics,
         topicRelations: result.topicRelations,
         teachingBlocks: result.teachingBlocks,
@@ -524,8 +515,8 @@ export const useStore = create<AppState>((set, get) => ({
         unassignedBlocks: result.unassignedBlocks,
         knowledgeBaseVersions: result.versions,
         structureQuality: buildStructureQuality(result.validation),
-        jobStatus: result.status === 'ready' ? 'completed' : 'failed',
-        pipelineProgress: result.status === 'ready'
+        jobStatus: usable ? 'completed' : 'failed',
+        pipelineProgress: usable
           ? completeProgress(get().pipelineProgress)
           : failProgress(get().pipelineProgress, result.errors.join('; ')),
       });
