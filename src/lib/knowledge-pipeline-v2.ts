@@ -80,8 +80,8 @@ const AUTH_ERROR_HINT = ' —— API Key 无效或被服务端拒绝，请在「
 
 const COMPILER_STATUS: Record<CourseCompilerStage, V2PipelineStage> = {
   batching: 'normalizing',
-  compiling: 'topic-extraction',
-  normalizing: 'topic-reconciliation',
+  compiling: 'compiling-sections',
+  normalizing: 'normalizing-topics',
   reviewing: 'ordering',
   scheduling: 'ordering',
   validating: 'validation',
