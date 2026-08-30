@@ -10,3 +10,4 @@ export * from './curriculum-review';
 export * from './validator';
 export * from './legacy-adapter';
 export * from './compiler';
+export * from './incremental-reconcile';

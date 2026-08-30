@@ -3,6 +3,7 @@ import { normalizeCandidates, type ResolvedTopicDraft } from './candidate-normal
 import { compileCourseOrder } from './course-scheduler';
 import { reviewCurriculum } from './curriculum-review';
 import { resolveEvidenceSpan } from './evidence-span';
+import { preserveCorrectedObjects } from './incremental-reconcile';
 import { buildSectionBatches, type SectionBatch } from './section-batching';
 import { compileSectionBatch } from './section-compiler';
 import { constraintStableKey, teachingUnitStableKey } from './stable-identity';
@@ -64,7 +65,8 @@ async function mapConcurrent<T, R>(
 }
 
 function effectiveCacheKey(batch: SectionBatch, config: ModelConfig): string {
-  return `${batch.cacheKey}:${config.endpoint.replace(/\/$/, '')}:${config.model}`;
+  void config;
+  return batch.cacheKey;
 }
 
 function unionInOrder(...groups: string[][]): string[] {
@@ -384,7 +386,7 @@ export async function compileCourseStructure(
   };
   const structureChanged = !previous || canonicalSignature(base) !== canonicalSignature(previous);
 
-  return {
+  return preserveCorrectedObjects(previous, {
     courseId,
     sourceVersion: previous ? previous.sourceVersion + (sourceChanged ? 1 : 0) : 1,
     structureVersion: previous ? previous.structureVersion + (structureChanged ? 1 : 0) : 1,
@@ -393,5 +395,5 @@ export async function compileCourseStructure(
     status: validated.status,
     validation: validated.validation,
     checkpoints,
-  };
+  });
 }

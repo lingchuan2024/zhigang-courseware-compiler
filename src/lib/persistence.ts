@@ -34,7 +34,7 @@ const PERSISTED_KEYS: (keyof ProjectState)[] = [
   'pipelineProgress',
   'staleMarker',
   'structureExtractionStatus', 'extractionErrors',
-  'sourceDocuments', 'knowledgeTopics', 'topicRelations',
+  'sourceDocuments', 'courseLearningStructure', 'knowledgeTopics', 'topicRelations',
   'teachingBlocks', 'teachingRelations', 'courseLearningPath',
   'narrativePaths', 'knowledgeCards', 'topicNotes',
   'topicSyntheses', 'chapterPlan', 'chapterNotes', 'courseMasterNote',

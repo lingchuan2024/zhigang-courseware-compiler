@@ -65,6 +65,7 @@ const initialState: ProjectState = {
   generationMemory: initialMemory,
   // v6 新架构
   sourceDocuments: [],
+  courseLearningStructure: null,
   knowledgeTopics: [],
   topicRelations: [],
   teachingBlocks: [],
@@ -224,6 +225,7 @@ export const useStore = create<AppState>((set, get) => ({
       staleMarker: null,
       viewMode: 'view',
       sourceDocuments: doc.fileType === 'markdown' ? get().sourceDocuments : [],
+      courseLearningStructure: null,
       mineruParseResult: doc.fileType === 'markdown' ? get().mineruParseResult : null,
       knowledgeTopics: [],
       topicRelations: [],
@@ -874,6 +876,7 @@ export const useStore = create<AppState>((set, get) => ({
   resetKnowledgeBase: () => {
     set({
       sourceDocuments: [],
+      courseLearningStructure: null,
       knowledgeTopics: [],
       topicRelations: [],
       teachingBlocks: [],
@@ -911,6 +914,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       document: example.document,
       sourceDocuments: example.sourceDocuments,
+      courseLearningStructure: null,
       knowledgeTopics: example.knowledgeTopics,
       topicRelations: example.topicRelations,
       teachingBlocks: example.teachingBlocks,

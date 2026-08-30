@@ -184,4 +184,13 @@ describe('pickPersistedFields', () => {
     });
     expect(Object.keys(picked).sort()).toEqual(['document', 'knowledgeCards', 'stage']);
   });
+
+  it('keeps the canonical course learning structure and its checkpoints', () => {
+    const courseLearningStructure = {
+      courseId: 'course-1',
+      checkpoints: [{ cacheKey: 'cache-a', batchId: 'batch-a' }],
+    };
+    const picked = pickPersistedFields({ courseLearningStructure });
+    expect(picked.courseLearningStructure).toEqual(courseLearningStructure);
+  });
 });

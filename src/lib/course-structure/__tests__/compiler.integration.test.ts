@@ -88,4 +88,32 @@ describe('course structure compiler integration', () => {
     expect(Object.values(result.teachingPaths).every(path => path.length > 0)).toBe(true);
     expect(result.status).toBe('ready');
   });
+
+  it('reuses every unchanged checkpoint without recompiling a section', async () => {
+    const documents = [document('d1', '似然函数用于参数估计。')];
+    const compileBatch = async (batch: ReturnType<typeof buildSectionBatches>[number]): Promise<SectionCompilation> => {
+      const evidence = { blockId: batch.blocks[0].id, quote: batch.blocks[0].content, role: 'definition' as const };
+      return {
+        batchId: batch.id,
+        sectionIds: batch.sectionIds,
+        topicMentions: [{ localId: `${batch.id}:t1`, name: '似然函数', aliases: [], learningObjective: '解释似然函数', scope: '估计', genre: 'concept', difficulty: 1, importance: 'core', evidence: [evidence], confidence: 1 }],
+        teachingUnits: [{ localId: `${batch.id}:u1`, topicLocalId: `${batch.id}:t1`, role: 'definition', title: '定义', summary: '似然函数', evidence: [evidence], required: true, confidence: 1 }],
+        orderClaims: [], unresolvedReferences: [], confidence: 1,
+      };
+    };
+    const review = async () => ({ operations: [], constraints: [], warnings: [] });
+    const first = await compileCourseStructure(config, documents, 'course-1', { compileBatch, review });
+    let recompileCalls = 0;
+    const second = await compileCourseStructure(config, documents, 'course-1', {
+      previous: first,
+      compileBatch: async batch => {
+        recompileCalls += 1;
+        return compileBatch(batch);
+      },
+      review,
+    });
+    expect(recompileCalls).toBe(0);
+    expect(second.sourceVersion).toBe(first.sourceVersion);
+    expect(second.structureVersion).toBe(first.structureVersion);
+  });
 });

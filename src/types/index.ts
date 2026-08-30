@@ -1,3 +1,5 @@
+import type { CourseLearningStructure } from '../lib/course-structure/types';
+
 // ============== 基础类型 ==============
 
 // 六步用户流程（主页面）
@@ -538,6 +540,8 @@ export interface ProjectState {
   // ===== v6 新架构：Markdown-based =====
   /** 源文档列表（MinerU Markdown） */
   sourceDocuments: SourceDocument[];
+  /** 两层课程知识结构的规范主数据；旧 V2 字段由适配器投影得到。 */
+  courseLearningStructure: CourseLearningStructure | null;
   /** 知识主题（替代 CourseTopic） */
   knowledgeTopics: KnowledgeTopic[];
   /** 主题间关系 */
