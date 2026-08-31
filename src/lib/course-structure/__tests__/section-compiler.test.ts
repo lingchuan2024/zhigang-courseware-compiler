@@ -122,4 +122,28 @@ describe('unified section compiler', () => {
     expect(prompt.system).toContain('beforeTopicLocalId');
     expect(prompt.promptVersion).toBe('course-section-v1');
   });
+
+  it('allows Responses/Agent Plan enough time to finish reasoning', async () => {
+    mocks.callChatCompletion.mockResolvedValue({
+      data: {
+        topicMentions: [],
+        teachingUnits: [],
+        orderClaims: [],
+        unresolvedReferences: [],
+        confidence: 0,
+      },
+      usage: {},
+    });
+
+    await compileSectionBatch({ ...config, apiMode: 'responses' }, batch);
+
+    expect(mocks.callChatCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ apiMode: 'responses' }),
+      expect.any(Object),
+      'course-section-compile',
+      240000,
+      batch.id,
+      'section-compile',
+    );
+  });
 });

@@ -102,8 +102,16 @@ export class ExtractionError extends Error {
 export function inferErrorCode(error: unknown): ExtractionErrorCode {
   if (error instanceof ExtractionError) return error.code;
   const msg = error instanceof Error ? error.message : String(error);
+  const name = error instanceof Error ? error.name : '';
 
-  if (msg.includes('timeout') || msg.includes('Timeout') || msg.includes('AbortError')) {
+  if (
+    name === 'TimeoutError'
+    || name === 'AbortError'
+    || msg.includes('timeout')
+    || msg.includes('Timeout')
+    || msg.includes('timed out')
+    || msg.includes('AbortError')
+  ) {
     return 'api-timeout';
   }
   if (msg.includes('429') || msg.includes('rate limit') || msg.includes('Rate limit')) {

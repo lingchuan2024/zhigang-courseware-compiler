@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { ModelConfig, SourceDocument } from '../../../types';
+import { ExtractionError } from '../../extraction-errors';
 import { compileCourseStructure } from '../compiler';
 import { buildSectionBatches } from '../section-batching';
 import type { SectionCompilation } from '../types';
@@ -20,6 +21,57 @@ function document(id: string, content: string): SourceDocument {
     contentHash: `${id}-hash`,
     createdAt: '',
     updatedAt: '',
+  };
+}
+
+function multiBlockDocument(id: string, blockCount: number): SourceDocument {
+  const blocks = Array.from({ length: blockCount }, (_, index) => ({
+    id: `${id}-b${index + 1}`,
+    documentId: id,
+    type: 'paragraph' as const,
+    content: `知识片段 ${index + 1}`,
+    headingPath: [id],
+    orderIndex: index,
+    contentHash: `${id}-h${index + 1}`,
+  }));
+  return {
+    id,
+    courseId: 'course-1',
+    title: id,
+    markdown: blocks.map(block => block.content).join('\n'),
+    blocks,
+    outline: [],
+    contentHash: `${id}-hash`,
+    createdAt: '',
+    updatedAt: '',
+  };
+}
+
+function compilationForBatch(batch: ReturnType<typeof buildSectionBatches>[number]): SectionCompilation {
+  const evidence = {
+    blockId: batch.blocks[0].id,
+    quote: batch.blocks[0].content,
+    role: 'definition' as const,
+  };
+  return {
+    batchId: batch.id,
+    sectionIds: batch.sectionIds,
+    topicMentions: [{
+      localId: `${batch.id}:topic`,
+      name: `知识点 ${batch.blocks[0].id}`,
+      aliases: [],
+      learningObjective: '理解知识片段',
+      scope: '测试',
+      genre: 'concept',
+      difficulty: 1,
+      importance: 'core',
+      evidence: [evidence],
+      confidence: 0.9,
+    }],
+    teachingUnits: [],
+    orderClaims: [],
+    unresolvedReferences: [],
+    confidence: 0.9,
   };
 }
 
@@ -115,5 +167,72 @@ describe('course structure compiler integration', () => {
     expect(recompileCalls).toBe(0);
     expect(second.sourceVersion).toBe(first.sourceVersion);
     expect(second.structureVersion).toBe(first.structureVersion);
+  });
+
+  it('Agent Plan 大批次超时后自动拆小并合并结果', async () => {
+    const documents = [multiBlockDocument('large', 4)];
+    const seenBatchSizes: number[] = [];
+
+    const result = await compileCourseStructure(
+      { ...config, apiMode: 'responses' },
+      documents,
+      'course-1',
+      {
+        compileBatch: async batch => {
+          seenBatchSizes.push(batch.blocks.length);
+          if (batch.blocks.length > 2) {
+            throw new ExtractionError('api-timeout', 'section-compile', '模型请求超时');
+          }
+          return compilationForBatch(batch);
+        },
+        review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      },
+    );
+
+    expect(seenBatchSizes).toEqual([4, 2, 2]);
+    expect(result.checkpoints).toHaveLength(1);
+    expect(result.topics).toHaveLength(2);
+    expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(false);
+  });
+
+  it('Agent Plan 初始批次限制为约 3000 tokens', async () => {
+    const documents = [multiBlockDocument('token-heavy', 4)];
+    documents[0].blocks.forEach((block, index) => {
+      block.content = `片段${index}${'知'.repeat(994)}`;
+    });
+    const seenBatchSizes: number[] = [];
+
+    await compileCourseStructure(
+      { ...config, apiMode: 'responses' },
+      documents,
+      'course-1',
+      {
+        compileBatch: async batch => {
+          seenBatchSizes.push(batch.blocks.length);
+          return compilationForBatch(batch);
+        },
+        review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      },
+    );
+
+    expect(seenBatchSizes).toEqual([3, 1]);
+  });
+
+  it('不可再拆的失败批次向界面保留真实错误', async () => {
+    const result = await compileCourseStructure(
+      { ...config, apiMode: 'responses' },
+      [multiBlockDocument('single', 1)],
+      'course-1',
+      {
+        compileBatch: async () => {
+          throw new ExtractionError('api-timeout', 'section-compile', '连接模型服务失败：请求超时');
+        },
+        review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      },
+    );
+
+    const issue = result.validation.issues.find(item => item.code === 'FAILED_SECTION_BATCH');
+    expect(issue?.batchId).toBe('batch_single_0');
+    expect(issue?.message).toContain('连接模型服务失败：请求超时');
   });
 });

@@ -1,4 +1,5 @@
 import type { MarkdownBlock, ModelConfig, SourceDocument } from '../../types';
+import { ExtractionError, inferErrorCode } from '../extraction-errors';
 import { normalizeCandidates, type ResolvedTopicDraft } from './candidate-normalizer';
 import { compileCourseOrder } from './course-scheduler';
 import { reviewCurriculum } from './curriculum-review';
@@ -76,6 +77,73 @@ function unionInOrder(...groups: string[][]): string[] {
     seen.add(value);
     return true;
   }));
+}
+
+function splitSectionBatch(batch: SectionBatch): [SectionBatch, SectionBatch] | null {
+  if (batch.blocks.length < 2) return null;
+  const midpoint = Math.ceil(batch.blocks.length / 2);
+  const createPart = (blocks: MarkdownBlock[], index: number): SectionBatch => ({
+    ...batch,
+    id: `${batch.id}__part${index + 1}`,
+    blocks,
+    estimatedTokens: Math.max(1, Math.ceil(batch.estimatedTokens * blocks.length / batch.blocks.length)),
+    cacheKey: `${batch.cacheKey}__part${index + 1}`,
+  });
+  return [createPart(batch.blocks.slice(0, midpoint), 0), createPart(batch.blocks.slice(midpoint), 1)];
+}
+
+function mergeSectionCompilations(
+  batch: SectionBatch,
+  compilations: SectionCompilation[],
+): SectionCompilation {
+  const totalWeight = Math.max(1, batch.blocks.length);
+  return {
+    batchId: batch.id,
+    sectionIds: unionInOrder(...compilations.map(compilation => compilation.sectionIds)),
+    topicMentions: compilations.flatMap(compilation => compilation.topicMentions),
+    teachingUnits: compilations.flatMap(compilation => compilation.teachingUnits),
+    orderClaims: compilations.flatMap(compilation => compilation.orderClaims),
+    unresolvedReferences: unionInOrder(...compilations.map(compilation => compilation.unresolvedReferences)),
+    confidence: compilations.reduce((sum, compilation, index) => {
+      const weight = Math.max(1, index === 0
+        ? Math.ceil(batch.blocks.length / 2)
+        : Math.floor(batch.blocks.length / 2));
+      return sum + compilation.confidence * weight;
+    }, 0) / totalWeight,
+  };
+}
+
+function canRecoverBySplitting(error: unknown): boolean {
+  const code = inferErrorCode(error);
+  return code === 'api-timeout' || code === 'response-truncated';
+}
+
+async function compileBatchAdaptively(
+  batch: SectionBatch,
+  compileBatch: (batch: SectionBatch) => Promise<SectionCompilation>,
+  allowSplit: boolean,
+): Promise<SectionCompilation> {
+  try {
+    return await compileBatch(batch);
+  } catch (error) {
+    const parts = allowSplit && canRecoverBySplitting(error) ? splitSectionBatch(batch) : null;
+    if (!parts) throw error;
+    // 顺序执行，避免同一个 Agent Plan 同时承担多个长推理请求。
+    const compilations: SectionCompilation[] = [];
+    for (const part of parts) {
+      compilations.push(await compileBatchAdaptively(part, compileBatch, allowSplit));
+    }
+    return mergeSectionCompilations(batch, compilations);
+  }
+}
+
+function batchFailureMessage(batch: SectionBatch, error: unknown): string {
+  const detail = error instanceof ExtractionError
+    ? error.toUserMessage()
+    : error instanceof Error
+      ? error.message
+      : String(error);
+  return `章节批次 ${batch.id} 编译失败：${detail}`;
 }
 
 function applyCurriculumOperations(
@@ -177,13 +245,14 @@ export async function compileCourseStructure(
   dependencies: CourseCompilerDependencies = {},
 ): Promise<CourseLearningStructure> {
   dependencies.onStage?.('batching');
-  const batches = buildSectionBatches(documents);
+  const usesResponses = config.apiMode === 'responses';
+  const batches = buildSectionBatches(documents, usesResponses ? 3000 : 6000);
   const previous = dependencies.previous ?? null;
   const previousByCacheKey = new Map(
     (previous?.checkpoints ?? []).map(checkpoint => [checkpoint.cacheKey, checkpoint]),
   );
   const compileBatch = dependencies.compileBatch ?? (batch => compileSectionBatch(config, batch));
-  const failedBatchIds: string[] = [];
+  const issues: CourseStructureIssue[] = [];
   let completedBatches = 0;
 
   dependencies.onStage?.('compiling');
@@ -191,10 +260,15 @@ export async function compileCourseStructure(
     const cacheKey = effectiveCacheKey(batch, config);
     const reusable = previousByCacheKey.get(cacheKey);
     try {
-      const result = reusable?.result ?? await compileBatch(batch);
+      const result = reusable?.result ?? await compileBatchAdaptively(batch, compileBatch, usesResponses);
       return { cacheKey, batchId: batch.id, sectionIds: batch.sectionIds, result } satisfies SectionCompilationCheckpoint;
-    } catch {
-      failedBatchIds.push(batch.id);
+    } catch (error) {
+      issues.push({
+        code: 'FAILED_SECTION_BATCH',
+        severity: 'error',
+        message: batchFailureMessage(batch, error),
+        batchId: batch.id,
+      });
       return null;
     } finally {
       completedBatches += 1;
@@ -203,7 +277,6 @@ export async function compileCourseStructure(
   });
   const checkpoints = checkpointResults.filter((item): item is SectionCompilationCheckpoint => item !== null);
 
-  const issues: CourseStructureIssue[] = [];
   const evidenceById = new Map<string, EvidenceSpan>();
   const resolvedTopics: ResolvedTopicDraft[] = [];
   const resolvedUnits: ResolvedUnitDraft[] = [];
@@ -371,7 +444,8 @@ export async function compileCourseStructure(
     orderedTopicIds: schedule.orderedTopicIds,
     orderConstraints,
     schedulerIssues: [...issues, ...schedule.issues],
-    failedBatchIds,
+    // 失败已作为包含真实原因的 scheduler issue 注入，避免再生成一条泛化重复错误。
+    failedBatchIds: [],
     meaningfulBlockIds,
   });
   const sourceChanged = !previous || batches.some(batch => !previousByCacheKey.has(effectiveCacheKey(batch, config)))

@@ -137,12 +137,16 @@ async function fetchWithTransientRetry(
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
+      const code = inferErrorCode(e);
       lastError = new ExtractionError(
-        inferErrorCode(e),
+        code,
         stage || 'unknown' as ExtractionStage,
         `连接模型服务失败（已重试 ${attempt} 次）：${message}`,
         { cause: e },
       );
+      // 超时通常说明当前输入规模超过了本阶段的处理预算。重复发送完全相同的
+      // 请求只会再次耗尽等待时间；交给上层按内容边界拆小后重试。
+      if (code === 'api-timeout') throw lastError;
       continue;
     }
 

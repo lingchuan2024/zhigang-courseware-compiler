@@ -115,11 +115,14 @@ export async function compileSectionBatch(
   config: ModelConfig,
   batch: SectionBatch,
 ): Promise<SectionCompilation> {
+  // Responses/Agent Plan 模型可能包含较长的内部推理，实测大型章节会超过两分钟。
+  // 批次拆分由上层负责，这里给已拆小的请求留出完整返回时间。
+  const timeout = config.apiMode === 'responses' ? 240000 : 120000;
   const completion = await callChatCompletion<RawSectionCompilation>(
     config,
     buildSectionCompilerPrompt(batch),
     'course-section-compile',
-    120000,
+    timeout,
     batch.id,
     'section-compile',
   );

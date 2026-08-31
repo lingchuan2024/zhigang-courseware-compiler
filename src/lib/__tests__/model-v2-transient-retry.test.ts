@@ -113,6 +113,22 @@ describe('callChatCompletion 瞬时错误退避', () => {
     expect(sleeps).toEqual([1000]);
   });
 
+  it('请求超时不在传输层盲目重试', async () => {
+    const sleeps: number[] = [];
+    const sleep = async (ms: number) => { sleeps.push(ms); };
+    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const fetchMock = vi.fn().mockRejectedValue(timeout);
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      callChatCompletion(config, makePrompt(), 'topic-merge', 5000, undefined, 'section-compile', sleep),
+    ).rejects.toMatchObject({ code: 'api-timeout', stage: 'section-compile' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleeps).toEqual([]);
+  });
+
   it('429 携带 Retry-After 时优先按其等待', async () => {
     const sleeps: number[] = [];
     const sleep = async (ms: number) => { sleeps.push(ms); };
