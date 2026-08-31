@@ -82,7 +82,7 @@ The existing `learning-order.ts` remains temporarily for old snapshots but is no
 - Create: `src/lib/course-structure/index.ts`
 - Test: `src/lib/course-structure/__tests__/stable-identity.test.ts`
 
-- [ ] **Step 1: Write the failing stable-identity tests**
+- [x] **Step 1: Write the failing stable-identity tests**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -108,13 +108,13 @@ describe('stable course structure identity', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify the module is missing**
+- [x] **Step 2: Run the test and verify the module is missing**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/stable-identity.test.ts`
 
 Expected: FAIL with `Failed to resolve import "../stable-identity"`.
 
-- [ ] **Step 3: Add the canonical types**
+- [x] **Step 3: Add the canonical types**
 
 Create `types.ts` with the exact public contracts from the approved design:
 
@@ -189,7 +189,7 @@ export interface OrderClaimDraft { beforeTopicLocalId: string; afterTopicLocalId
 export interface SectionCompilation { batchId: string; sectionIds: string[]; topicMentions: TopicMentionDraft[]; teachingUnits: TeachingUnitDraft[]; orderClaims: OrderClaimDraft[]; unresolvedReferences: string[]; confidence: number }
 ```
 
-- [ ] **Step 4: Implement deterministic key functions**
+- [x] **Step 4: Implement deterministic key functions**
 
 ```typescript
 function hash(input: string): string {
@@ -219,7 +219,7 @@ export function teachingUnitStableKey(topicKey: string, role: string, coreEviden
 
 Export all public symbols from `index.ts`.
 
-- [ ] **Step 5: Run tests and type checking**
+- [x] **Step 5: Run tests and type checking**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/stable-identity.test.ts`
 
@@ -229,7 +229,7 @@ Run: `pnpm check`
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/course-structure
@@ -244,7 +244,7 @@ git commit -m "feat: add canonical course structure IR"
 - Create: `src/lib/course-structure/evidence-span.ts`
 - Test: `src/lib/course-structure/__tests__/evidence-span.test.ts`
 
-- [ ] **Step 1: Write failing tests for offsets, quote repair, ambiguity, and shared evidence**
+- [x] **Step 1: Write failing tests for offsets, quote repair, ambiguity, and shared evidence**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -275,13 +275,13 @@ describe('evidence span resolution', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and verify failure**
+- [x] **Step 2: Run the test and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/evidence-span.test.ts`
 
 Expected: FAIL because `resolveEvidenceSpan` does not exist.
 
-- [ ] **Step 3: Implement exact-or-unique quote resolution**
+- [x] **Step 3: Implement exact-or-unique quote resolution**
 
 Implement this public signature:
 
@@ -314,13 +314,13 @@ function allOccurrences(content: string, quote: string): number[] {
 }
 ```
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/evidence-span.test.ts`
 
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/course-structure/evidence-span.ts src/lib/course-structure/__tests__/evidence-span.test.ts
@@ -337,7 +337,7 @@ git commit -m "feat: add block-level evidence spans"
 - Test: `src/lib/course-structure/__tests__/course-scheduler.test.ts`
 - Test: `src/lib/course-structure/__tests__/teaching-path-compiler.test.ts`
 
-- [ ] **Step 1: Write failing course-scheduler tests**
+- [x] **Step 1: Write failing course-scheduler tests**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -375,7 +375,7 @@ describe('course scheduler', () => {
 });
 ```
 
-- [ ] **Step 2: Write failing teaching-path tests**
+- [x] **Step 2: Write failing teaching-path tests**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -401,13 +401,13 @@ describe('teaching path compiler', () => {
 });
 ```
 
-- [ ] **Step 3: Run both tests and verify failure**
+- [x] **Step 3: Run both tests and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/course-scheduler.test.ts src/lib/course-structure/__tests__/teaching-path-compiler.test.ts`
 
 Expected: FAIL because both compiler modules are missing.
 
-- [ ] **Step 4: Implement the teaching role templates**
+- [x] **Step 4: Implement the teaching role templates**
 
 Export an immutable template map and a stable compiler:
 
@@ -434,7 +434,7 @@ export function compileTeachingPath(
 }
 ```
 
-- [ ] **Step 5: Implement hard-cycle resolution and stable Kahn scheduling**
+- [x] **Step 5: Implement hard-cycle resolution and stable Kahn scheduling**
 
 Export:
 
@@ -463,7 +463,7 @@ Implementation rules:
 - Among zero-indegree topics, sort by: number of satisfied incoming soft constraints descending, importance (`core`, `important`, `supplementary`), difficulty ascending, minimum numeric value looked up from `sectionOrderById`, stable key. Missing sections sort after known sections. Build this map once from document/block order in the orchestrator; never infer order from opaque section ID strings.
 - Explanations use existing constraint reasons; do not call an LLM.
 
-- [ ] **Step 6: Run focused tests and type checking**
+- [x] **Step 6: Run focused tests and type checking**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/course-scheduler.test.ts src/lib/course-structure/__tests__/teaching-path-compiler.test.ts`
 
@@ -473,7 +473,7 @@ Run: `pnpm check`
 
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/course-structure/course-scheduler.ts src/lib/course-structure/teaching-path-compiler.ts src/lib/course-structure/__tests__
@@ -488,7 +488,7 @@ git commit -m "feat: compile deterministic learning paths"
 - Create: `src/lib/course-structure/section-batching.ts`
 - Test: `src/lib/course-structure/__tests__/section-batching.test.ts`
 
-- [ ] **Step 1: Write failing batching tests**
+- [x] **Step 1: Write failing batching tests**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -521,13 +521,13 @@ describe('section batching', () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/section-batching.test.ts`
 
 Expected: FAIL because the batching module is missing.
 
-- [ ] **Step 3: Implement section-aware batching**
+- [x] **Step 3: Implement section-aware batching**
 
 Define:
 
@@ -547,13 +547,13 @@ export function buildSectionBatches(documents: SourceDocument[], maxTokens = 600
 
 Use `SourceDocument.outline` when present. If it is empty, derive top-level section boundaries from heading blocks. Pack adjacent sections until the next section would exceed `maxTokens`. Split an oversized section at block boundaries. Use `estimateTokens` from `content-window.ts` during migration and generate a cache key from document content hash, section IDs, block content hashes, and compiler prompt version.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/section-batching.test.ts`
 
 Expected: PASS, 2 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/course-structure/section-batching.ts src/lib/course-structure/__tests__/section-batching.test.ts
@@ -570,7 +570,7 @@ git commit -m "feat: batch course content by document section"
 - Modify: `src/lib/model-usage.ts`
 - Modify: `src/lib/extraction-errors.ts`
 
-- [ ] **Step 1: Add failing parser and one-call tests**
+- [x] **Step 1: Add failing parser and one-call tests**
 
 Mock `callChatCompletion` rather than global fetch so the test asserts the domain boundary:
 
@@ -612,19 +612,19 @@ describe('unified section compiler', () => {
 });
 ```
 
-- [ ] **Step 2: Extend model usage and error stages**
+- [x] **Step 2: Extend model usage and error stages**
 
 Add `'course-section-compile' | 'course-curriculum-review'` to `ModelTaskType`.
 
 Add `'section-compile' | 'curriculum-review'` to `ExtractionStage` and Chinese labels to `toUserMessage()`.
 
-- [ ] **Step 3: Run and verify failure**
+- [x] **Step 3: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/section-compiler.test.ts`
 
 Expected: FAIL because `compileSectionBatch` is missing.
 
-- [ ] **Step 4: Implement the unified prompt and response parser**
+- [x] **Step 4: Implement the unified prompt and response parser**
 
 Export:
 
@@ -656,7 +656,7 @@ callChatCompletion<RawSectionCompilation>(
 )
 ```
 
-- [ ] **Step 5: Run focused tests and type checking**
+- [x] **Step 5: Run focused tests and type checking**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/section-compiler.test.ts src/lib/__tests__/model-usage.test.ts`
 
@@ -666,7 +666,7 @@ Run: `pnpm check`
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/course-structure/section-compiler.ts src/lib/course-structure/__tests__/section-compiler.test.ts src/lib/model-usage.ts src/lib/extraction-errors.ts
@@ -681,7 +681,7 @@ git commit -m "feat: compile each course section in one model call"
 - Create: `src/lib/course-structure/candidate-normalizer.ts`
 - Test: `src/lib/course-structure/__tests__/candidate-normalizer.test.ts`
 
-- [ ] **Step 1: Write failing normalization tests**
+- [x] **Step 1: Write failing normalization tests**
 
 ```typescript
 import { describe, expect, it } from 'vitest';
@@ -716,13 +716,13 @@ describe('candidate normalization', () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/candidate-normalizer.test.ts`
 
 Expected: FAIL because the normalizer is missing.
 
-- [ ] **Step 3: Implement deterministic normalization**
+- [x] **Step 3: Implement deterministic normalization**
 
 Define an internal resolved draft type and return mapping:
 
@@ -743,13 +743,13 @@ export interface CandidateNormalizationResult {
 
 Automatically merge only when normalized names/aliases match and either evidence Jaccard overlap is positive or section IDs overlap. Preserve sorted unions of aliases and sections. Preserve evidence in document/section/block/offset order, deduplicate it, and keep the first evidence key as the core identity anchor; later supporting evidence must not alter the stable key. Keep same-name candidates separate otherwise and emit them as an ambiguous pair only when objective token overlap is non-zero. Use `topicStableKey(courseId, name, [], coreEvidenceKey)` for new generated topics; corrected prior topics retain their prior stable key during incremental reconciliation.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/candidate-normalizer.test.ts`
 
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/course-structure/candidate-normalizer.ts src/lib/course-structure/__tests__/candidate-normalizer.test.ts
@@ -764,7 +764,7 @@ git commit -m "feat: normalize course topics without losing evidence"
 - Create: `src/lib/course-structure/curriculum-review.ts`
 - Test: `src/lib/course-structure/__tests__/curriculum-review.test.ts`
 
-- [ ] **Step 1: Write failing operation-validation tests**
+- [x] **Step 1: Write failing operation-validation tests**
 
 ```typescript
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -788,13 +788,13 @@ describe('restricted curriculum review', () => {
 });
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/curriculum-review.test.ts`
 
 Expected: FAIL because `reviewCurriculum` is missing.
 
-- [ ] **Step 3: Implement one compact review call**
+- [x] **Step 3: Implement one compact review call**
 
 Export:
 
@@ -818,13 +818,13 @@ export async function reviewCurriculum(
 
 Send only ID, name, aliases, objective, scope, genre, difficulty, importance, evidence IDs, and short evidence quotes resolved through `evidenceById`. The model cannot add topics. Validate all IDs against the input topics and all returned evidence IDs against `evidenceById` after the response. Convert inferred hard constraints to soft unless they carry at least one valid evidence ID. Use task type `course-curriculum-review` and stage `curriculum-review`.
 
-- [ ] **Step 4: Run focused tests**
+- [x] **Step 4: Run focused tests**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/curriculum-review.test.ts`
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/course-structure/curriculum-review.ts src/lib/course-structure/__tests__/curriculum-review.test.ts
@@ -841,7 +841,7 @@ git commit -m "feat: add constrained curriculum review"
 - Test: `src/lib/course-structure/__tests__/validator.test.ts`
 - Test: `src/lib/course-structure/__tests__/legacy-adapter.test.ts`
 
-- [ ] **Step 1: Write failing validation tests**
+- [x] **Step 1: Write failing validation tests**
 
 Cover these exact release gates:
 
@@ -854,7 +854,7 @@ it('is ready only when evidence, topics, units, and order are valid', () => expe
 
 Build fixtures explicitly in the test file using the Task 1 types; do not mock the validator.
 
-- [ ] **Step 2: Write failing adapter tests**
+- [x] **Step 2: Write failing adapter tests**
 
 ```typescript
 it('projects flat topics without parentTopicId', () => {
@@ -870,13 +870,13 @@ it('projects teaching units and deterministic paths', () => {
 });
 ```
 
-- [ ] **Step 3: Run and verify failure**
+- [x] **Step 3: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/validator.test.ts src/lib/course-structure/__tests__/legacy-adapter.test.ts`
 
 Expected: FAIL because both modules are missing.
 
-- [ ] **Step 4: Implement the release-gate validator**
+- [x] **Step 4: Implement the release-gate validator**
 
 Export:
 
@@ -893,7 +893,7 @@ export function validateCourseStructure(input: CourseStructureValidationInput): 
 
 `failed` is reserved for zero valid topics or corrupt canonical IDs. All other error-severity issues produce `degraded`. Coverage uses meaningful non-heading blocks and exact EvidenceSpan block IDs, not expanded topic ranges.
 
-- [ ] **Step 5: Implement the single legacy adapter boundary**
+- [x] **Step 5: Implement the single legacy adapter boundary**
 
 Export:
 
@@ -910,7 +910,7 @@ export function projectLegacyStructure(structure: CourseLearningStructure, block
 
 Group EvidenceSpan block IDs into contiguous `SourceRange` values without dropping intermediate evidence. Project hard/soft constraints as `hard_prerequisite`/`helpful_before` only for display compatibility. Project consecutive path items into `TeachingRelation` values of type `should_explain_before`. Use `status: 'generated'` for draft/verified and `status: 'corrected'` for corrected canonical topics.
 
-- [ ] **Step 6: Run focused tests and type checking**
+- [x] **Step 6: Run focused tests and type checking**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/validator.test.ts src/lib/course-structure/__tests__/legacy-adapter.test.ts`
 
@@ -920,7 +920,7 @@ Run: `pnpm check`
 
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/course-structure/validator.ts src/lib/course-structure/legacy-adapter.ts src/lib/course-structure/__tests__
@@ -936,7 +936,7 @@ git commit -m "feat: validate and project compiled course structures"
 - Test: `src/lib/course-structure/__tests__/compiler.integration.test.ts`
 - Modify: `src/lib/course-structure/index.ts`
 
-- [ ] **Step 1: Write a failing end-to-end compiler test with mocked section/review calls**
+- [x] **Step 1: Write a failing end-to-end compiler test with mocked section/review calls**
 
 The fixture must contain two documents and assert:
 
@@ -958,13 +958,13 @@ expect(batchCallCount).toBe(buildSectionBatches(documents).length);
 expect(result.status).toBe('ready');
 ```
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/compiler.integration.test.ts`
 
 Expected: FAIL because the orchestrator is missing.
 
-- [ ] **Step 3: Implement orchestration without domain logic duplication**
+- [x] **Step 3: Implement orchestration without domain logic duplication**
 
 Export:
 
@@ -999,13 +999,13 @@ The function must only coordinate existing modules:
 
 Set `compilerVersion = 'course-structure-v1'`. Increment `structureVersion` from `previous?.structureVersion ?? 0` only when canonical content changes.
 
-- [ ] **Step 4: Run integration and focused domain tests**
+- [x] **Step 4: Run integration and focused domain tests**
 
 Run: `pnpm test -- src/lib/course-structure`
 
 Expected: PASS for every course-structure test file.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/lib/course-structure/compiler.ts src/lib/course-structure/index.ts src/lib/course-structure/__tests__/compiler.integration.test.ts
@@ -1025,7 +1025,7 @@ git commit -m "feat: orchestrate the course structure compiler"
 - Modify: `src/store/__tests__/structure-extraction-persistence.test.ts`
 - Modify: `src/store/__tests__/mineru-reparse-increment.test.ts`
 
-- [ ] **Step 1: Write failing incremental tests**
+- [x] **Step 1: Write failing incremental tests**
 
 ```typescript
 it('reuses unchanged section checkpoints', () => {
@@ -1042,13 +1042,13 @@ it('preserves corrected topic identity and name', () => {
 
 Add a store integration assertion that a one-section MinerU change triggers one compiler batch and leaves unrelated topic IDs unchanged.
 
-- [ ] **Step 2: Run and verify failure**
+- [x] **Step 2: Run and verify failure**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/incremental-reconcile.test.ts src/store/__tests__/mineru-reparse-increment.test.ts`
 
 Expected: FAIL because canonical incremental reconciliation is missing.
 
-- [ ] **Step 3: Implement checkpoint reuse and corrected-object preservation**
+- [x] **Step 3: Implement checkpoint reuse and corrected-object preservation**
 
 Export:
 
@@ -1064,7 +1064,7 @@ export function preserveCorrectedObjects(previous: CourseLearningStructure | nul
 
 Match checkpoints only by exact `cacheKey`. Preserve corrected topics by `stableKey`; preserve corrected order constraints when both endpoints still exist. Do not preserve corrected objects whose evidence no longer resolves—emit `INVALID_EVIDENCE` and degrade instead.
 
-- [ ] **Step 4: Add canonical structure to project state and snapshots**
+- [x] **Step 4: Add canonical structure to project state and snapshots**
 
 In `src/types/index.ts`, add:
 
@@ -1077,7 +1077,7 @@ courseLearningStructure: CourseLearningStructure | null;
 
 Initialize it to `null` in the store. Add `courseLearningStructure` to `PERSISTED_PROJECT_FIELDS` and clone it through `library-repository.ts`. Keep workspace pointer schema 10 unchanged because the pointer format does not change.
 
-- [ ] **Step 5: Run persistence and incremental tests**
+- [x] **Step 5: Run persistence and incremental tests**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/incremental-reconcile.test.ts src/store/__tests__/structure-extraction-persistence.test.ts src/store/__tests__/mineru-reparse-increment.test.ts`
 
@@ -1087,7 +1087,7 @@ Run: `pnpm check`
 
 Expected: exit 0.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/lib/course-structure/incremental-reconcile.ts src/lib/course-structure/__tests__/incremental-reconcile.test.ts src/types/index.ts src/lib/persistence.ts src/lib/library-repository.ts src/store/__tests__
@@ -1109,7 +1109,7 @@ git commit -m "feat: persist and reuse compiled course structures"
 - Modify: `src/components/__tests__/KnowledgeStructureView.network.test.tsx`
 - Add: `src/lib/__tests__/knowledge-pipeline-course-structure.test.ts`
 
-- [ ] **Step 1: Rewrite pipeline boundary tests before production code**
+- [x] **Step 1: Rewrite pipeline boundary tests before production code**
 
 Update the card test expectations:
 
@@ -1123,13 +1123,13 @@ expect(mocks.callChatCompletion).not.toHaveBeenCalledWith(
 
 Add a new integration test that mocks `compileCourseStructure`, verifies `runKnowledgePipeline` stores the canonical structure, and verifies validation status controls `ready/degraded/failed`.
 
-- [ ] **Step 2: Run and verify the tests fail on the old pipeline**
+- [x] **Step 2: Run and verify the tests fail on the old pipeline**
 
 Run: `pnpm test -- src/lib/__tests__/knowledge-pipeline-v2-cards.test.ts src/lib/__tests__/knowledge-pipeline-course-structure.test.ts src/lib/__tests__/pipeline-progress.test.ts`
 
 Expected: FAIL because the old pipeline calls reconciliation, relation traversal, teaching extraction, and card enrichment.
 
-- [ ] **Step 3: Replace the structure stages in `runKnowledgePipeline`**
+- [x] **Step 3: Replace the structure stages in `runKnowledgePipeline`**
 
 Modify `PipelineResultV2`:
 
@@ -1166,11 +1166,11 @@ const knowledgeCards = generateCards(
 
 Do not call `enrichKnowledgeCards` inside `runKnowledgePipeline`. Preserve canonical status directly: `ready → ready`, `degraded → degraded`, `failed → failed`. Preserve base cards so the existing Cards stage can call `regenerateKnowledgeCards` for enrichment.
 
-- [ ] **Step 4: Store the canonical structure and previous structure input**
+- [x] **Step 4: Store the canonical structure and previous structure input**
 
 In `useStore.extractKnowledgeStructure`, pass the existing `courseLearningStructure` through options and store `result.courseLearningStructure`. For `degraded`, set `jobStatus: 'completed'` only when at least one verified topic exists, retain `knowledgePipelineStatus: 'degraded'`, and show a warning banner through `structureQuality.qualityIssues`. Update `KnowledgeStructureView` and its tests so `degraded` displays usable content plus the warning instead of the generic failure state.
 
-- [ ] **Step 5: Replace progress stages**
+- [x] **Step 5: Replace progress stages**
 
 Use:
 
@@ -1187,7 +1187,7 @@ export const STRUCTURE_EXTRACTION_STEPS = [
 
 Map compiler stages to these progress IDs and update range tests.
 
-- [ ] **Step 6: Run pipeline, store, and progress tests**
+- [x] **Step 6: Run pipeline, store, and progress tests**
 
 Run: `pnpm test -- src/lib/__tests__/knowledge-pipeline-v2-cards.test.ts src/lib/__tests__/knowledge-pipeline-course-structure.test.ts src/lib/__tests__/pipeline-progress.test.ts src/store/__tests__/structure-extraction-persistence.test.ts src/components/__tests__/KnowledgeStructureView.network.test.tsx`
 
@@ -1197,7 +1197,7 @@ Run: `pnpm check`
 
 Expected: exit 0.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add src/lib/knowledge-pipeline-v2.ts src/types/index.ts src/store/useStore.ts src/lib/pipeline-progress.ts src/components/KnowledgeStructureView.tsx src/lib/__tests__ src/store/__tests__/structure-extraction-persistence.test.ts src/components/__tests__/KnowledgeStructureView.network.test.tsx
@@ -1217,7 +1217,7 @@ git commit -m "feat: switch structure extraction to the course compiler"
 - Modify: `README.md`
 - Add: `src/lib/course-structure/__tests__/compiler-performance.test.ts`
 
-- [ ] **Step 1: Add the performance regression test**
+- [x] **Step 1: Add the performance regression test**
 
 Use a deterministic 12-section fixture and injected dependencies:
 
@@ -1235,13 +1235,13 @@ it('does not add model calls per topic', async () => {
 });
 ```
 
-- [ ] **Step 2: Run the performance test**
+- [x] **Step 2: Run the performance test**
 
 Run: `pnpm test -- src/lib/course-structure/__tests__/compiler-performance.test.ts`
 
 Expected: PASS and no timeout.
 
-- [ ] **Step 3: Prove legacy production references are gone**
+- [x] **Step 3: Prove legacy production references are gone**
 
 Run:
 
@@ -1251,11 +1251,11 @@ rg -n "topic-extraction-v2|topic-reconciliation|knowledge-relation-traversal|tea
 
 Expected: no production references. If references remain in active source, migrate them before deletion. Do not delete compatibility types used by old snapshots.
 
-- [ ] **Step 4: Delete the unused legacy modules and dedicated tests**
+- [x] **Step 4: Delete the unused legacy modules and dedicated tests**
 
 Delete only after Step 3 returns no production references. Keep fixtures or tests that exercise shared public behavior by rewriting them against the new compiler.
 
-- [ ] **Step 5: Update README architecture and limitations**
+- [x] **Step 5: Update README architecture and limitations**
 
 Replace the old eight-stage text with:
 
@@ -1266,7 +1266,7 @@ MinerU Markdown → 稳定证据片段 → 章节统一编译 → 课程知识�
 
 Document that the product builds a curriculum structure, not a generic knowledge graph; first-layer topics are independent learning goals, second-layer units explain them, and ordering is deterministic under explicit constraints.
 
-- [ ] **Step 6: Run the complete verification suite**
+- [x] **Step 6: Run the complete verification suite**
 
 Run: `pnpm test`
 
@@ -1284,7 +1284,7 @@ Run: `pnpm build`
 
 Expected: TypeScript build and Vite production build succeed.
 
-- [ ] **Step 7: Inspect final model-call surface**
+- [x] **Step 7: Inspect final model-call surface**
 
 Run:
 
@@ -1294,7 +1294,7 @@ rg -n "callChatCompletion<|callChatCompletion\(" src/lib/course-structure src/li
 
 Expected: model calls exist only in `section-compiler.ts` and `curriculum-review.ts`; no call occurs in schedulers, validators, adapters, or per-topic loops.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add -A src README.md
@@ -1305,16 +1305,47 @@ git commit -m "refactor: retire repeated knowledge extraction passes"
 
 ## Final Acceptance Checklist
 
-- [ ] New courses produce exactly two knowledge layers.
-- [ ] First-layer topics have no parent-topic hierarchy.
-- [ ] One source block can support multiple topics through distinct or shared EvidenceSpans.
-- [ ] Hard ordering semantics are uniformly `before → after`.
-- [ ] Course order is deterministic and satisfies every retained hard constraint.
-- [ ] Teaching paths use controlled roles and deterministic templates.
-- [ ] Structure readiness does not wait for card enrichment or note generation.
-- [ ] Unchanged sections cause zero extraction calls on rerun.
-- [ ] Corrected topics and constraints survive incremental recompilation.
-- [ ] Legacy views, cards, notes, persistence, and QA pass regression tests.
-- [ ] Structure model-call count is exactly `uncached section batches + at most one curriculum review`, independent of topic count.
-- [ ] `getUsageRecords()` contains no per-topic structure task types after compilation; section/review token totals remain observable for later real-course comparison.
-- [ ] `pnpm test`, `pnpm check`, `pnpm lint`, and `pnpm build` all succeed.
+- [x] New courses produce exactly two knowledge layers.
+- [x] First-layer topics have no parent-topic hierarchy.
+- [x] One source block can support multiple topics through distinct or shared EvidenceSpans.
+- [x] Hard ordering semantics are uniformly `before → after`.
+- [x] Course order is deterministic and satisfies every retained hard constraint.
+- [x] Teaching paths use controlled roles and deterministic templates.
+- [x] Structure readiness does not wait for card enrichment or note generation.
+- [x] Unchanged sections cause zero extraction calls on rerun.
+- [x] Corrected topics and constraints survive incremental recompilation.
+- [x] Legacy views, cards, notes, persistence, and QA pass regression tests.
+- [x] Structure model-call count is exactly `uncached section batches + at most one curriculum review`, independent of topic count.
+- [x] `getUsageRecords()` contains no per-topic structure task types after compilation; section/review token totals remain observable for later real-course comparison.
+- [x] `pnpm test`, `pnpm check`, `pnpm lint`, and `pnpm build` all succeed.
+
+---
+
+## 验收记录（2026-08-31，真实课件）
+
+> 对比环境：lecture1（Introduction to Machine Learning，69 页）还原为 24.7k 字符 Markdown / 263 块 / 44 章节；
+> 模型 模力方舟 DeepSeek-V4-Flash（chat-completions）；新编译器跑 `codex/course-structure-compiler` 分支，
+> 旧管线跑 `main` 分支，同一课件同一模型。完整数据见 `course_weave/real-courseware-validation/RESULTS.md`。
+
+| 指标 | 旧管线 | 新编译器 | 验收目标 | 结论 |
+|---|---|---|---|---|
+| 结构阶段模型调用 | 48 | 6（4 批次 + 1 截断拆分重试 + 1 审查） | 减少 ≥60% | **-87.5%** ✅ |
+| 结构阶段总 token | 213,325 | 50,004 | 减少 ≥50% | **-76.6%** ✅ |
+| 结构阶段耗时 | 40.0 分钟 | 10.8 分钟 | -- | -73% |
+| 相同课件二次运行 | 48 次全重跑 | 19 秒 / 0 次批次调用 | 未变化章节调用数为零 | ✅ |
+| 调用数与主题数解耦 | 随 T 线性（35 次逐主题调用） | 仅随章节数 | 不含逐主题调用 | ✅ |
+
+结构质量：17 个一级主题（仅 1 个课程事务类，旧管线 4 个）、53 个受控角色讲解单元、
+98 个块内字符级证据 span（quote 实测与原文一致）、13 条方向统一顺序约束、二次运行学习
+顺序完全一致；status=ready，仅 1 条 LOW_COVERAGE(36.5%) warning。
+
+真实模型暴露并已修复的健壮性问题（提交 `7e39db4`）：
+
+1. 响应 schema 未写入 prompt，模型自造字段名导致整批结果被静默丢弃（本次最严重问题）；
+2. 批次预算 6000 低估 JSON 封装开销，输出撞 max_tokens 截断；预算统一降为 3000；
+3. 截断/超时自动拆批此前仅 responses 模式启用，chat-completions 模式现已一致启用；
+4. 批次调用成功但结果为空时无告警，新增 `EMPTY_SECTION_COMPILATION` issue；
+5. 模型把 localId 写成数字时被静默丢弃，新增 `identifier()` 容错。
+
+已知留观项：chat 模式 `callChatCompletion` 硬编码 120s 超时对慢模型（生成 7k token JSON 需
+110-180s）偏紧，验证脚本中放宽到 10 分钟绕过；生产上可通过更小批次（已随预算调整）缓解。
