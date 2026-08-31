@@ -46,6 +46,12 @@ function text(value: unknown): string {
   return typeof value === 'string' ? value.trim() : '';
 }
 
+/** 模型常把 ID 写成数字，这里统一转成字符串，避免静默丢弃整条候选。 */
+function identifier(value: unknown): string {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return text(value);
+}
+
 function clamp(value: unknown, minimum: number, maximum: number): number {
   const numeric = typeof value === 'number' && Number.isFinite(value) ? value : minimum;
   return Math.min(maximum, Math.max(minimum, numeric));
@@ -73,18 +79,50 @@ export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt 
     '每个 topic 与 teaching unit 都必须引用输入中真实 blockId 和原文短句。',
     '顺序方向固定：beforeTopicLocalId 必须在 afterTopicLocalId 之前学习。',
     'hard 仅用于真实依赖；推断得到的关系必须为 soft。',
-    '只返回一个 JSON 对象，不得输出解释性文字。',
+    '严格按 responseSchema 的字段名返回一个 JSON 对象，不得输出解释性文字，不得改用其他字段名。',
   ].join('\n');
   const stablePrefix = JSON.stringify({
     learningGenres: [...LEARNING_GENRES],
     teachingRoles: [...TEACHING_ROLES],
     evidenceRoles: [...EVIDENCE_ROLES],
-    schema: {
-      topicMentions: 'array',
-      teachingUnits: 'array',
-      orderClaims: 'array',
-      unresolvedReferences: 'array',
+    responseSchema: {
+      topicMentions: [{
+        localId: 'string，批次内唯一，如 t1/t2',
+        name: 'string，主题名',
+        aliases: 'string[]',
+        learningObjective: 'string，学完后能理解/解释/推导/比较/应用什么',
+        scope: 'string',
+        genre: 'learningGenres 之一',
+        difficulty: '1-5 整数',
+        importance: 'core|important|supplementary',
+        evidence: 'evidenceItem[]，至少 1 条',
+      }],
+      teachingUnits: [{
+        localId: 'string，批次内唯一，如 u1/u2',
+        topicLocalId: 'string，所属 topicMentions[].localId',
+        role: 'teachingRoles 之一',
+        title: 'string',
+        summary: 'string',
+        evidence: 'evidenceItem[]，至少 1 条',
+        required: 'boolean',
+      }],
+      orderClaims: [{
+        beforeTopicLocalId: 'string，topicMentions[].localId',
+        afterTopicLocalId: 'string，topicMentions[].localId',
+        strength: 'hard|soft',
+        reason: 'string',
+        evidence: 'evidenceItem[]，可为空',
+        source: 'explicit|inferred',
+      }],
+      unresolvedReferences: 'string[]',
       confidence: '0..1',
+      evidenceItem: {
+        blockId: '输入 blocks[].id',
+        quote: '该 block 原文中真实存在的短句（用于精确定位）',
+        role: 'evidenceRoles 之一',
+        startOffset: '可选整数，quote 在 block content 中的起始字符偏移',
+        endOffset: '可选整数，结束偏移',
+      },
     },
   });
   const dynamicInput = JSON.stringify({
@@ -134,7 +172,7 @@ export async function compileSectionBatch(
 
   rawTopics.forEach(item => {
     if (!isRecord(item)) return;
-    const localId = text(item.localId);
+    const localId = identifier(item.localId);
     const genre = text(item.genre) as LearningGenre;
     const importance = text(item.importance) as TopicMentionDraft['importance'];
     const name = text(item.name);
@@ -159,8 +197,8 @@ export async function compileSectionBatch(
   const rawUnits = Array.isArray(raw.teachingUnits) ? raw.teachingUnits : [];
   rawUnits.forEach(item => {
     if (!isRecord(item)) return;
-    const localId = text(item.localId);
-    const topicLocalId = namespacedTopicIds.get(text(item.topicLocalId));
+    const localId = identifier(item.localId);
+    const topicLocalId = namespacedTopicIds.get(identifier(item.topicLocalId));
     const role = text(item.role) as TeachingRole;
     if (!localId || !topicLocalId || !TEACHING_ROLES.has(role)) return;
     teachingUnits.push({
@@ -179,8 +217,8 @@ export async function compileSectionBatch(
   const rawClaims = Array.isArray(raw.orderClaims) ? raw.orderClaims : [];
   rawClaims.forEach(item => {
     if (!isRecord(item)) return;
-    const beforeTopicLocalId = namespacedTopicIds.get(text(item.beforeTopicLocalId));
-    const afterTopicLocalId = namespacedTopicIds.get(text(item.afterTopicLocalId));
+    const beforeTopicLocalId = namespacedTopicIds.get(identifier(item.beforeTopicLocalId));
+    const afterTopicLocalId = namespacedTopicIds.get(identifier(item.afterTopicLocalId));
     const source = text(item.source) === 'explicit' ? 'explicit' : 'inferred';
     if (!beforeTopicLocalId || !afterTopicLocalId || beforeTopicLocalId === afterTopicLocalId) return;
     orderClaims.push({

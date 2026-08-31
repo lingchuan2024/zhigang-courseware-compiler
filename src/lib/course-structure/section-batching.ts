@@ -1,7 +1,7 @@
 import type { MarkdownBlock, SourceDocument } from '../../types';
 import { estimateTokens } from '../content-window';
 
-export const SECTION_COMPILER_PROMPT_VERSION = 'course-section-v1';
+export const SECTION_COMPILER_PROMPT_VERSION = 'course-section-v2';
 
 export interface SectionBatch {
   id: string;

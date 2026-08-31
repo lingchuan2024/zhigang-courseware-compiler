@@ -245,8 +245,9 @@ export async function compileCourseStructure(
   dependencies: CourseCompilerDependencies = {},
 ): Promise<CourseLearningStructure> {
   dependencies.onStage?.('batching');
-  const usesResponses = config.apiMode === 'responses';
-  const batches = buildSectionBatches(documents, usesResponses ? 3000 : 6000);
+  // 统一 3000 token 批次预算：内容之外还有 JSON 封装与提示词开销，
+  // 6000 预算的批次实测输出会逼近 max_tokens 上限并拉长生成时间。
+  const batches = buildSectionBatches(documents, 3000);
   const previous = dependencies.previous ?? null;
   const previousByCacheKey = new Map(
     (previous?.checkpoints ?? []).map(checkpoint => [checkpoint.cacheKey, checkpoint]),
@@ -261,7 +262,7 @@ export async function compileCourseStructure(
     const cacheKey = effectiveCacheKey(batch, config);
     const reusable = previousByCacheKey.get(cacheKey);
     try {
-      const result = reusable?.result ?? await compileBatchAdaptively(batch, compileBatch, usesResponses);
+      const result = reusable?.result ?? await compileBatchAdaptively(batch, compileBatch, true);
       return { cacheKey, batchId: batch.id, sectionIds: batch.sectionIds, result } satisfies SectionCompilationCheckpoint;
     } catch (error) {
       issues.push({
@@ -307,6 +308,15 @@ export async function compileCourseStructure(
     if (!batch) return;
     const blockById = new Map(batch.blocks.map(block => [block.id, block]));
     const compilation: SectionCompilation = checkpoint.result;
+    // 批次调用成功但一条结构都没解析出来，多半是响应字段名不符；不能静默吞掉。
+    if (compilation.topicMentions.length === 0 && compilation.teachingUnits.length === 0) {
+      issues.push({
+        code: 'EMPTY_SECTION_COMPILATION',
+        severity: 'warning',
+        message: `章节批次 ${batch.id} 调用成功但未解析出任何主题或讲解单元（响应格式可能不符）`,
+        batchId: batch.id,
+      });
+    }
     compilation.topicMentions.forEach(mention => resolvedTopics.push({
       localId: mention.localId,
       name: mention.name,

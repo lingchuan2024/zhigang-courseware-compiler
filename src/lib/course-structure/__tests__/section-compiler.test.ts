@@ -120,7 +120,7 @@ describe('unified section compiler', () => {
     const prompt = buildSectionCompilerPrompt(batch);
     expect(prompt.dynamicInput).toContain('b1');
     expect(prompt.system).toContain('beforeTopicLocalId');
-    expect(prompt.promptVersion).toBe('course-section-v1');
+    expect(prompt.promptVersion).toBe('course-section-v2');
   });
 
   it('allows Responses/Agent Plan enough time to finish reasoning', async () => {
