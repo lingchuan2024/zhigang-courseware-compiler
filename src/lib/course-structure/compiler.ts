@@ -256,6 +256,7 @@ export async function compileCourseStructure(
   let completedBatches = 0;
 
   dependencies.onStage?.('compiling');
+  dependencies.onBatchProgress?.(0, batches.length);
   const checkpointResults = await mapConcurrent(batches, 2, async batch => {
     const cacheKey = effectiveCacheKey(batch, config);
     const reusable = previousByCacheKey.get(cacheKey);

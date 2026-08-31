@@ -169,6 +169,17 @@ describe('course structure compiler integration', () => {
     expect(second.structureVersion).toBe(first.structureVersion);
   });
 
+  it('reports zero completed batches before the first long model request finishes', async () => {
+    const progress: Array<[number, number]> = [];
+    await compileCourseStructure(config, [document('d1', '似然函数用于参数估计。')], 'course-1', {
+      compileBatch: async batch => compilationForBatch(batch),
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      onBatchProgress: (current, total) => progress.push([current, total]),
+    });
+
+    expect(progress).toEqual([[0, 1], [1, 1]]);
+  });
+
   it('Agent Plan 大批次超时后自动拆小并合并结果', async () => {
     const documents = [multiBlockDocument('large', 4)];
     const seenBatchSizes: number[] = [];

@@ -11,6 +11,7 @@ import {
   failProgress,
   updateCurrentItem,
   updateCompilerProgress,
+  updateWindowProgress,
   deriveStructureProgress,
   deriveSidebarStepStates,
   computeProgressPercent,
@@ -44,6 +45,14 @@ describe('pipeline-progress', () => {
       expect(progress.steps.find(step => step.id === 'review-curriculum')?.status).toBe('skipped');
       expect(progress.steps.find(step => step.id === 'schedule-course')?.status).toBe('running');
       expect(progress.steps.find(step => step.id === 'validate-structure')?.status).toBe('pending');
+    });
+
+    it('keeps estimated progress moving while the first section batch is running', () => {
+      const progress = updateCompilerProgress(createStructureExtractionProgress(), 'compiling');
+      const waitingForFirstBatch = updateWindowProgress(progress, 0, 4);
+
+      expect(waitingForFirstBatch.windowProgress).toEqual({ current: 0, total: 4 });
+      expect(waitingForFirstBatch.isEstimated).toBe(true);
     });
   });
 

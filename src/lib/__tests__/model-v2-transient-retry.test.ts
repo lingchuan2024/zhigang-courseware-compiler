@@ -98,6 +98,23 @@ describe('callChatCompletion 瞬时错误退避', () => {
     expect(sleeps).toEqual([]);
   });
 
+  it('代理 504 被识别为超时并立即交给上层拆批', async () => {
+    const sleeps: number[] = [];
+    const sleep = async (ms: number) => { sleeps.push(ms); };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: 'agent-plan-proxy-timeout',
+      message: 'Agent Plan proxy request timed out',
+    }), { status: 504, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      callChatCompletion(config, makePrompt(), 'topic-merge', 5000, undefined, 'section-compile', sleep),
+    ).rejects.toMatchObject({ code: 'api-timeout', stage: 'section-compile' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleeps).toEqual([]);
+  });
+
   it('网络中断重试后成功，错误消息包含重试次数', async () => {
     const sleeps: number[] = [];
     const sleep = async (ms: number) => { sleeps.push(ms); };

@@ -153,12 +153,13 @@ async function fetchWithTransientRetry(
     if (response.ok) return response;
 
     const body = await response.text().catch(() => '');
+    const proxyTimedOut = response.status === 504 && body.includes('agent-plan-proxy-timeout');
     const error = new ExtractionError(
-      response.status === 429 ? 'api-rate-limit' : 'api-http-error',
+      proxyTimedOut ? 'api-timeout' : response.status === 429 ? 'api-rate-limit' : 'api-http-error',
       stage || 'unknown' as ExtractionStage,
       `模型服务返回 ${response.status}（${response.statusText}）${body ? ` — ${body.substring(0, 200)}` : ''}`,
     );
-    if (!isTransientStatus(response.status) || attempt === TRANSIENT_RETRY_MAX) {
+    if (proxyTimedOut || !isTransientStatus(response.status) || attempt === TRANSIENT_RETRY_MAX) {
       throw error;
     }
     const retryAfter = Number(response.headers.get('retry-after'));

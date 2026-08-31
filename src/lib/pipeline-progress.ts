@@ -224,7 +224,8 @@ export function updateWindowProgress(
     ...progress,
     windowProgress: { current, total },
     estimatedProgress: Math.round(realProgress * 10) / 10,
-    isEstimated: false, // 窗口进度是真实的
+    // 第一个长推理尚未完成时保留平滑估算，同时明确显示 0 / total。
+    isEstimated: current === 0,
   };
 }
 
