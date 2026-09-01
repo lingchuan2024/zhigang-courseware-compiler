@@ -6,5 +6,7 @@ export interface CompiledPrompt {
   stablePrefix: string;
   dynamicInput: string;
   promptVersion: string;
+  /** 任务级输出上限；未指定时使用通用默认值。 */
+  maxOutputTokens?: number;
   messages: Array<{ role: 'system' | 'user'; content: string }>;
 }

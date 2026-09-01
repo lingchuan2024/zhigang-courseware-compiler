@@ -206,6 +206,39 @@ describe('course structure compiler integration', () => {
     expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(false);
   });
 
+  it('Agent Plan 单个大块超时后继续按文本边界拆分', async () => {
+    const documents = [document('single-large', '知识内容。'.repeat(240))];
+    const seenFragments: Array<{ blockId: string; contentLength: number }> = [];
+
+    const result = await compileCourseStructure(
+      { ...config, apiMode: 'responses' },
+      documents,
+      'course-1',
+      {
+        compileBatch: async batch => {
+          seenFragments.push({
+            blockId: batch.blocks[0].id,
+            contentLength: batch.blocks[0].content.length,
+          });
+          if (batch.blocks[0].content.length > 700) {
+            throw new ExtractionError('api-timeout', 'section-compile', '模型请求超时');
+          }
+          return compilationForBatch(batch);
+        },
+        review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      },
+    );
+
+    expect(seenFragments[0].contentLength).toBe(documents[0].blocks[0].content.length);
+    expect(seenFragments.slice(1).map(fragment => fragment.contentLength))
+      .toEqual(expect.arrayContaining([expect.any(Number), expect.any(Number)]));
+    expect(seenFragments.slice(1).every(fragment => fragment.contentLength <= 700)).toBe(true);
+    expect(new Set(seenFragments.map(fragment => fragment.blockId)))
+      .toEqual(new Set(['single-large-b1']));
+    expect(result.checkpoints).toHaveLength(1);
+    expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(false);
+  });
+
   it('Agent Plan 初始批次限制为约 3000 tokens', async () => {
     const documents = [multiBlockDocument('token-heavy', 4)];
     documents[0].blocks.forEach((block, index) => {

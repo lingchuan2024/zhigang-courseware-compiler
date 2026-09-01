@@ -58,11 +58,12 @@ function buildRequestUrl(config: ModelConfig): string {
 }
 
 function buildCompletionBody(config: ModelConfig, compiled: CompiledPrompt): Record<string, unknown> {
+  const maxOutputTokens = compiled.maxOutputTokens ?? 8192;
   if (getApiMode(config) === 'responses') {
     return {
       model: config.model,
       input: compiled.messages,
-      max_output_tokens: 8192,
+      max_output_tokens: maxOutputTokens,
       text: { format: { type: 'json_object' } },
     };
   }
@@ -70,7 +71,7 @@ function buildCompletionBody(config: ModelConfig, compiled: CompiledPrompt): Rec
     model: config.model,
     messages: compiled.messages,
     temperature: 0.2,
-    max_tokens: 8192,
+    max_tokens: maxOutputTokens,
     response_format: { type: 'json_object' },
   };
 }

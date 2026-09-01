@@ -121,6 +121,7 @@ describe('unified section compiler', () => {
     expect(prompt.dynamicInput).toContain('b1');
     expect(prompt.system).toContain('beforeTopicLocalId');
     expect(prompt.promptVersion).toBe('course-section-v2');
+    expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(2048);
   });
 
   it('allows Responses/Agent Plan enough time to finish reasoning', async () => {

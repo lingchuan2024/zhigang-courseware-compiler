@@ -142,6 +142,9 @@ export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt 
     stablePrefix,
     dynamicInput,
     promptVersion: SECTION_COMPILER_PROMPT_VERSION,
+    // 章节结构的 JSON 规模应跟输入成比例，固定 8192 会让推理模型
+    // 在小片段上仍长时间生成。保留 2048 下限容纳结构化字段。
+    maxOutputTokens: Math.min(4096, Math.max(2048, Math.ceil(batch.estimatedTokens * 1.5))),
     messages: [
       { role: 'system', content: `${system}\n\n${stablePrefix}` },
       { role: 'user', content: dynamicInput },

@@ -73,6 +73,22 @@ describe('Responses API transport', () => {
     expect(body).not.toHaveProperty('thinking');
   });
 
+  it('uses a task-specific output limit when the prompt provides one', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(responsesResponse('{"units":[]}'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callChatCompletion<{ units: unknown[] }>(
+      config,
+      { ...prompt, maxOutputTokens: 2048 } as CompiledPrompt,
+      'course-section-compile',
+      1000,
+    );
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    expect(body.max_output_tokens).toBe(2048);
+  });
+
   it('retries once when Responses reports an incomplete output', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(responsesResponse('{"units":[', 'incomplete'))

@@ -1,4 +1,5 @@
 import type { MarkdownBlock, ModelConfig, SourceDocument } from '../../types';
+import { estimateTokens } from '../content-window';
 import { ExtractionError, inferErrorCode } from '../extraction-errors';
 import { normalizeCandidates, type ResolvedTopicDraft } from './candidate-normalizer';
 import { compileCourseOrder } from './course-scheduler';
@@ -79,24 +80,71 @@ function unionInOrder(...groups: string[][]): string[] {
   }));
 }
 
+const MIN_ADAPTIVE_FRAGMENT_TOKENS = 256;
+
+function batchTokens(blocks: MarkdownBlock[]): number {
+  return blocks.reduce((total, block) => total + estimateTokens(block.content), 0);
+}
+
+function splitBlockContent(block: MarkdownBlock): [MarkdownBlock, MarkdownBlock] | null {
+  const content = block.content.trim();
+  if (estimateTokens(content) < MIN_ADAPTIVE_FRAGMENT_TOKENS * 2) return null;
+
+  const midpoint = Math.floor(content.length / 2);
+  const boundaryIndexes: number[] = [];
+  for (let index = 1; index < content.length; index += 1) {
+    if (/\s|[.?!;,。！？；，]/u.test(content[index - 1])) boundaryIndexes.push(index);
+  }
+  const candidates = [...boundaryIndexes, midpoint]
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .sort((left, right) => Math.abs(left - midpoint) - Math.abs(right - midpoint));
+
+  for (const cutIndex of candidates) {
+    const leftContent = content.slice(0, cutIndex).trim();
+    const rightContent = content.slice(cutIndex).trim();
+    if (
+      estimateTokens(leftContent) < MIN_ADAPTIVE_FRAGMENT_TOKENS
+      || estimateTokens(rightContent) < MIN_ADAPTIVE_FRAGMENT_TOKENS
+    ) continue;
+    const createFragment = (fragmentContent: string, index: number): MarkdownBlock => ({
+      ...block,
+      // 证据必须继续指向 MinerU 原始块，因此不改 blockId。
+      content: fragmentContent,
+      contentHash: `${block.contentHash}__fragment${index + 1}`,
+    });
+    return [createFragment(leftContent, 0), createFragment(rightContent, 1)];
+  }
+  return null;
+}
+
 function splitSectionBatch(batch: SectionBatch): [SectionBatch, SectionBatch] | null {
-  if (batch.blocks.length < 2) return null;
-  const midpoint = Math.ceil(batch.blocks.length / 2);
+  let blockParts: [MarkdownBlock[], MarkdownBlock[]] | null = null;
+  if (batch.blocks.length >= 2) {
+    const midpoint = Math.ceil(batch.blocks.length / 2);
+    blockParts = [batch.blocks.slice(0, midpoint), batch.blocks.slice(midpoint)];
+  } else if (batch.blocks.length === 1) {
+    const fragments = splitBlockContent(batch.blocks[0]);
+    if (fragments) blockParts = [[fragments[0]], [fragments[1]]];
+  }
+  if (!blockParts) return null;
+
   const createPart = (blocks: MarkdownBlock[], index: number): SectionBatch => ({
     ...batch,
     id: `${batch.id}__part${index + 1}`,
     blocks,
-    estimatedTokens: Math.max(1, Math.ceil(batch.estimatedTokens * blocks.length / batch.blocks.length)),
+    estimatedTokens: batchTokens(blocks),
     cacheKey: `${batch.cacheKey}__part${index + 1}`,
   });
-  return [createPart(batch.blocks.slice(0, midpoint), 0), createPart(batch.blocks.slice(midpoint), 1)];
+  return [createPart(blockParts[0], 0), createPart(blockParts[1], 1)];
 }
 
 function mergeSectionCompilations(
   batch: SectionBatch,
+  parts: [SectionBatch, SectionBatch],
   compilations: SectionCompilation[],
 ): SectionCompilation {
-  const totalWeight = Math.max(1, batch.blocks.length);
+  const weights = parts.map(part => Math.max(1, part.estimatedTokens));
+  const totalWeight = weights.reduce((total, weight) => total + weight, 0);
   return {
     batchId: batch.id,
     sectionIds: unionInOrder(...compilations.map(compilation => compilation.sectionIds)),
@@ -105,10 +153,7 @@ function mergeSectionCompilations(
     orderClaims: compilations.flatMap(compilation => compilation.orderClaims),
     unresolvedReferences: unionInOrder(...compilations.map(compilation => compilation.unresolvedReferences)),
     confidence: compilations.reduce((sum, compilation, index) => {
-      const weight = Math.max(1, index === 0
-        ? Math.ceil(batch.blocks.length / 2)
-        : Math.floor(batch.blocks.length / 2));
-      return sum + compilation.confidence * weight;
+      return sum + compilation.confidence * weights[index];
     }, 0) / totalWeight,
   };
 }
@@ -133,7 +178,7 @@ async function compileBatchAdaptively(
     for (const part of parts) {
       compilations.push(await compileBatchAdaptively(part, compileBatch, allowSplit));
     }
-    return mergeSectionCompilations(batch, compilations);
+    return mergeSectionCompilations(batch, parts, compilations);
   }
 }
 
