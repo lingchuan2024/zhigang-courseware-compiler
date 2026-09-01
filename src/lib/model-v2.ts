@@ -118,8 +118,9 @@ async function fetchWithTransientRetry(
 ): Promise<Response> {
   let lastError: ExtractionError | null = null;
   let retryAfterMs: number | null = null;
+  const maxTransportAttempts = Math.max(1, compiled.maxTransportAttempts ?? TRANSIENT_RETRY_MAX + 1);
 
-  for (let attempt = 0; attempt <= TRANSIENT_RETRY_MAX; attempt++) {
+  for (let attempt = 0; attempt < maxTransportAttempts; attempt++) {
     if (attempt > 0) {
       await sleep(retryAfterMs ?? Math.min(BACKOFF_BASE_MS * 2 ** (attempt - 1), BACKOFF_CAP_MS));
       retryAfterMs = null;
@@ -160,7 +161,7 @@ async function fetchWithTransientRetry(
       stage || 'unknown' as ExtractionStage,
       `模型服务返回 ${response.status}（${response.statusText}）${body ? ` — ${body.substring(0, 200)}` : ''}`,
     );
-    if (proxyTimedOut || !isTransientStatus(response.status) || attempt === TRANSIENT_RETRY_MAX) {
+    if (proxyTimedOut || !isTransientStatus(response.status) || attempt === maxTransportAttempts - 1) {
       throw error;
     }
     const retryAfter = Number(response.headers.get('retry-after'));
@@ -190,7 +191,7 @@ export async function callChatCompletion<T>(
   const url = buildRequestUrl(config);
 
   const startedAt = Date.now();
-  const maxStructuredAttempts = 2;
+  const maxStructuredAttempts = Math.max(1, compiled.maxStructuredAttempts ?? 2);
   let lastStructuredError: ExtractionError | null = null;
 
   for (let attempt = 0; attempt < maxStructuredAttempts; attempt++) {

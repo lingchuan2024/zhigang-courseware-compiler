@@ -1,6 +1,5 @@
 import type { MarkdownBlock, ModelConfig, SourceDocument } from '../../types';
-import { estimateTokens } from '../content-window';
-import { ExtractionError, inferErrorCode } from '../extraction-errors';
+import { ExtractionError } from '../extraction-errors';
 import { normalizeCandidates, type ResolvedTopicDraft } from './candidate-normalizer';
 import { compileCourseOrder } from './course-scheduler';
 import { reviewCurriculum } from './curriculum-review';
@@ -12,6 +11,8 @@ import { constraintStableKey, teachingUnitStableKey } from './stable-identity';
 import { compileTeachingPath } from './teaching-path-compiler';
 import type {
   CourseLearningStructure,
+  CourseExtractionProgress,
+  CourseExtractionUnitCheckpoint,
   CourseStructureIssue,
   EvidenceSpan,
   EvidenceSpanDraft,
@@ -29,6 +30,14 @@ export interface CourseCompilerDependencies {
   review?: typeof reviewCurriculum;
   previous?: CourseLearningStructure | null;
   onBatchProgress?: (current: number, total: number) => void;
+  onUnitCheckpoint?: (checkpoint: CourseExtractionUnitCheckpoint) => void;
+  onExtractionProgress?: (progress: CourseExtractionProgress) => void;
+  resumeCheckpoints?: CourseExtractionUnitCheckpoint[];
+  /** 默认只允许前台语义识别启动 60 秒；课程合并与校验另有固定预算。 */
+  foregroundBudgetMs?: number;
+  totalBudgetMs?: number;
+  concurrency?: number;
+  now?: () => number;
   onStage?: (stage: 'batching' | 'compiling' | 'normalizing' | 'reviewing' | 'scheduling' | 'validating') => void;
 }
 
@@ -67,8 +76,7 @@ async function mapConcurrent<T, R>(
 }
 
 function effectiveCacheKey(batch: SectionBatch, config: ModelConfig): string {
-  void config;
-  return batch.cacheKey;
+  return [batch.cacheKey, config.apiMode ?? 'chat-completions', config.endpoint, config.model].join('|');
 }
 
 function unionInOrder(...groups: string[][]): string[] {
@@ -78,108 +86,6 @@ function unionInOrder(...groups: string[][]): string[] {
     seen.add(value);
     return true;
   }));
-}
-
-const MIN_ADAPTIVE_FRAGMENT_TOKENS = 256;
-
-function batchTokens(blocks: MarkdownBlock[]): number {
-  return blocks.reduce((total, block) => total + estimateTokens(block.content), 0);
-}
-
-function splitBlockContent(block: MarkdownBlock): [MarkdownBlock, MarkdownBlock] | null {
-  const content = block.content.trim();
-  if (estimateTokens(content) < MIN_ADAPTIVE_FRAGMENT_TOKENS * 2) return null;
-
-  const midpoint = Math.floor(content.length / 2);
-  const boundaryIndexes: number[] = [];
-  for (let index = 1; index < content.length; index += 1) {
-    if (/\s|[.?!;,。！？；，]/u.test(content[index - 1])) boundaryIndexes.push(index);
-  }
-  const candidates = [...boundaryIndexes, midpoint]
-    .filter((value, index, values) => values.indexOf(value) === index)
-    .sort((left, right) => Math.abs(left - midpoint) - Math.abs(right - midpoint));
-
-  for (const cutIndex of candidates) {
-    const leftContent = content.slice(0, cutIndex).trim();
-    const rightContent = content.slice(cutIndex).trim();
-    if (
-      estimateTokens(leftContent) < MIN_ADAPTIVE_FRAGMENT_TOKENS
-      || estimateTokens(rightContent) < MIN_ADAPTIVE_FRAGMENT_TOKENS
-    ) continue;
-    const createFragment = (fragmentContent: string, index: number): MarkdownBlock => ({
-      ...block,
-      // 证据必须继续指向 MinerU 原始块，因此不改 blockId。
-      content: fragmentContent,
-      contentHash: `${block.contentHash}__fragment${index + 1}`,
-    });
-    return [createFragment(leftContent, 0), createFragment(rightContent, 1)];
-  }
-  return null;
-}
-
-function splitSectionBatch(batch: SectionBatch): [SectionBatch, SectionBatch] | null {
-  let blockParts: [MarkdownBlock[], MarkdownBlock[]] | null = null;
-  if (batch.blocks.length >= 2) {
-    const midpoint = Math.ceil(batch.blocks.length / 2);
-    blockParts = [batch.blocks.slice(0, midpoint), batch.blocks.slice(midpoint)];
-  } else if (batch.blocks.length === 1) {
-    const fragments = splitBlockContent(batch.blocks[0]);
-    if (fragments) blockParts = [[fragments[0]], [fragments[1]]];
-  }
-  if (!blockParts) return null;
-
-  const createPart = (blocks: MarkdownBlock[], index: number): SectionBatch => ({
-    ...batch,
-    id: `${batch.id}__part${index + 1}`,
-    blocks,
-    estimatedTokens: batchTokens(blocks),
-    cacheKey: `${batch.cacheKey}__part${index + 1}`,
-  });
-  return [createPart(blockParts[0], 0), createPart(blockParts[1], 1)];
-}
-
-function mergeSectionCompilations(
-  batch: SectionBatch,
-  parts: [SectionBatch, SectionBatch],
-  compilations: SectionCompilation[],
-): SectionCompilation {
-  const weights = parts.map(part => Math.max(1, part.estimatedTokens));
-  const totalWeight = weights.reduce((total, weight) => total + weight, 0);
-  return {
-    batchId: batch.id,
-    sectionIds: unionInOrder(...compilations.map(compilation => compilation.sectionIds)),
-    topicMentions: compilations.flatMap(compilation => compilation.topicMentions),
-    teachingUnits: compilations.flatMap(compilation => compilation.teachingUnits),
-    orderClaims: compilations.flatMap(compilation => compilation.orderClaims),
-    unresolvedReferences: unionInOrder(...compilations.map(compilation => compilation.unresolvedReferences)),
-    confidence: compilations.reduce((sum, compilation, index) => {
-      return sum + compilation.confidence * weights[index];
-    }, 0) / totalWeight,
-  };
-}
-
-function canRecoverBySplitting(error: unknown): boolean {
-  const code = inferErrorCode(error);
-  return code === 'api-timeout' || code === 'response-truncated';
-}
-
-async function compileBatchAdaptively(
-  batch: SectionBatch,
-  compileBatch: (batch: SectionBatch) => Promise<SectionCompilation>,
-  allowSplit: boolean,
-): Promise<SectionCompilation> {
-  try {
-    return await compileBatch(batch);
-  } catch (error) {
-    const parts = allowSplit && canRecoverBySplitting(error) ? splitSectionBatch(batch) : null;
-    if (!parts) throw error;
-    // 顺序执行，避免同一个 Agent Plan 同时承担多个长推理请求。
-    const compilations: SectionCompilation[] = [];
-    for (const part of parts) {
-      compilations.push(await compileBatchAdaptively(part, compileBatch, allowSplit));
-    }
-    return mergeSectionCompilations(batch, parts, compilations);
-  }
 }
 
 function batchFailureMessage(batch: SectionBatch, error: unknown): string {
@@ -290,36 +196,90 @@ export async function compileCourseStructure(
   dependencies: CourseCompilerDependencies = {},
 ): Promise<CourseLearningStructure> {
   dependencies.onStage?.('batching');
-  // 统一 3000 token 批次预算：内容之外还有 JSON 封装与提示词开销，
-  // 6000 预算的批次实测输出会逼近 max_tokens 上限并拉长生成时间。
-  const batches = buildSectionBatches(documents, 3000);
+  // 请求前就将证据单元限制在约 1000 token，不再等超时后递归拆分。
+  const batches = buildSectionBatches(documents, 1000);
   const previous = dependencies.previous ?? null;
   const previousByCacheKey = new Map(
     (previous?.checkpoints ?? []).map(checkpoint => [checkpoint.cacheKey, checkpoint]),
   );
+  const resumedByCacheKey = new Map(
+    (dependencies.resumeCheckpoints ?? [])
+      .filter(checkpoint => checkpoint.status === 'succeeded' && checkpoint.result)
+      .map(checkpoint => [checkpoint.cacheKey, checkpoint]),
+  );
   const compileBatch = dependencies.compileBatch ?? (batch => compileSectionBatch(config, batch));
   const issues: CourseStructureIssue[] = [];
+  const now = dependencies.now ?? Date.now;
+  const startedAt = now();
+  const foregroundBudgetMs = Math.max(1, dependencies.foregroundBudgetMs ?? 60_000);
+  const deadlineAt = startedAt + foregroundBudgetMs;
+  const totalDeadlineAt = startedAt + Math.max(foregroundBudgetMs, dependencies.totalBudgetMs ?? 90_000);
   let completedBatches = 0;
+  let successfulBatches = 0;
+  let failedBatches = 0;
+  let discoveredTopicMentions = 0;
+
+  const emitProgress = () => dependencies.onExtractionProgress?.({
+    completedUnits: completedBatches,
+    successfulUnits: successfulBatches,
+    failedUnits: failedBatches,
+    totalUnits: batches.length,
+    discoveredTopicMentions,
+    elapsedMs: Math.max(0, now() - startedAt),
+  });
 
   dependencies.onStage?.('compiling');
   dependencies.onBatchProgress?.(0, batches.length);
-  const checkpointResults = await mapConcurrent(batches, 2, async batch => {
+  emitProgress();
+  const checkpointResults = await mapConcurrent(batches, Math.max(1, dependencies.concurrency ?? 3), async batch => {
     const cacheKey = effectiveCacheKey(batch, config);
-    const reusable = previousByCacheKey.get(cacheKey);
+    const resumed = resumedByCacheKey.get(cacheKey);
+    const reusableResult = resumed?.result ?? previousByCacheKey.get(cacheKey)?.result;
+    let unitCheckpoint: CourseExtractionUnitCheckpoint;
+    let attempted = false;
     try {
-      const result = reusable?.result ?? await compileBatchAdaptively(batch, compileBatch, true);
+      if (!reusableResult && now() >= deadlineAt) {
+        throw new ExtractionError('api-timeout', 'section-compile', '已达到前台处理时限，剩余证据单元待下次续跑');
+      }
+      attempted = !reusableResult;
+      const result = reusableResult ?? await compileBatch(batch);
+      successfulBatches += 1;
+      discoveredTopicMentions += result.topicMentions.length;
+      unitCheckpoint = {
+        cacheKey,
+        batchId: batch.id,
+        sectionIds: batch.sectionIds,
+        status: 'succeeded',
+        attempts: reusableResult ? 0 : 1,
+        result,
+        completedAt: now(),
+      };
+      if (!reusableResult) dependencies.onUnitCheckpoint?.(unitCheckpoint);
       return { cacheKey, batchId: batch.id, sectionIds: batch.sectionIds, result } satisfies SectionCompilationCheckpoint;
     } catch (error) {
+      const message = batchFailureMessage(batch, error);
+      failedBatches += 1;
+      unitCheckpoint = {
+        cacheKey,
+        batchId: batch.id,
+        sectionIds: batch.sectionIds,
+        status: 'failed',
+        attempts: attempted ? 1 : 0,
+        error: message,
+        completedAt: now(),
+      };
+      dependencies.onUnitCheckpoint?.(unitCheckpoint);
       issues.push({
         code: 'FAILED_SECTION_BATCH',
         severity: 'error',
-        message: batchFailureMessage(batch, error),
+        message,
         batchId: batch.id,
       });
       return null;
     } finally {
       completedBatches += 1;
       dependencies.onBatchProgress?.(completedBatches, batches.length);
+      emitProgress();
     }
   });
   const checkpoints = checkpointResults.filter((item): item is SectionCompilationCheckpoint => item !== null);
@@ -329,6 +289,10 @@ export async function compileCourseStructure(
   const resolvedUnits: ResolvedUnitDraft[] = [];
   const resolvedClaims: ResolvedClaimDraft[] = [];
   const batchById = new Map(batches.map(batch => [batch.id, batch]));
+  const originalBlocksByDocument = new Map(documents.map(document => [
+    document.id,
+    new Map(document.blocks.map(block => [block.id, block])),
+  ]));
 
   const resolveDrafts = (drafts: EvidenceSpanDraft[], blockById: Map<string, MarkdownBlock>): string[] => {
     const ids: string[] = [];
@@ -351,7 +315,7 @@ export async function compileCourseStructure(
   checkpoints.forEach(checkpoint => {
     const batch = batchById.get(checkpoint.batchId);
     if (!batch) return;
-    const blockById = new Map(batch.blocks.map(block => [block.id, block]));
+    const blockById = originalBlocksByDocument.get(batch.documentId) ?? new Map<string, MarkdownBlock>();
     const compilation: SectionCompilation = checkpoint.result;
     // 批次调用成功但一条结构都没解析出来，多半是响应字段名不符；不能静默吞掉。
     if (compilation.topicMentions.length === 0 && compilation.teachingUnits.length === 0) {
@@ -403,14 +367,28 @@ export async function compileCourseStructure(
   };
   dependencies.onStage?.('reviewing');
   if (normalized.topics.length > 0) {
-    try {
-      reviewResult = await (dependencies.review ?? reviewCurriculum)(config, normalized.topics, evidenceById);
-    } catch {
+    const remainingReviewMs = Math.max(0, totalDeadlineAt - now());
+    if (remainingReviewMs === 0) {
       issues.push({
         code: 'CURRICULUM_REVIEW_FAILED',
         severity: 'warning',
-        message: '课程级审查失败，已使用确定性结果继续编译',
+        message: '已达到总处理时限，跳过课程级审查并使用确定性结果继续编译',
       });
+    } else {
+      try {
+        reviewResult = await (dependencies.review ?? reviewCurriculum)(
+          config,
+          normalized.topics,
+          evidenceById,
+          Math.min(20_000, remainingReviewMs),
+        );
+      } catch {
+        issues.push({
+          code: 'CURRICULUM_REVIEW_FAILED',
+          severity: 'warning',
+          message: '课程级审查失败，已使用确定性结果继续编译',
+        });
+      }
     }
   }
   issues.push(...reviewResult.warnings);
@@ -520,7 +498,7 @@ export async function compileCourseStructure(
     courseId,
     sourceVersion: previous ? previous.sourceVersion + (sourceChanged ? 1 : 0) : 1,
     structureVersion: previous ? previous.structureVersion + (structureChanged ? 1 : 0) : 1,
-    compilerVersion: 'course-structure-v1',
+    compilerVersion: 'course-structure-v2-fast',
     ...base,
     status: validated.status,
     validation: validated.validation,

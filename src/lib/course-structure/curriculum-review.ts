@@ -70,6 +70,9 @@ function buildPrompt(
     stablePrefix: 'course-curriculum-review-v1',
     dynamicInput,
     promptVersion: 'course-curriculum-review-v1',
+    maxOutputTokens: 1536,
+    maxStructuredAttempts: 1,
+    maxTransportAttempts: 1,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: dynamicInput },
@@ -81,12 +84,13 @@ export async function reviewCurriculum(
   config: ModelConfig,
   topics: LearningTopic[],
   evidenceById: ReadonlyMap<string, EvidenceSpan>,
+  timeoutMs = 20_000,
 ): Promise<CurriculumReviewResult> {
   const completion = await callChatCompletion<unknown>(
     config,
     buildPrompt(topics, evidenceById),
     'course-curriculum-review',
-    120000,
+    Math.max(1, Math.min(20_000, timeoutMs)),
     undefined,
     'curriculum-review',
   );

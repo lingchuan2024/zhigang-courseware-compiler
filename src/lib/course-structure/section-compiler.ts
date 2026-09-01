@@ -1,7 +1,7 @@
 import type { ModelConfig } from '../../types';
 import { callChatCompletion } from '../model-v2';
 import type { CompiledPrompt } from '../prompt-builder';
-import type { SectionBatch } from './section-batching';
+import type { SectionBatch, SectionBatchBlock } from './section-batching';
 import { SECTION_COMPILER_PROMPT_VERSION } from './section-batching';
 import type {
   EvidenceRole,
@@ -31,8 +31,11 @@ const IMPORTANCE = new Set(['core', 'important', 'supplementary']);
 type RawRecord = Record<string, unknown>;
 
 interface RawSectionCompilation {
+  topics?: unknown;
   topicMentions?: unknown;
+  units?: unknown;
   teachingUnits?: unknown;
+  explicitOrders?: unknown;
   orderClaims?: unknown;
   unresolvedReferences?: unknown;
   confidence?: unknown;
@@ -57,71 +60,86 @@ function clamp(value: unknown, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, numeric));
 }
 
-function parseEvidence(value: unknown, validBlockIds: ReadonlySet<string>): EvidenceSpanDraft[] {
+function evidenceRoleForTeachingRole(role: TeachingRole): EvidenceRole {
+  if (role === 'definition' || role === 'formula' || role === 'condition'
+    || role === 'example' || role === 'comparison' || role === 'application') return role;
+  if (role === 'derivation_step') return 'derivation';
+  return 'statement';
+}
+
+function parseEvidence(
+  value: unknown,
+  blocks: readonly SectionBatchBlock[],
+  fallbackRole: EvidenceRole = 'statement',
+): EvidenceSpanDraft[] {
   if (!Array.isArray(value)) return [];
+  const atomById = new Map(blocks.map(block => [block.atomId, block]));
+  const validBlockIds = new Set(blocks.map(block => block.id));
   return value.flatMap(item => {
     if (!isRecord(item)) return [];
     const blockId = text(item.blockId);
-    const quote = text(item.quote);
-    const role = text(item.role) as EvidenceRole;
+    const quote = text(item.quote) || text(item.anchor);
+    const requestedRole = text(item.role) as EvidenceRole;
+    const role = EVIDENCE_ROLES.has(requestedRole) ? requestedRole : fallbackRole;
     if (!validBlockIds.has(blockId) || !quote || !EVIDENCE_ROLES.has(role)) return [];
-    const startOffset = typeof item.startOffset === 'number' ? Math.floor(item.startOffset) : undefined;
-    const endOffset = typeof item.endOffset === 'number' ? Math.floor(item.endOffset) : undefined;
+    const atomId = text(item.atomId);
+    const atom = atomId ? atomById.get(atomId) : undefined;
+    if (atomId && (!atom || atom.id !== blockId)) return [];
+    let startOffset = typeof item.startOffset === 'number' ? Math.floor(item.startOffset) : undefined;
+    let endOffset = typeof item.endOffset === 'number' ? Math.floor(item.endOffset) : undefined;
+    if (atom) {
+      const first = atom.content.indexOf(quote);
+      const second = first < 0 ? -1 : atom.content.indexOf(quote, first + Math.max(1, quote.length));
+      if (first < 0 || second >= 0) return [];
+      startOffset = atom.sourceStartOffset + first;
+      endOffset = startOffset + quote.length;
+    }
     return [{ blockId, quote, role, startOffset, endOffset }];
   });
 }
 
 export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt {
   const system = [
-    '你是课程结构编译器，只能根据输入课件生成两层课程结构。',
-    '第一层 topic 必须拥有可独立检验的学习目标；定义、公式和步骤若不是独立学习目标，应放入第二层 teachingUnits。',
-    'genre、teaching role 和 evidence role 只能使用给定枚举。',
-    '每个 topic 与 teaching unit 都必须引用输入中真实 blockId 和原文短句。',
+    '你是轻量两层课程语义识别器，只能使用输入课件内容。',
+    '第一层 topics 只保留有独立学习目标的知识点。',
+    '第二层 units 表示知识点内部的问题、直觉、定义、公式、条件、步骤、示例等教学角色。',
+    '每个 topic 至少有一个 unit；每个 unit 必须引用真实 blockId 和简短原文 anchor。',
+    '不要复制大段原文，不要生成长摘要，不要输出通用知识图谱关系。',
     '顺序方向固定：beforeTopicLocalId 必须在 afterTopicLocalId 之前学习。',
-    'hard 仅用于真实依赖；推断得到的关系必须为 soft。',
     '严格按 responseSchema 的字段名返回一个 JSON 对象，不得输出解释性文字，不得改用其他字段名。',
   ].join('\n');
   const stablePrefix = JSON.stringify({
     learningGenres: [...LEARNING_GENRES],
     teachingRoles: [...TEACHING_ROLES],
-    evidenceRoles: [...EVIDENCE_ROLES],
     responseSchema: {
-      topicMentions: [{
+      topics: [{
         localId: 'string，批次内唯一，如 t1/t2',
         name: 'string，主题名',
         aliases: 'string[]',
         learningObjective: 'string，学完后能理解/解释/推导/比较/应用什么',
-        scope: 'string',
         genre: 'learningGenres 之一',
         difficulty: '1-5 整数',
         importance: 'core|important|supplementary',
-        evidence: 'evidenceItem[]，至少 1 条',
       }],
-      teachingUnits: [{
+      units: [{
         localId: 'string，批次内唯一，如 u1/u2',
-        topicLocalId: 'string，所属 topicMentions[].localId',
+        topicLocalId: 'string，所属 topics[].localId',
         role: 'teachingRoles 之一',
-        title: 'string',
-        summary: 'string',
-        evidence: 'evidenceItem[]，至少 1 条',
+        title: 'string，简短标签',
+        evidence: 'anchorItem[]，至少 1 条',
         required: 'boolean',
       }],
-      orderClaims: [{
-        beforeTopicLocalId: 'string，topicMentions[].localId',
-        afterTopicLocalId: 'string，topicMentions[].localId',
-        strength: 'hard|soft',
+      explicitOrders: [{
+        beforeTopicLocalId: 'string，topics[].localId',
+        afterTopicLocalId: 'string，topics[].localId',
         reason: 'string',
-        evidence: 'evidenceItem[]，可为空',
-        source: 'explicit|inferred',
+        evidence: 'anchorItem[]，必须引用明示顺序的原文',
       }],
-      unresolvedReferences: 'string[]',
       confidence: '0..1',
-      evidenceItem: {
+      anchorItem: {
+        atomId: '输入 blocks[].atomId',
         blockId: '输入 blocks[].id',
-        quote: '该 block 原文中真实存在的短句（用于精确定位）',
-        role: 'evidenceRoles 之一',
-        startOffset: '可选整数，quote 在 block content 中的起始字符偏移',
-        endOffset: '可选整数，结束偏移',
+        anchor: '该 block 中真实存在的简短原文，建议 8-40 字',
       },
     },
   });
@@ -131,6 +149,7 @@ export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt 
     documentTitle: batch.documentTitle,
     sectionIds: batch.sectionIds,
     blocks: batch.blocks.map(block => ({
+      atomId: block.atomId,
       id: block.id,
       type: block.type,
       headingPath: block.headingPath,
@@ -142,9 +161,9 @@ export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt 
     stablePrefix,
     dynamicInput,
     promptVersion: SECTION_COMPILER_PROMPT_VERSION,
-    // 章节结构的 JSON 规模应跟输入成比例，固定 8192 会让推理模型
-    // 在小片段上仍长时间生成。保留 2048 下限容纳结构化字段。
-    maxOutputTokens: Math.min(4096, Math.max(2048, Math.ceil(batch.estimatedTokens * 1.5))),
+    maxOutputTokens: 1024,
+    maxStructuredAttempts: 1,
+    maxTransportAttempts: 1,
     messages: [
       { role: 'system', content: `${system}\n\n${stablePrefix}` },
       { role: 'user', content: dynamicInput },
@@ -156,9 +175,7 @@ export async function compileSectionBatch(
   config: ModelConfig,
   batch: SectionBatch,
 ): Promise<SectionCompilation> {
-  // Responses/Agent Plan 模型可能包含较长的内部推理，实测大型章节会超过两分钟。
-  // 批次拆分由上层负责，这里给已拆小的请求留出完整返回时间。
-  const timeout = config.apiMode === 'responses' ? 240000 : 120000;
+  const timeout = 30000;
   const completion = await callChatCompletion<RawSectionCompilation>(
     config,
     buildSectionCompilerPrompt(batch),
@@ -168,8 +185,10 @@ export async function compileSectionBatch(
     'section-compile',
   );
   const raw = isRecord(completion.data) ? completion.data : {};
-  const validBlockIds = new Set(batch.blocks.map(block => block.id));
-  const rawTopics = Array.isArray(raw.topicMentions) ? raw.topicMentions : [];
+  const overallConfidence = clamp(raw.confidence, 0, 1);
+  const rawTopics = Array.isArray(raw.topics)
+    ? raw.topics
+    : Array.isArray(raw.topicMentions) ? raw.topicMentions : [];
   const topicMentions: TopicMentionDraft[] = [];
   const namespacedTopicIds = new Map<string, string>();
 
@@ -187,51 +206,76 @@ export async function compileSectionBatch(
       name,
       aliases: Array.isArray(item.aliases) ? item.aliases.map(text).filter(Boolean) : [],
       learningObjective: text(item.learningObjective),
-      scope: text(item.scope),
+      scope: text(item.scope) || batch.sectionIds.join(' / '),
       genre,
       difficulty: Math.round(clamp(item.difficulty, 1, 5)),
       importance,
-      evidence: parseEvidence(item.evidence, validBlockIds),
-      confidence: clamp(item.confidence, 0, 1),
+      evidence: parseEvidence(item.evidence, batch.blocks),
+      confidence: typeof item.confidence === 'number'
+        ? clamp(item.confidence, 0, 1)
+        : overallConfidence,
     });
   });
 
   const teachingUnits: TeachingUnitDraft[] = [];
-  const rawUnits = Array.isArray(raw.teachingUnits) ? raw.teachingUnits : [];
+  const rawUnits = Array.isArray(raw.units)
+    ? raw.units
+    : Array.isArray(raw.teachingUnits) ? raw.teachingUnits : [];
   rawUnits.forEach(item => {
     if (!isRecord(item)) return;
     const localId = identifier(item.localId);
     const topicLocalId = namespacedTopicIds.get(identifier(item.topicLocalId));
     const role = text(item.role) as TeachingRole;
     if (!localId || !topicLocalId || !TEACHING_ROLES.has(role)) return;
+    const title = text(item.title);
+    const evidence = parseEvidence(item.evidence, batch.blocks, evidenceRoleForTeachingRole(role));
     teachingUnits.push({
       localId: `${batch.id}:${localId}`,
       topicLocalId,
       role,
-      title: text(item.title),
-      summary: text(item.summary),
-      evidence: parseEvidence(item.evidence, validBlockIds),
+      title,
+      summary: text(item.summary) || title,
+      evidence,
       required: item.required === true,
-      confidence: clamp(item.confidence, 0, 1),
+      confidence: typeof item.confidence === 'number'
+        ? clamp(item.confidence, 0, 1)
+        : overallConfidence,
     });
   });
 
+  const evidenceByTopicId = new Map<string, EvidenceSpanDraft[]>();
+  teachingUnits.forEach(unit => {
+    evidenceByTopicId.set(unit.topicLocalId, [
+      ...(evidenceByTopicId.get(unit.topicLocalId) ?? []),
+      ...unit.evidence,
+    ]);
+  });
+  topicMentions.forEach(topic => {
+    if (topic.evidence.length === 0) topic.evidence = evidenceByTopicId.get(topic.localId) ?? [];
+  });
+
   const orderClaims: OrderClaimDraft[] = [];
-  const rawClaims = Array.isArray(raw.orderClaims) ? raw.orderClaims : [];
+  const hasExplicitOrders = Array.isArray(raw.explicitOrders);
+  const rawClaims = hasExplicitOrders
+    ? raw.explicitOrders as unknown[]
+    : Array.isArray(raw.orderClaims) ? raw.orderClaims : [];
   rawClaims.forEach(item => {
     if (!isRecord(item)) return;
     const beforeTopicLocalId = namespacedTopicIds.get(identifier(item.beforeTopicLocalId));
     const afterTopicLocalId = namespacedTopicIds.get(identifier(item.afterTopicLocalId));
-    const source = text(item.source) === 'explicit' ? 'explicit' : 'inferred';
+    const source = hasExplicitOrders || text(item.source) === 'explicit' ? 'explicit' : 'inferred';
     if (!beforeTopicLocalId || !afterTopicLocalId || beforeTopicLocalId === afterTopicLocalId) return;
+    const evidence = parseEvidence(item.evidence, batch.blocks);
     orderClaims.push({
       beforeTopicLocalId,
       afterTopicLocalId,
-      strength: source === 'inferred' ? 'soft' : text(item.strength) === 'hard' ? 'hard' : 'soft',
+      strength: source === 'explicit' && evidence.length > 0 ? 'hard' : 'soft',
       reason: text(item.reason),
-      evidence: parseEvidence(item.evidence, validBlockIds),
+      evidence,
       source,
-      confidence: clamp(item.confidence, 0, 1),
+      confidence: typeof item.confidence === 'number'
+        ? clamp(item.confidence, 0, 1)
+        : overallConfidence,
     });
   });
 
@@ -244,6 +288,6 @@ export async function compileSectionBatch(
     unresolvedReferences: Array.isArray(raw.unresolvedReferences)
       ? raw.unresolvedReferences.map(text).filter(Boolean)
       : [],
-    confidence: clamp(raw.confidence, 0, 1),
+    confidence: overallConfidence,
   };
 }

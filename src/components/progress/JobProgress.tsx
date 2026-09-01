@@ -50,10 +50,10 @@ export function JobProgress({ progress, title, warnings }: JobProgressProps) {
           />
         </div>
 
-        {/* Window progress */}
+        {/* Evidence-unit progress */}
         {progress.windowProgress && (
           <div className="mt-2 text-center text-xs text-paper/50">
-            窗口 {progress.windowProgress.current} / {progress.windowProgress.total}
+            证据单元 {progress.windowProgress.current} / {progress.windowProgress.total}
           </div>
         )}
       </div>

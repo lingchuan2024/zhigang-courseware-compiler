@@ -1,4 +1,4 @@
-import type { CourseLearningStructure } from '../lib/course-structure/types';
+import type { CourseExtractionSession, CourseLearningStructure } from '../lib/course-structure/types';
 
 // ============== 基础类型 ==============
 
@@ -86,6 +86,12 @@ export interface PipelineProgress {
 
   /** 当前窗口进度（分窗口提取时使用） */
   windowProgress?: { current: number; total: number };
+
+  /** 证据单元的真实运行统计。 */
+  successfulItems?: number;
+  failedItems?: number;
+  discoveredItems?: number;
+  elapsedMs?: number;
 
   /** 失败时的阶段信息，用于 UI 精准显示 */
   failedStage?: string;
@@ -548,6 +554,8 @@ export interface ProjectState {
   sourceDocuments: SourceDocument[];
   /** 两层课程知识结构的规范主数据；旧 V2 字段由适配器投影得到。 */
   courseLearningStructure: CourseLearningStructure | null;
+  /** 语义证据单元的持久化会话，用于刷新后断点续跑。 */
+  courseExtractionSession: CourseExtractionSession | null;
   /** 知识主题（替代 CourseTopic） */
   knowledgeTopics: KnowledgeTopic[];
   /** 主题间关系 */

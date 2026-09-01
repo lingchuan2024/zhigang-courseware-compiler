@@ -106,6 +106,20 @@ describe('Responses API transport', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it('does not replay a lightweight extraction after truncated structured output', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(responsesResponse('{"topics":[', 'incomplete'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callChatCompletion(
+      config,
+      { ...prompt, maxStructuredAttempts: 1 } as CompiledPrompt,
+      'course-section-compile',
+      1000,
+    )).rejects.toMatchObject({ code: 'response-truncated' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('verifies Agent Plan through the Responses endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal('fetch', fetchMock);

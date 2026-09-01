@@ -176,6 +176,36 @@ export interface SectionCompilationCheckpoint {
   result: SectionCompilation;
 }
 
+/** 单个证据单元的可持久化执行结果。失败项保留原因，成功项可直接断点复用。 */
+export interface CourseExtractionUnitCheckpoint {
+  cacheKey: string;
+  batchId: string;
+  sectionIds: string[];
+  status: 'succeeded' | 'failed';
+  attempts: number;
+  result?: SectionCompilation;
+  error?: string;
+  completedAt: number;
+}
+
+/** 仅由真实完成事件驱动的提取进度，不使用假进度计时器。 */
+export interface CourseExtractionProgress {
+  completedUnits: number;
+  successfulUnits: number;
+  failedUnits: number;
+  totalUnits: number;
+  discoveredTopicMentions: number;
+  elapsedMs: number;
+}
+
+export interface CourseExtractionSession {
+  id: string;
+  courseId: string;
+  startedAt: number;
+  deadlineAt: number;
+  checkpoints: CourseExtractionUnitCheckpoint[];
+}
+
 export interface CourseLearningStructure {
   courseId: string;
   sourceVersion: number;

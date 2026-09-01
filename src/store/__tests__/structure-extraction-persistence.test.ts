@@ -50,6 +50,8 @@ function seedExtractable(): void {
       id: 'doc-1', courseId: 'course-1', title: '测试课件', markdown: '# 课程',
       blocks: [], outline: [], contentHash: 'h', createdAt: '', updatedAt: '',
     }],
+    courseLearningStructure: null,
+    courseExtractionSession: null,
     knowledgeTopics: [],
     knowledgePipelineStatus: 'idle',
   });
@@ -141,6 +143,48 @@ describe('startKnowledgePipeline persistence', () => {
     expect(mirrored.stage).toBe('structure');
     expect(mirrored.jobStatus).toBe('idle');
     expect(mirrored.job).toBeNull();
+
+    await act(async () => {
+      rejectPipeline(new Error('end of test'));
+      await running;
+    });
+  });
+
+  it('persists every successful evidence unit so a reload can resume it', async () => {
+    seedExtractable();
+    let rejectPipeline!: (reason: Error) => void;
+    mirrors.runKnowledgePipeline.mockImplementationOnce(
+      () => new Promise<PipelineResultV2>((_, reject) => { rejectPipeline = reject; }),
+    );
+
+    let running!: Promise<void>;
+    await act(async () => { running = useStore.getState().startKnowledgePipeline(); });
+    const options = mirrors.runKnowledgePipeline.mock.calls[0][3];
+    const checkpoint = {
+      cacheKey: 'cache-a', batchId: 'batch-a', sectionIds: ['sec-a'],
+      status: 'succeeded' as const, attempts: 1, completedAt: 100,
+      result: {
+        batchId: 'batch-a', sectionIds: ['sec-a'], topicMentions: [], teachingUnits: [],
+        orderClaims: [], unresolvedReferences: [], confidence: 1,
+      },
+    };
+    await act(async () => {
+      options.onUnitCheckpoint?.(checkpoint);
+      options.onExtractionProgress?.({
+        completedUnits: 1, successfulUnits: 1, failedUnits: 0, totalUnits: 2,
+        discoveredTopicMentions: 3, elapsedMs: 5_000,
+      });
+    });
+    await act(async () => { await flushPendingSaves(); });
+
+    expect(useStore.getState().courseExtractionSession?.checkpoints).toEqual([checkpoint]);
+    expect(useStore.getState().pipelineProgress).toMatchObject({
+      successfulItems: 1, failedItems: 0, discoveredItems: 3, elapsedMs: 5_000,
+    });
+    const mirrored = mirrors.saveLibraryProjectSnapshot.mock.calls.at(-1)?.[2] as Record<string, unknown>;
+    expect(mirrored.courseExtractionSession).toMatchObject({
+      courseId: 'course-1', checkpoints: [checkpoint],
+    });
 
     await act(async () => {
       rejectPipeline(new Error('end of test'));

@@ -5,15 +5,14 @@ import {
   StructureExtractionStatus,
   WorkflowStage,
 } from '../types';
+import type { CourseExtractionProgress } from './course-structure/types';
 
 // ========== 常量 ==========
 
 export const STRUCTURE_EXTRACTION_STEPS: PipelineProgressStep[] = [
   { id: 'prepare-evidence', label: '准备证据', status: 'pending' },
-  { id: 'compile-sections', label: '按章节编译知识', status: 'pending' },
-  { id: 'normalize-topics', label: '归一化课程知识点', status: 'pending' },
-  { id: 'review-curriculum', label: '审查课程结构', status: 'pending' },
-  { id: 'schedule-course', label: '编排学习顺序', status: 'pending' },
+  { id: 'extract-two-layer', label: '识别两层知识', status: 'pending' },
+  { id: 'compile-course', label: '合并知识点与学习顺序', status: 'pending' },
   { id: 'validate-structure', label: '校验课程结构', status: 'pending' },
 ];
 
@@ -39,10 +38,8 @@ export const IDLE_PROGRESS: PipelineProgress = {
  */
 export const STAGE_PROGRESS_RANGES: Record<string, [number, number]> = {
   'prepare-evidence': [1, 5],
-  'compile-sections': [5, 55],
-  'normalize-topics': [55, 68],
-  'review-curriculum': [68, 78],
-  'schedule-course': [78, 90],
+  'extract-two-layer': [5, 75],
+  'compile-course': [75, 90],
   'validate-structure': [90, 99],
   // 笔记生成
   'prepare-packages': [1, 5],
@@ -207,14 +204,14 @@ export function updateCurrentItem(
 
 /**
  * 更新窗口进度（分窗口提取时使用）。
- * 章节批次完成数量驱动 5%~55% 的真实进度。
+ * 语义提取单元完成数量驱动 5%~75% 的真实进度。
  */
 export function updateWindowProgress(
   progress: PipelineProgress,
   current: number,
   total: number,
 ): PipelineProgress {
-  const range = STAGE_PROGRESS_RANGES['compile-sections'];
+  const range = STAGE_PROGRESS_RANGES['extract-two-layer'];
   if (!range) return progress;
 
   const ratio = total > 0 ? current / total : 0;
@@ -224,8 +221,26 @@ export function updateWindowProgress(
     ...progress,
     windowProgress: { current, total },
     estimatedProgress: Math.round(realProgress * 10) / 10,
-    // 第一个长推理尚未完成时保留平滑估算，同时明确显示 0 / total。
-    isEstimated: current === 0,
+    isEstimated: false,
+    message: `已完成 ${current}/${total} 个证据单元`,
+  };
+}
+
+/** 使用编译器真实事件刷新计数与进度，不按时间伪造百分比。 */
+export function updateExtractionProgress(
+  progress: PipelineProgress,
+  event: CourseExtractionProgress,
+): PipelineProgress {
+  const updated = updateWindowProgress(progress, event.completedUnits, event.totalUnits);
+  const elapsedSeconds = Math.max(0, Math.round(event.elapsedMs / 1000));
+  return {
+    ...updated,
+    successfulItems: event.successfulUnits,
+    failedItems: event.failedUnits,
+    discoveredItems: event.discoveredTopicMentions,
+    elapsedMs: event.elapsedMs,
+    message: `已完成 ${event.completedUnits}/${event.totalUnits} · 成功 ${event.successfulUnits} · 失败 ${event.failedUnits} · 发现 ${event.discoveredTopicMentions} 个知识点 · ${elapsedSeconds} 秒`,
+    isEstimated: false,
   };
 }
 
@@ -265,20 +280,20 @@ export function tickEstimatedProgress(progress: PipelineProgress): PipelineProgr
 // ========== 从 StructureExtractionStatus 推导进度 ==========
 
 const STATUS_TO_STEP: Record<string, string> = {
-  'extracting-topics': 'compile-sections',
-  'repairing-topics': 'normalize-topics',
-  'extracting-relations': 'schedule-course',
+  'extracting-topics': 'extract-two-layer',
+  'repairing-topics': 'compile-course',
+  'extracting-relations': 'compile-course',
   'extracting-internal-structures': 'validate-structure',
-  'quality-checking': 'review-curriculum',
+  'quality-checking': 'compile-course',
   'quality-repairing': 'validate-structure',
 };
 
 const COMPILER_STAGE_TO_STEP: Record<string, string> = {
   batching: 'prepare-evidence',
-  compiling: 'compile-sections',
-  normalizing: 'normalize-topics',
-  reviewing: 'review-curriculum',
-  scheduling: 'schedule-course',
+  compiling: 'extract-two-layer',
+  normalizing: 'compile-course',
+  reviewing: 'compile-course',
+  scheduling: 'compile-course',
   validating: 'validate-structure',
 };
 
@@ -304,7 +319,7 @@ export function updateCompilerProgress(
     status: 'running',
     steps,
     estimatedProgress: range?.[0] ?? progress.estimatedProgress,
-    isEstimated: true,
+    isEstimated: false,
   };
 }
 

@@ -29,8 +29,8 @@ import {
   failProgressWithStage,
   completeProgress,
   updateWindowProgress,
+  updateExtractionProgress,
   updateCompilerProgress,
-  tickEstimatedProgress,
 } from '../lib/pipeline-progress';
 import {
   canNavigateToStage,
@@ -66,6 +66,7 @@ const initialState: ProjectState = {
   // v6 新架构
   sourceDocuments: [],
   courseLearningStructure: null,
+  courseExtractionSession: null,
   knowledgeTopics: [],
   topicRelations: [],
   teachingBlocks: [],
@@ -227,6 +228,7 @@ export const useStore = create<AppState>((set, get) => ({
       viewMode: 'view',
       sourceDocuments: doc.fileType === 'markdown' ? get().sourceDocuments : [],
       courseLearningStructure: null,
+      courseExtractionSession: null,
       mineruParseResult: doc.fileType === 'markdown' ? get().mineruParseResult : null,
       knowledgeTopics: [],
       topicRelations: [],
@@ -412,7 +414,7 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   startKnowledgePipeline: async () => {
-    const { sourceDocuments, modelConfig, courseLearningStructure } = get();
+    const { sourceDocuments, modelConfig, courseLearningStructure, courseExtractionSession } = get();
 
     if (!modelConfig?.apiKey) {
       set({
@@ -431,22 +433,16 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
-    // 启动进度计时器
-    let progressTimer: ReturnType<typeof setInterval> | null = null;
-    const startProgressTimer = () => {
-      if (progressTimer) clearInterval(progressTimer);
-      progressTimer = setInterval(() => {
-        const current = get().pipelineProgress;
-        if (current.status === 'running') {
-          set({ pipelineProgress: tickEstimatedProgress(current) });
-        }
-      }, 800);
-    };
-    const stopProgressTimer = () => {
-      if (progressTimer) {
-        clearInterval(progressTimer);
-        progressTimer = null;
-      }
+    const courseId = sourceDocuments[0]?.courseId ?? `course_${Date.now()}`;
+    const startedAt = Date.now();
+    const extractionSession = {
+      id: `extract_${courseId}_${startedAt}`,
+      courseId,
+      startedAt,
+      deadlineAt: startedAt + 60_000,
+      checkpoints: courseExtractionSession?.courseId === courseId
+        ? courseExtractionSession.checkpoints
+        : [],
     };
 
     set({
@@ -457,25 +453,37 @@ export const useStore = create<AppState>((set, get) => ({
       pipelineProgress: {
         ...createStructureExtractionProgress(),
         status: 'running',
-        estimatedProgress: 2,
-        isEstimated: true,
+        estimatedProgress: 5,
+        isEstimated: false,
       },
+      courseExtractionSession: extractionSession,
     });
     // 立即落盘：提取中途刷新/中断时，工作区应恢复到 structure 阶段（含 running→idle 降级），
     // 而不是退回 mineru 阶段重看解析结果。
     saveState(get());
-    startProgressTimer();
 
     try {
       const markdownTexts = sourceDocuments.map(doc => ({
         markdown: doc.markdown,
         title: doc.title,
       }));
-      const courseId = sourceDocuments[0]?.courseId ?? `course_${Date.now()}`;
-
       const result = await runKnowledgePipeline(modelConfig, markdownTexts, courseId, {
         sourceDocuments,
         previousStructure: courseLearningStructure,
+        resumeCheckpoints: extractionSession.checkpoints,
+        onUnitCheckpoint: (checkpoint) => {
+          const current = get().courseExtractionSession;
+          if (!current || current.id !== extractionSession.id) return;
+          const checkpoints = [
+            ...current.checkpoints.filter(item => item.cacheKey !== checkpoint.cacheKey),
+            checkpoint,
+          ];
+          set({ courseExtractionSession: { ...current, checkpoints } });
+          saveState(get());
+        },
+        onExtractionProgress: (event) => {
+          set({ pipelineProgress: updateExtractionProgress(get().pipelineProgress, event) });
+        },
         onStatusChange: (status) => {
           set({ knowledgePipelineStatus: status });
         },
@@ -488,7 +496,6 @@ export const useStore = create<AppState>((set, get) => ({
         },
       });
 
-      stopProgressTimer();
       const usable = (result.status === 'ready' || result.status === 'degraded')
         && result.topics.length > 0;
 
@@ -522,7 +529,6 @@ export const useStore = create<AppState>((set, get) => ({
       });
       saveState(get());
     } catch (e) {
-      stopProgressTimer();
       const msg = e instanceof Error ? e.message : String(e);
       set({
         knowledgePipelineStatus: 'failed',
@@ -868,6 +874,7 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       sourceDocuments: [],
       courseLearningStructure: null,
+      courseExtractionSession: null,
       knowledgeTopics: [],
       topicRelations: [],
       teachingBlocks: [],
@@ -906,6 +913,7 @@ export const useStore = create<AppState>((set, get) => ({
       document: example.document,
       sourceDocuments: example.sourceDocuments,
       courseLearningStructure: null,
+      courseExtractionSession: null,
       knowledgeTopics: example.knowledgeTopics,
       topicRelations: example.topicRelations,
       teachingBlocks: example.teachingBlocks,

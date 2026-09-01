@@ -29,6 +29,8 @@ import type { ValidationIssue, ValidationReport } from './knowledge-validation';
 import { compileCourseStructure } from './course-structure/compiler';
 import { projectLegacyStructure } from './course-structure/legacy-adapter';
 import type {
+  CourseExtractionProgress,
+  CourseExtractionUnitCheckpoint,
   CourseLearningStructure,
   CourseStructureIssue,
   CourseStructureStatus,
@@ -52,6 +54,9 @@ export interface PipelineOptionsV2 {
   onCompilerStage?: (stage: CourseCompilerStage) => void;
   sourceDocuments?: SourceDocument[];
   previousStructure?: CourseLearningStructure | null;
+  resumeCheckpoints?: CourseExtractionUnitCheckpoint[];
+  onUnitCheckpoint?: (checkpoint: CourseExtractionUnitCheckpoint) => void;
+  onExtractionProgress?: (progress: CourseExtractionProgress) => void;
 }
 
 export interface PipelineResultV2 {
@@ -174,6 +179,9 @@ export async function runKnowledgePipeline(
   try {
     structure = await compileCourseStructure(config, sourceDocuments, courseId, {
       previous: options.previousStructure ?? null,
+      resumeCheckpoints: options.resumeCheckpoints,
+      onUnitCheckpoint: options.onUnitCheckpoint,
+      onExtractionProgress: options.onExtractionProgress,
       onBatchProgress: options.onWindowProgress,
       onStage: stage => {
         options.onCompilerStage?.(stage);

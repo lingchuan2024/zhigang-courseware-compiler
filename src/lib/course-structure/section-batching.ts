@@ -1,14 +1,22 @@
 import type { MarkdownBlock, SourceDocument } from '../../types';
 import { estimateTokens } from '../content-window';
 
-export const SECTION_COMPILER_PROMPT_VERSION = 'course-section-v2';
+export const SECTION_COMPILER_PROMPT_VERSION = 'course-section-v3';
+
+export interface SectionBatchBlock extends MarkdownBlock {
+  /** 请求内证据原子的唯一 ID；同一原文块拆分后仍保留原 block.id。 */
+  atomId: string;
+  /** 该原子在原始 MarkdownBlock.content 中的半开区间。 */
+  sourceStartOffset: number;
+  sourceEndOffset: number;
+}
 
 export interface SectionBatch {
   id: string;
   documentId: string;
   documentTitle: string;
   sectionIds: string[];
-  blocks: MarkdownBlock[];
+  blocks: SectionBatchBlock[];
   estimatedTokens: number;
   cacheKey: string;
 }
@@ -29,6 +37,66 @@ function shortHash(input: string): string {
 
 function tokensForBlocks(blocks: MarkdownBlock[]): number {
   return blocks.reduce((total, block) => total + estimateTokens(block.content), 0);
+}
+
+function largestPrefixWithinBudget(content: string, maxTokens: number): number {
+  let low = 1;
+  let high = content.length;
+  while (low < high) {
+    const midpoint = Math.ceil((low + high) / 2);
+    if (estimateTokens(content.slice(0, midpoint)) <= maxTokens) low = midpoint;
+    else high = midpoint - 1;
+  }
+  return low;
+}
+
+function atomizeOversizedBlock(block: MarkdownBlock, maxTokens: number): SectionBatchBlock[] {
+  if (estimateTokens(block.content) <= maxTokens) {
+    return [{
+      ...block,
+      atomId: `${block.id}:atom:0`,
+      sourceStartOffset: 0,
+      sourceEndOffset: block.content.length,
+    }];
+  }
+  const fragments: SectionBatchBlock[] = [];
+  let remaining = block.content;
+  let fragmentIndex = 0;
+  let sourceStartOffset = 0;
+  while (estimateTokens(remaining) > maxTokens) {
+    const hardCut = largestPrefixWithinBudget(remaining, maxTokens);
+    const searchFloor = Math.max(1, Math.floor(hardCut * 0.6));
+    let cut = hardCut;
+    for (let index = hardCut; index >= searchFloor; index -= 1) {
+      if (/\s|[.?!;,。！？；，]/u.test(remaining[index - 1])) {
+        cut = index;
+        break;
+      }
+    }
+    const content = remaining.slice(0, cut);
+    fragments.push({
+      ...block,
+      atomId: `${block.id}:atom:${fragmentIndex}`,
+      sourceStartOffset,
+      sourceEndOffset: sourceStartOffset + content.length,
+      content,
+      contentHash: `${block.contentHash}__atom${fragmentIndex + 1}`,
+    });
+    fragmentIndex += 1;
+    sourceStartOffset += content.length;
+    remaining = remaining.slice(cut);
+  }
+  if (remaining.length > 0) {
+    fragments.push({
+      ...block,
+      atomId: `${block.id}:atom:${fragmentIndex}`,
+      sourceStartOffset,
+      sourceEndOffset: sourceStartOffset + remaining.length,
+      content: remaining,
+      contentHash: `${block.contentHash}__atom${fragmentIndex + 1}`,
+    });
+  }
+  return fragments;
 }
 
 function deriveSections(document: SourceDocument): SectionSlice[] {
@@ -76,9 +144,9 @@ function deriveSections(document: SourceDocument): SectionSlice[] {
 
 function splitOversizedSection(section: SectionSlice, maxTokens: number): SectionSlice[] {
   const parts: SectionSlice[] = [];
-  let current: MarkdownBlock[] = [];
+  let current: SectionBatchBlock[] = [];
   let currentTokens = 0;
-  section.blocks.forEach(block => {
+  section.blocks.flatMap(block => atomizeOversizedBlock(block, maxTokens)).forEach(block => {
     const blockTokens = estimateTokens(block.content);
     if (current.length > 0 && currentTokens + blockTokens > maxTokens) {
       parts.push({ id: section.id, blocks: current });
@@ -93,13 +161,13 @@ function splitOversizedSection(section: SectionSlice, maxTokens: number): Sectio
 }
 
 function toBatch(document: SourceDocument, parts: SectionSlice[], batchIndex: number): SectionBatch {
-  const blocks = parts.flatMap(part => part.blocks);
+  const blocks = parts.flatMap(part => part.blocks) as SectionBatchBlock[];
   const sectionIds = [...new Set(parts.map(part => part.id))];
   const cacheMaterial = [
     SECTION_COMPILER_PROMPT_VERSION,
     document.contentHash,
     sectionIds.join(','),
-    ...blocks.map(block => `${block.id}:${block.contentHash}`),
+    ...blocks.map(block => `${block.atomId}:${block.contentHash}`),
   ].join('|');
   return {
     id: `batch_${document.id}_${batchIndex}`,

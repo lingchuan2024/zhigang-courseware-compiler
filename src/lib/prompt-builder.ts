@@ -8,5 +8,9 @@ export interface CompiledPrompt {
   promptVersion: string;
   /** 任务级输出上限；未指定时使用通用默认值。 */
   maxOutputTokens?: number;
+  /** 结构化输出尝试次数；前台轻量提取使用 1，避免重放长请求。 */
+  maxStructuredAttempts?: number;
+  /** 传输请求总尝试次数；前台轻量提取使用 1，避免 429/5xx 后重复等待。 */
+  maxTransportAttempts?: number;
   messages: Array<{ role: 'system' | 'user'; content: string }>;
 }

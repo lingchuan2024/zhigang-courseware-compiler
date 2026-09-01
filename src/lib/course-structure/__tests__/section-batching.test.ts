@@ -39,8 +39,11 @@ describe('section batching', () => {
   it('keeps every block exactly once without overlap duplication', () => {
     const doc = document('d1', ['# A', 'a'.repeat(80), 'b'.repeat(80), 'c'.repeat(80)]);
     const batches = buildSectionBatches([doc], 60);
-    expect(batches.flatMap(batch => batch.blocks.map(block => block.id)))
+    const atoms = batches.flatMap(batch => batch.blocks);
+    expect([...new Set(atoms.map(block => block.id))])
       .toEqual(doc.blocks.map(block => block.id));
+    expect(atoms.filter(atom => atom.id === 'd1-b0').map(atom => atom.content).join(''))
+      .toBe(doc.blocks[0].content);
   });
 
   it('uses top-level outline boundaries and retains preamble blocks', () => {
@@ -55,8 +58,25 @@ describe('section batching', () => {
       { id: 's-b', title: 'B', level: 1, blockIds: ['d1-b3', 'd1-b4'], childSectionIds: [], startOrder: 3, endOrder: 4 },
     ];
     const batches = buildSectionBatches([doc], 3);
-    expect(batches.flatMap(batch => batch.blocks.map(block => block.id)))
+    expect([...new Set(batches.flatMap(batch => batch.blocks.map(block => block.id)))])
       .toEqual(doc.blocks.map(block => block.id));
     expect(batches.flatMap(batch => batch.sectionIds)).toContain('s-a');
+  });
+
+  it('assigns stable atom ids and source offsets when a single source block is split', () => {
+    const doc = document('large', ['重复知识。'.repeat(80)]);
+    doc.blocks[0].type = 'paragraph';
+    const atoms = buildSectionBatches([doc], 20).flatMap(batch => batch.blocks);
+
+    expect(atoms.length).toBeGreaterThan(1);
+    expect(new Set(atoms.map(atom => atom.atomId)).size).toBe(atoms.length);
+    expect(atoms.every(atom => atom.id === 'large-b0')).toBe(true);
+    expect(atoms.map(atom => atom.sourceStartOffset)).toEqual(
+      atoms.reduce<number[]>((offsets, _atom, index) => {
+        offsets.push(index === 0 ? 0 : offsets[index - 1] + atoms[index - 1].content.length);
+        return offsets;
+      }, []),
+    );
+    expect(atoms.map(atom => atom.content).join('')).toBe(doc.blocks[0].content);
   });
 });

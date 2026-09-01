@@ -22,6 +22,9 @@ const batch: SectionBatch = {
   cacheKey: 'cache',
   blocks: [{
     id: 'b1',
+    atomId: 'b1:atom:0',
+    sourceStartOffset: 0,
+    sourceEndOffset: 11,
     documentId: 'd1',
     type: 'paragraph',
     content: 'MLE 最大化似然函数。',
@@ -120,11 +123,13 @@ describe('unified section compiler', () => {
     const prompt = buildSectionCompilerPrompt(batch);
     expect(prompt.dynamicInput).toContain('b1');
     expect(prompt.system).toContain('beforeTopicLocalId');
-    expect(prompt.promptVersion).toBe('course-section-v2');
-    expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(2048);
+    expect(prompt.promptVersion).toBe('course-section-v3');
+    expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(1024);
+    expect((prompt as { maxStructuredAttempts?: number }).maxStructuredAttempts).toBe(1);
+    expect((prompt as { maxTransportAttempts?: number }).maxTransportAttempts).toBe(1);
   });
 
-  it('allows Responses/Agent Plan enough time to finish reasoning', async () => {
+  it('bounds each lightweight Agent Plan extraction request to 30 seconds', async () => {
     mocks.callChatCompletion.mockResolvedValue({
       data: {
         topicMentions: [],
@@ -142,9 +147,86 @@ describe('unified section compiler', () => {
       expect.objectContaining({ apiMode: 'responses' }),
       expect.any(Object),
       'course-section-compile',
-      240000,
+      30000,
       batch.id,
       'section-compile',
     );
+  });
+
+  it('maps lightweight topics and teaching roles onto the canonical compilation', async () => {
+    mocks.callChatCompletion.mockResolvedValue({
+      data: {
+        topics: [{
+          localId: 't1',
+          name: '最大似然估计',
+          aliases: ['MLE'],
+          learningObjective: '理解并应用最大似然估计',
+          genre: 'algorithm',
+          difficulty: 2,
+          importance: 'core',
+        }],
+        units: [{
+          localId: 'u1',
+          topicLocalId: 't1',
+          role: 'definition',
+          title: 'MLE 定义',
+          evidence: [{ blockId: 'b1', anchor: 'MLE 最大化似然函数' }],
+          required: true,
+        }],
+        explicitOrders: [],
+        confidence: 0.85,
+      },
+      usage: {},
+    });
+
+    const result = await compileSectionBatch(config, batch);
+
+    expect(result.topicMentions[0]).toMatchObject({
+      name: '最大似然估计',
+      genre: 'algorithm',
+      confidence: 0.85,
+    });
+    expect(result.topicMentions[0].evidence[0]).toMatchObject({
+      blockId: 'b1',
+      quote: 'MLE 最大化似然函数',
+    });
+    expect(result.teachingUnits[0]).toMatchObject({
+      role: 'definition',
+      summary: 'MLE 定义',
+      confidence: 0.85,
+    });
+  });
+
+  it('translates an atom-local anchor into precise source-block offsets', async () => {
+    const fragmentBatch: SectionBatch = {
+      ...batch,
+      blocks: [{
+        ...batch.blocks[0],
+        atomId: 'b1:atom:1',
+        sourceStartOffset: 10,
+        sourceEndOffset: 17,
+        content: '重复句。尾部',
+      }],
+    };
+    mocks.callChatCompletion.mockResolvedValue({
+      data: {
+        topics: [{
+          localId: 't1', name: '重复知识', aliases: [], learningObjective: '理解重复知识',
+          genre: 'concept', difficulty: 1, importance: 'core',
+        }],
+        units: [{
+          localId: 'u1', topicLocalId: 't1', role: 'definition', title: '定义', required: true,
+          evidence: [{ atomId: 'b1:atom:1', blockId: 'b1', anchor: '重复句' }],
+        }],
+        explicitOrders: [], confidence: 1,
+      },
+      usage: {},
+    });
+
+    const result = await compileSectionBatch(config, fragmentBatch);
+    expect(buildSectionCompilerPrompt(fragmentBatch).dynamicInput).toContain('b1:atom:1');
+    expect(result.teachingUnits[0].evidence[0]).toMatchObject({
+      blockId: 'b1', quote: '重复句', startOffset: 10, endOffset: 13,
+    });
   });
 });

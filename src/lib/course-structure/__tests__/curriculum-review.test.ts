@@ -72,4 +72,19 @@ describe('restricted curriculum review', () => {
     expect(result.constraints[0].strength).toBe('soft');
     expect(result.constraints[0].source).toBe('inferred');
   });
+
+  it('uses one compact review call with a 20 second budget', async () => {
+    mocks.callChatCompletion.mockResolvedValue({ data: { operations: [], constraints: [] }, usage: {} });
+    await reviewCurriculum(
+      { endpoint: 'x', model: 'm', apiKey: 'k' },
+      [topic('a')],
+      new Map([['e1', evidence]]),
+    );
+
+    const [, prompt, , timeout] = mocks.callChatCompletion.mock.calls[0];
+    expect(prompt.maxOutputTokens).toBe(1536);
+    expect(prompt.maxStructuredAttempts).toBe(1);
+    expect(prompt.maxTransportAttempts).toBe(1);
+    expect(timeout).toBe(20_000);
+  });
 });

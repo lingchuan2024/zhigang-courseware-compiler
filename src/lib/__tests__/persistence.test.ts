@@ -193,4 +193,13 @@ describe('pickPersistedFields', () => {
     const picked = pickPersistedFields({ courseLearningStructure });
     expect(picked.courseLearningStructure).toEqual(courseLearningStructure);
   });
+
+  it('keeps extraction unit checkpoints for refresh-safe resume', () => {
+    const courseExtractionSession = {
+      id: 'session-1', courseId: 'course-1', startedAt: 1, deadlineAt: 60_001,
+      checkpoints: [{ cacheKey: 'cache-a', batchId: 'batch-a', status: 'succeeded' }],
+    };
+    const picked = pickPersistedFields({ courseExtractionSession });
+    expect(picked.courseExtractionSession).toEqual(courseExtractionSession);
+  });
 });

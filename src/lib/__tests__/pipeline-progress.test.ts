@@ -5,12 +5,12 @@ import {
   createStructureExtractionProgress,
   createNoteGenerationProgress,
   updateProgressStep,
-  skipProgressStep,
   blockProgress,
   completeProgress,
   failProgress,
   updateCurrentItem,
   updateCompilerProgress,
+  updateExtractionProgress,
   updateWindowProgress,
   deriveStructureProgress,
   deriveSidebarStepStates,
@@ -25,34 +25,50 @@ function idleProgress(): PipelineProgress {
 
 describe('pipeline-progress', () => {
   describe('course compiler progress', () => {
-    it('uses the six compiler phases as the structure extraction steps', () => {
+    it('uses four user-facing phases for fast two-layer compilation', () => {
       expect(STRUCTURE_EXTRACTION_STEPS.map(step => step.id)).toEqual([
         'prepare-evidence',
-        'compile-sections',
-        'normalize-topics',
-        'review-curriculum',
-        'schedule-course',
+        'extract-two-layer',
+        'compile-course',
         'validate-structure',
       ]);
     });
 
-    it('advances compiler phases while preserving an explicitly skipped prior phase', () => {
+    it('maps compiler scheduling onto the deterministic course compilation phase', () => {
       let progress = createStructureExtractionProgress();
-      progress = skipProgressStep(progress, 'review-curriculum');
+      progress = updateCompilerProgress(progress, 'compiling');
       progress = updateCompilerProgress(progress, 'scheduling');
 
-      expect(progress.steps.find(step => step.id === 'compile-sections')?.status).toBe('completed');
-      expect(progress.steps.find(step => step.id === 'review-curriculum')?.status).toBe('skipped');
-      expect(progress.steps.find(step => step.id === 'schedule-course')?.status).toBe('running');
+      expect(progress.steps.find(step => step.id === 'extract-two-layer')?.status).toBe('completed');
+      expect(progress.steps.find(step => step.id === 'compile-course')?.status).toBe('running');
       expect(progress.steps.find(step => step.id === 'validate-structure')?.status).toBe('pending');
     });
 
-    it('keeps estimated progress moving while the first section batch is running', () => {
+    it('reports exact progress even before the first extraction unit completes', () => {
       const progress = updateCompilerProgress(createStructureExtractionProgress(), 'compiling');
       const waitingForFirstBatch = updateWindowProgress(progress, 0, 4);
 
       expect(waitingForFirstBatch.windowProgress).toEqual({ current: 0, total: 4 });
-      expect(waitingForFirstBatch.isEstimated).toBe(true);
+      expect(waitingForFirstBatch.isEstimated).toBe(false);
+    });
+
+    it('shows real success, failure, topic and elapsed counters', () => {
+      const progress = updateExtractionProgress(createStructureExtractionProgress(), {
+        completedUnits: 3,
+        successfulUnits: 2,
+        failedUnits: 1,
+        totalUnits: 5,
+        discoveredTopicMentions: 7,
+        elapsedMs: 12_400,
+      });
+
+      expect(progress.windowProgress).toEqual({ current: 3, total: 5 });
+      expect(progress.successfulItems).toBe(2);
+      expect(progress.failedItems).toBe(1);
+      expect(progress.discoveredItems).toBe(7);
+      expect(progress.elapsedMs).toBe(12_400);
+      expect(progress.message).toBe('已完成 3/5 · 成功 2 · 失败 1 · 发现 7 个知识点 · 12 秒');
+      expect(progress.isEstimated).toBe(false);
     });
   });
 
@@ -201,32 +217,21 @@ describe('pipeline-progress', () => {
 
   // ========== Case 6: StructureExtractionStatus progression ==========
   describe('deriveStructureProgress - status progression', () => {
-    it('maps the legacy extracting-topics status onto section compilation', () => {
+    it('maps the legacy extracting-topics status onto two-layer extraction', () => {
       const progress = deriveStructureProgress('extracting-topics', null);
       expect(progress.steps.find(s => s.id === 'prepare-evidence')?.status).toBe('completed');
-      expect(progress.steps.find(s => s.id === 'compile-sections')?.status).toBe('running');
-      expect(progress.steps.find(s => s.id === 'normalize-topics')?.status).toBe('pending');
-      expect(progress.steps.find(s => s.id === 'schedule-course')?.status).toBe('pending');
+      expect(progress.steps.find(s => s.id === 'extract-two-layer')?.status).toBe('running');
+      expect(progress.steps.find(s => s.id === 'compile-course')?.status).toBe('pending');
       expect(progress.steps.find(s => s.id === 'validate-structure')?.status).toBe('pending');
       expect(progress.status).toBe('running');
     });
 
-    it('preserves a skipped normalization phase while advancing to scheduling', () => {
-      let prev = createStructureExtractionProgress();
-      prev = skipProgressStep(prev, 'normalize-topics');
-      const progress = deriveStructureProgress('extracting-relations', prev);
+    it('maps legacy relation extraction onto deterministic course compilation', () => {
+      const progress = deriveStructureProgress('extracting-relations', null);
 
-      const mergeStep = progress.steps.find(s => s.id === 'normalize-topics');
-      expect(mergeStep?.status).toBe('skipped');
-
-      const extractTopicsStep = progress.steps.find(s => s.id === 'compile-sections');
-      expect(extractTopicsStep?.status).toBe('completed');
-
-      const extractRelationsStep = progress.steps.find(s => s.id === 'schedule-course');
-      expect(extractRelationsStep?.status).toBe('running');
-
-      const extractInternalStep = progress.steps.find(s => s.id === 'validate-structure');
-      expect(extractInternalStep?.status).toBe('pending');
+      expect(progress.steps.find(s => s.id === 'extract-two-layer')?.status).toBe('completed');
+      expect(progress.steps.find(s => s.id === 'compile-course')?.status).toBe('running');
+      expect(progress.steps.find(s => s.id === 'validate-structure')?.status).toBe('pending');
     });
 
     it('when status is ready (with progressed prevProgress), all steps should be completed', () => {
@@ -252,22 +257,17 @@ describe('pipeline-progress', () => {
     });
   });
 
-  // ========== Case 7: Unexecuted merge step shows skipped ==========
-  describe('unexecuted merge step shows skipped', () => {
-    it('preserves skipped normalization when legacy status moves to relations', () => {
-      let prev = createStructureExtractionProgress();
-      prev = skipProgressStep(prev, 'normalize-topics');
-      const progress = deriveStructureProgress('extracting-relations', prev);
-      const mergeStep = progress.steps.find(s => s.id === 'normalize-topics');
-      expect(mergeStep?.status).toBe('skipped');
+  // ========== Case 7: Legacy statuses map to the four-phase compiler ==========
+  describe('legacy structure statuses', () => {
+    it('keeps relation extraction in the course compilation phase', () => {
+      const progress = deriveStructureProgress('extracting-relations', null);
+      expect(progress.steps.find(s => s.id === 'compile-course')?.status).toBe('running');
     });
 
-    it('preserves skipped normalization when legacy status moves to validation', () => {
-      let prev = createStructureExtractionProgress();
-      prev = skipProgressStep(prev, 'normalize-topics');
-      const progress = deriveStructureProgress('extracting-internal-structures', prev);
-      const mergeStep = progress.steps.find(s => s.id === 'normalize-topics');
-      expect(mergeStep?.status).toBe('skipped');
+    it('moves course compilation to completed when validation starts', () => {
+      const progress = deriveStructureProgress('extracting-internal-structures', null);
+      expect(progress.steps.find(s => s.id === 'compile-course')?.status).toBe('completed');
+      expect(progress.steps.find(s => s.id === 'validate-structure')?.status).toBe('running');
     });
   });
 
@@ -365,8 +365,8 @@ describe('pipeline-progress', () => {
           status: i < 2 ? ('completed' as const) : ('pending' as const),
         })),
       };
-      // 2 out of 6 steps completed
-      expect(computeProgressPercent(progress)).toBe(Math.min(99, (2 / 6) * 100));
+      // 2 out of 4 steps completed
+      expect(computeProgressPercent(progress)).toBe(Math.min(99, (2 / 4) * 100));
     });
 
     it('should cap at 99 for all-completed steps with running status via fallback', () => {
@@ -503,19 +503,19 @@ describe('pipeline-progress', () => {
 
     it('should mark running steps as completed', () => {
       let progress = createStructureExtractionProgress();
-      progress = updateProgressStep(progress, 'compile-sections', 'running');
+      progress = updateProgressStep(progress, 'extract-two-layer', 'running');
       const completed = completeProgress(progress);
-      const extractTopicsStep = completed.steps.find(s => s.id === 'compile-sections');
+      const extractTopicsStep = completed.steps.find(s => s.id === 'extract-two-layer');
       expect(extractTopicsStep?.status).toBe('completed');
     });
 
     it('should leave non-running steps unchanged', () => {
       let progress = createStructureExtractionProgress();
-      progress = updateProgressStep(progress, 'compile-sections', 'completed');
-      progress = updateProgressStep(progress, 'normalize-topics', 'pending');
+      progress = updateProgressStep(progress, 'extract-two-layer', 'completed');
+      progress = updateProgressStep(progress, 'compile-course', 'pending');
       const completed = completeProgress(progress);
-      const extractTopicsStep = completed.steps.find(s => s.id === 'compile-sections');
-      const mergeTopicsStep = completed.steps.find(s => s.id === 'normalize-topics');
+      const extractTopicsStep = completed.steps.find(s => s.id === 'extract-two-layer');
+      const mergeTopicsStep = completed.steps.find(s => s.id === 'compile-course');
       expect(extractTopicsStep?.status).toBe('completed');
       expect(mergeTopicsStep?.status).toBe('pending');
     });
@@ -532,9 +532,9 @@ describe('pipeline-progress', () => {
 
     it('should not mutate the original progress', () => {
       let progress = createStructureExtractionProgress();
-      progress = updateProgressStep(progress, 'compile-sections', 'running');
+      progress = updateProgressStep(progress, 'extract-two-layer', 'running');
       completeProgress(progress);
-      const extractTopicsStep = progress.steps.find(s => s.id === 'compile-sections');
+      const extractTopicsStep = progress.steps.find(s => s.id === 'extract-two-layer');
       expect(extractTopicsStep?.status).toBe('running');
       expect(progress.status).toBe('running');
     });

@@ -3,7 +3,11 @@ import type { ModelConfig, SourceDocument } from '../../../types';
 import { ExtractionError } from '../../extraction-errors';
 import { compileCourseStructure } from '../compiler';
 import { buildSectionBatches } from '../section-batching';
-import type { SectionCompilation } from '../types';
+import type {
+  CourseExtractionProgress,
+  CourseExtractionUnitCheckpoint,
+  SectionCompilation,
+} from '../types';
 
 const config: ModelConfig = { endpoint: 'x', model: 'm', apiKey: 'k' };
 
@@ -180,7 +184,138 @@ describe('course structure compiler integration', () => {
     expect(progress).toEqual([[0, 1], [1, 1]]);
   });
 
-  it('Agent Plan 大批次超时后自动拆小并合并结果', async () => {
+  it('emits a durable checkpoint and exact counters after every evidence unit', async () => {
+    const checkpoints: CourseExtractionUnitCheckpoint[] = [];
+    const progress: CourseExtractionProgress[] = [];
+    const documents = [
+      document('success', '成功知识片段。'),
+      document('failure', '失败知识片段。'),
+    ];
+
+    await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => {
+        if (batch.documentId === 'failure') throw new Error('单元失败');
+        return compilationForBatch(batch);
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      onUnitCheckpoint: checkpoint => checkpoints.push(checkpoint),
+      onExtractionProgress: event => progress.push(event),
+    });
+
+    expect(checkpoints.map(checkpoint => checkpoint.status).sort()).toEqual(['failed', 'succeeded']);
+    expect(checkpoints.every(checkpoint => checkpoint.attempts === 1)).toBe(true);
+    expect(progress[0]).toMatchObject({
+      completedUnits: 0,
+      successfulUnits: 0,
+      failedUnits: 0,
+      totalUnits: 2,
+      discoveredTopicMentions: 0,
+    });
+    expect(progress.at(-1)).toMatchObject({
+      completedUnits: 2,
+      successfulUnits: 1,
+      failedUnits: 1,
+      totalUnits: 2,
+      discoveredTopicMentions: 1,
+    });
+  });
+
+  it('resumes from a persisted successful unit without calling the model again', async () => {
+    const documents = [document('resume', '可以恢复的知识片段。')];
+    let persisted: CourseExtractionUnitCheckpoint | undefined;
+    await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => compilationForBatch(batch),
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      onUnitCheckpoint: checkpoint => { persisted = checkpoint; },
+    });
+
+    let calls = 0;
+    const resumed = await compileCourseStructure(config, documents, 'course-1', {
+      resumeCheckpoints: persisted ? [persisted] : [],
+      compileBatch: async batch => {
+        calls += 1;
+        return compilationForBatch(batch);
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    expect(persisted?.status).toBe('succeeded');
+    expect(calls).toBe(0);
+    expect(resumed.topics).toHaveLength(1);
+  });
+
+  it('stops starting new units after the foreground budget and returns a degraded partial structure', async () => {
+    const documents = [multiBlockDocument('budget', 4)];
+    documents[0].blocks.forEach((block, index) => {
+      block.content = `片段${index}${'知'.repeat(994)}`;
+    });
+    let clock = 0;
+    let calls = 0;
+    const checkpoints: CourseExtractionUnitCheckpoint[] = [];
+
+    const result = await compileCourseStructure(config, documents, 'course-1', {
+      concurrency: 1,
+      foregroundBudgetMs: 60_000,
+      now: () => clock,
+      compileBatch: async batch => {
+        calls += 1;
+        clock = 60_001;
+        return compilationForBatch(batch);
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+      onUnitCheckpoint: checkpoint => checkpoints.push(checkpoint),
+    });
+
+    expect(calls).toBe(1);
+    expect(checkpoints.filter(checkpoint => checkpoint.status === 'succeeded')).toHaveLength(1);
+    expect(checkpoints.filter(checkpoint => checkpoint.status === 'failed')).toHaveLength(3);
+    expect(result.topics).toHaveLength(1);
+    expect(result.status).toBe('degraded');
+    expect(result.validation.issues.some(issue => issue.message.includes('前台处理时限'))).toBe(true);
+  });
+
+  it('caps curriculum review by the remaining total foreground budget', async () => {
+    let clock = 0;
+    let reviewTimeout: number | undefined;
+    const result = await compileCourseStructure(config, [document('total', '总时限知识片段。')], 'course-1', {
+      now: () => clock,
+      totalBudgetMs: 90_000,
+      compileBatch: async batch => {
+        clock = 75_000;
+        return compilationForBatch(batch);
+      },
+      review: async (_model, _topics, _evidence, timeoutMs) => {
+        reviewTimeout = timeoutMs;
+        return { operations: [], constraints: [], warnings: [] };
+      },
+    });
+
+    expect(reviewTimeout).toBe(15_000);
+    expect(result.topics).toHaveLength(1);
+  });
+
+  it('skips curriculum review when semantic extraction has exhausted the total budget', async () => {
+    let clock = 0;
+    let reviewCalls = 0;
+    const result = await compileCourseStructure(config, [document('exhausted', '耗尽时限的知识片段。')], 'course-1', {
+      now: () => clock,
+      totalBudgetMs: 90_000,
+      compileBatch: async batch => {
+        clock = 90_001;
+        return compilationForBatch(batch);
+      },
+      review: async () => {
+        reviewCalls += 1;
+        return { operations: [], constraints: [], warnings: [] };
+      },
+    });
+
+    expect(reviewCalls).toBe(0);
+    expect(result.topics).toHaveLength(1);
+    expect(result.validation.issues.some(issue => issue.message.includes('总处理时限'))).toBe(true);
+  });
+
+  it('Agent Plan 单元超时后不递归拆分或重放', async () => {
     const documents = [multiBlockDocument('large', 4)];
     const seenBatchSizes: number[] = [];
 
@@ -191,22 +326,18 @@ describe('course structure compiler integration', () => {
       {
         compileBatch: async batch => {
           seenBatchSizes.push(batch.blocks.length);
-          if (batch.blocks.length > 2) {
-            throw new ExtractionError('api-timeout', 'section-compile', '模型请求超时');
-          }
-          return compilationForBatch(batch);
+          throw new ExtractionError('api-timeout', 'section-compile', '模型请求超时');
         },
         review: async () => ({ operations: [], constraints: [], warnings: [] }),
       },
     );
 
-    expect(seenBatchSizes).toEqual([4, 2, 2]);
-    expect(result.checkpoints).toHaveLength(1);
-    expect(result.topics).toHaveLength(2);
-    expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(false);
+    expect(seenBatchSizes).toEqual([4]);
+    expect(result.checkpoints).toHaveLength(0);
+    expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(true);
   });
 
-  it('Agent Plan 单个大块超时后继续按文本边界拆分', async () => {
+  it('Agent Plan 单个大块在请求前已按文本边界拆分', async () => {
     const documents = [document('single-large', '知识内容。'.repeat(240))];
     const seenFragments: Array<{ blockId: string; contentLength: number }> = [];
 
@@ -220,26 +351,21 @@ describe('course structure compiler integration', () => {
             blockId: batch.blocks[0].id,
             contentLength: batch.blocks[0].content.length,
           });
-          if (batch.blocks[0].content.length > 700) {
-            throw new ExtractionError('api-timeout', 'section-compile', '模型请求超时');
-          }
           return compilationForBatch(batch);
         },
         review: async () => ({ operations: [], constraints: [], warnings: [] }),
       },
     );
 
-    expect(seenFragments[0].contentLength).toBe(documents[0].blocks[0].content.length);
-    expect(seenFragments.slice(1).map(fragment => fragment.contentLength))
-      .toEqual(expect.arrayContaining([expect.any(Number), expect.any(Number)]));
-    expect(seenFragments.slice(1).every(fragment => fragment.contentLength <= 700)).toBe(true);
+    expect(seenFragments.length).toBeGreaterThan(1);
+    expect(seenFragments.every(fragment => fragment.contentLength <= 1000)).toBe(true);
     expect(new Set(seenFragments.map(fragment => fragment.blockId)))
       .toEqual(new Set(['single-large-b1']));
-    expect(result.checkpoints).toHaveLength(1);
+    expect(result.checkpoints).toHaveLength(seenFragments.length);
     expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(false);
   });
 
-  it('Agent Plan 初始批次限制为约 3000 tokens', async () => {
+  it('Agent Plan 初始语义单元限制为约 1000 tokens', async () => {
     const documents = [multiBlockDocument('token-heavy', 4)];
     documents[0].blocks.forEach((block, index) => {
       block.content = `片段${index}${'知'.repeat(994)}`;
@@ -259,7 +385,7 @@ describe('course structure compiler integration', () => {
       },
     );
 
-    expect(seenBatchSizes).toEqual([3, 1]);
+    expect(seenBatchSizes).toEqual([1, 1, 1, 1]);
   });
 
   it('不可再拆的失败批次向界面保留真实错误', async () => {

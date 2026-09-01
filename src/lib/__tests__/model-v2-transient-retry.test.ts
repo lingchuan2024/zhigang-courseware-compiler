@@ -82,6 +82,25 @@ describe('callChatCompletion 瞬时错误退避', () => {
     expect(sleeps).toEqual([1000, 2000]);
   });
 
+  it('allows latency-sensitive prompts to disable transport replay', async () => {
+    const sleeps: number[] = [];
+    const fetchMock = vi.fn().mockResolvedValue(new Response('boom', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callChatCompletion(
+      config,
+      { ...makePrompt(), maxTransportAttempts: 1 },
+      'topic-merge',
+      5000,
+      undefined,
+      'section-compile',
+      async ms => { sleeps.push(ms); },
+    )).rejects.toMatchObject({ code: 'api-http-error' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleeps).toEqual([]);
+  });
+
   it('非瞬时状态码（401）不重试，直接抛出', async () => {
     const sleeps: number[] = [];
     const sleep = async (ms: number) => { sleeps.push(ms); };
