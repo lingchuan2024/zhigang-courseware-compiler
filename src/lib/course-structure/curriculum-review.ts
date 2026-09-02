@@ -70,7 +70,8 @@ function buildPrompt(
     stablePrefix: 'course-curriculum-review-v1',
     dynamicInput,
     promptVersion: 'course-curriculum-review-v1',
-    maxOutputTokens: 1536,
+    // 同 section-compiler：GLM Responses 把内部推理计入输出预算，需覆盖推理 + JSON。
+    maxOutputTokens: 8192,
     maxStructuredAttempts: 1,
     maxTransportAttempts: 1,
     messages: [
@@ -84,13 +85,14 @@ export async function reviewCurriculum(
   config: ModelConfig,
   topics: LearningTopic[],
   evidenceById: ReadonlyMap<string, EvidenceSpan>,
-  timeoutMs = 20_000,
+  timeoutMs = 120_000,
 ): Promise<CurriculumReviewResult> {
   const completion = await callChatCompletion<unknown>(
     config,
     buildPrompt(topics, evidenceById),
     'course-curriculum-review',
-    Math.max(1, Math.min(20_000, timeoutMs)),
+    // GLM 强制推理下 20 秒不够，与 section-compile 一致放宽到 120 秒。
+    Math.max(1, Math.min(120_000, timeoutMs)),
     undefined,
     'curriculum-review',
   );

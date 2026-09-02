@@ -294,6 +294,30 @@ describe('course structure compiler integration', () => {
     expect(result.topics).toHaveLength(1);
   });
 
+  it('passes only the remaining total budget to each newly started evidence unit', async () => {
+    const documents = [multiBlockDocument('deadline', 2)];
+    documents[0].blocks.forEach((block, index) => {
+      block.content = `片段${index}${'知'.repeat(994)}`;
+    });
+    let clock = 0;
+    const requestBudgets: Array<number | undefined> = [];
+
+    await compileCourseStructure(config, documents, 'course-1', {
+      concurrency: 1,
+      now: () => clock,
+      foregroundBudgetMs: 60_000,
+      totalBudgetMs: 90_000,
+      compileBatch: async (batch, timeoutMs) => {
+        requestBudgets.push(timeoutMs);
+        if (requestBudgets.length === 1) clock = 50_000;
+        return compilationForBatch(batch);
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    expect(requestBudgets).toEqual([90_000, 40_000]);
+  });
+
   it('skips curriculum review when semantic extraction has exhausted the total budget', async () => {
     let clock = 0;
     let reviewCalls = 0;

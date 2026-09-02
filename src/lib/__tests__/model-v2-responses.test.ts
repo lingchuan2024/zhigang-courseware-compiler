@@ -120,6 +120,35 @@ describe('Responses API transport', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it('reports a reasoning-exhausted output budget with incomplete reason and usage', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      json: async () => ({
+        status: 'incomplete',
+        incomplete_details: { reason: 'max_output_tokens' },
+        output: [{ type: 'reasoning', summary: [] }],
+        usage: { input_tokens: 812, output_tokens: 1024, total_tokens: 1836 },
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const error: Error & { code?: string } = await callChatCompletion(
+      config,
+      { ...prompt, maxStructuredAttempts: 1, maxOutputTokens: 1024 } as CompiledPrompt,
+      'course-section-compile',
+      1000,
+    ).catch(err => err);
+
+    expect(error.code).toBe('response-truncated');
+    expect(error.message).toContain('推理耗尽输出预算');
+    expect(error.message).toContain('max_output_tokens=1024');
+    expect(error.message).toContain('incomplete_details.reason=max_output_tokens');
+    expect(error.message).toContain('输出 1024');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('verifies Agent Plan through the Responses endpoint', async () => {
     const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 200 });
     vi.stubGlobal('fetch', fetchMock);

@@ -79,7 +79,7 @@ function buildCompletionBody(config: ModelConfig, compiled: CompiledPrompt): Rec
 function extractResponsePayload(
   rawData: unknown,
   apiMode: ModelApiMode,
-): { content: string; truncated: boolean } {
+): { content: string; truncated: boolean; incompleteReason?: string } {
   if (apiMode === 'chat-completions') {
     const data = rawData as {
       choices?: Array<{ finish_reason?: string; message?: { content?: string } }>;
@@ -94,6 +94,7 @@ function extractResponsePayload(
   const data = rawData as {
     status?: string;
     output_text?: string;
+    incomplete_details?: { reason?: string } | null;
     output?: Array<{
       type?: string;
       content?: Array<{ type?: string; text?: string }>;
@@ -105,7 +106,11 @@ function extractResponsePayload(
     .filter(item => item.type === 'output_text' && typeof item.text === 'string')
     .map(item => item.text)
     .join('') ?? '';
-  return { content, truncated: data.status === 'incomplete' };
+  return {
+    content,
+    truncated: data.status === 'incomplete',
+    incompleteReason: data.incomplete_details?.reason,
+  };
 }
 
 async function fetchWithTransientRetry(
@@ -216,14 +221,41 @@ export async function callChatCompletion<T>(
       return { data: parsed as T, usage };
     }
 
+    // 失败的调用同样消耗 token（GLM 的内部推理尤其如此），先记录用量再报错，
+    // 让界面能区分“推理耗尽输出预算”与真正的空响应。
+    const failedUsage = extractUsage(
+      rawData,
+      config.model,
+      taskType,
+      compiled.promptVersion,
+      Date.now() - startedAt,
+      topicId,
+    );
+    recordUsage(failedUsage);
+    const usageParts = [
+      failedUsage.promptTokens !== undefined ? `输入 ${failedUsage.promptTokens}` : null,
+      failedUsage.completionTokens !== undefined ? `输出 ${failedUsage.completionTokens}` : null,
+    ].filter(Boolean).join('，');
+    const usageSuffix = usageParts ? `；token 用量：${usageParts}` : '';
+    const incompleteSuffix = payload.incompleteReason
+      ? `（incomplete_details.reason=${payload.incompleteReason}）`
+      : '';
+
     const code = wasTruncated || !rawContent ? 'response-truncated' : 'json-parse-failed';
-    const message = !rawContent
-      ? apiMode === 'responses'
-        ? 'API 返回的 output_text 为空'
-        : 'API 返回的 choices[0].message.content 为空'
-      : wasTruncated
-        ? `模型输出达到长度上限，JSON 未完成（前 200 字符：${rawContent.substring(0, 200)}）`
-        : `模型输出不是合法 JSON（前 200 字符：${rawContent.substring(0, 200)}）`;
+    let message: string;
+    if (!rawContent) {
+      if (apiMode === 'responses' && payload.incompleteReason === 'max_output_tokens') {
+        message = `模型内部推理耗尽输出预算：max_output_tokens=${compiled.maxOutputTokens ?? 8192} 全部被推理消耗，未生成最终 JSON${incompleteSuffix}${usageSuffix}`;
+      } else if (apiMode === 'responses') {
+        message = `API 返回的 output_text 为空${incompleteSuffix}${usageSuffix}`;
+      } else {
+        message = `API 返回的 choices[0].message.content 为空${usageSuffix}`;
+      }
+    } else if (wasTruncated) {
+      message = `模型输出达到长度上限，JSON 未完成${incompleteSuffix}${usageSuffix}（前 200 字符：${rawContent.substring(0, 200)}）`;
+    } else {
+      message = `模型输出不是合法 JSON${usageSuffix}（前 200 字符：${rawContent.substring(0, 200)}）`;
+    }
     lastStructuredError = new ExtractionError(
       code,
       stage || 'unknown' as ExtractionStage,

@@ -124,12 +124,12 @@ describe('unified section compiler', () => {
     expect(prompt.dynamicInput).toContain('b1');
     expect(prompt.system).toContain('beforeTopicLocalId');
     expect(prompt.promptVersion).toBe('course-section-v3');
-    expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(1024);
+    expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(8192);
     expect((prompt as { maxStructuredAttempts?: number }).maxStructuredAttempts).toBe(1);
     expect((prompt as { maxTransportAttempts?: number }).maxTransportAttempts).toBe(1);
   });
 
-  it('bounds each lightweight Agent Plan extraction request to 30 seconds', async () => {
+  it('gives each GLM reasoning request a 120 second budget', async () => {
     mocks.callChatCompletion.mockResolvedValue({
       data: {
         topicMentions: [],
@@ -147,7 +147,25 @@ describe('unified section compiler', () => {
       expect.objectContaining({ apiMode: 'responses' }),
       expect.any(Object),
       'course-section-compile',
-      30000,
+      120000,
+      batch.id,
+      'section-compile',
+    );
+  });
+
+  it('honors a smaller remaining foreground budget from the course compiler', async () => {
+    mocks.callChatCompletion.mockResolvedValue({
+      data: { topics: [], units: [], explicitOrders: [], confidence: 0 },
+      usage: {},
+    });
+
+    await compileSectionBatch({ ...config, apiMode: 'responses' }, batch, 45_000);
+
+    expect(mocks.callChatCompletion).toHaveBeenCalledWith(
+      expect.objectContaining({ apiMode: 'responses' }),
+      expect.any(Object),
+      'course-section-compile',
+      45_000,
       batch.id,
       'section-compile',
     );

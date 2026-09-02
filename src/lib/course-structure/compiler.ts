@@ -26,7 +26,7 @@ import type {
 import { validateCourseStructure } from './validator';
 
 export interface CourseCompilerDependencies {
-  compileBatch?: (batch: SectionBatch) => Promise<SectionCompilation>;
+  compileBatch?: (batch: SectionBatch, timeoutMs?: number) => Promise<SectionCompilation>;
   review?: typeof reviewCurriculum;
   previous?: CourseLearningStructure | null;
   onBatchProgress?: (current: number, total: number) => void;
@@ -207,13 +207,14 @@ export async function compileCourseStructure(
       .filter(checkpoint => checkpoint.status === 'succeeded' && checkpoint.result)
       .map(checkpoint => [checkpoint.cacheKey, checkpoint]),
   );
-  const compileBatch = dependencies.compileBatch ?? (batch => compileSectionBatch(config, batch));
   const issues: CourseStructureIssue[] = [];
   const now = dependencies.now ?? Date.now;
   const startedAt = now();
   const foregroundBudgetMs = Math.max(1, dependencies.foregroundBudgetMs ?? 60_000);
   const deadlineAt = startedAt + foregroundBudgetMs;
   const totalDeadlineAt = startedAt + Math.max(foregroundBudgetMs, dependencies.totalBudgetMs ?? 90_000);
+  const compileBatch = dependencies.compileBatch
+    ?? ((batch, timeoutMs) => compileSectionBatch(config, batch, timeoutMs));
   let completedBatches = 0;
   let successfulBatches = 0;
   let failedBatches = 0;
@@ -242,7 +243,8 @@ export async function compileCourseStructure(
         throw new ExtractionError('api-timeout', 'section-compile', '已达到前台处理时限，剩余证据单元待下次续跑');
       }
       attempted = !reusableResult;
-      const result = reusableResult ?? await compileBatch(batch);
+      const remainingTotalMs = Math.max(1, totalDeadlineAt - now());
+      const result = reusableResult ?? await compileBatch(batch, Math.min(120_000, remainingTotalMs));
       successfulBatches += 1;
       discoveredTopicMentions += result.topicMentions.length;
       unitCheckpoint = {
@@ -380,7 +382,7 @@ export async function compileCourseStructure(
           config,
           normalized.topics,
           evidenceById,
-          Math.min(20_000, remainingReviewMs),
+          Math.min(120_000, remainingReviewMs),
         );
       } catch {
         issues.push({
