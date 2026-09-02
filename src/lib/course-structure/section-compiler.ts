@@ -161,8 +161,9 @@ export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt 
     stablePrefix,
     dynamicInput,
     promptVersion: SECTION_COMPILER_PROMPT_VERSION,
-    // GLM 的 Responses API 把内部推理计入 max_output_tokens：预算必须覆盖
-    // 推理 + 最终 JSON（旧 Agent Plan 适配为 8192），不能按 JSON 自身长度设置。
+    // 课程结构是受限信息抽取，不需要深度思考。Responses API 显式使用
+    // minimal，避免 GLM 在返回 JSON 前进行数分钟内部推理。
+    reasoningEffort: 'minimal',
     maxOutputTokens: 8192,
     maxStructuredAttempts: 1,
     maxTransportAttempts: 1,
@@ -178,8 +179,7 @@ export async function compileSectionBatch(
   batch: SectionBatch,
   timeoutMs = 120_000,
 ): Promise<SectionCompilation> {
-  // GLM 强制推理先消耗输出预算再生成 JSON，单次请求实际耗时远高于纯输出耗时，
-  // 与 card-enrichment 等推理调用一致使用 120 秒。
+  // 保留网络慢路径的上限；正常 Responses 抽取由 minimal reasoning 直接输出 JSON。
   const timeout = Math.max(1, Math.min(120_000, timeoutMs));
   const completion = await callChatCompletion<RawSectionCompilation>(
     config,

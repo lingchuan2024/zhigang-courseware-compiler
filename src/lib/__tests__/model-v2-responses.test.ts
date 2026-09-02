@@ -89,6 +89,23 @@ describe('Responses API transport', () => {
     expect(body.max_output_tokens).toBe(2048);
   });
 
+  it('forwards minimal reasoning effort for bounded extraction tasks', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(responsesResponse('{"units":[]}'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await callChatCompletion<{ units: unknown[] }>(
+      config,
+      { ...prompt, reasoningEffort: 'minimal' } as CompiledPrompt,
+      'course-section-compile',
+      1000,
+    );
+
+    const init = fetchMock.mock.calls[0][1] as RequestInit;
+    const body = JSON.parse(String(init.body));
+    expect(body.reasoning).toEqual({ effort: 'minimal' });
+    expect(body).not.toHaveProperty('thinking');
+  });
+
   it('retries once when Responses reports an incomplete output', async () => {
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(responsesResponse('{"units":[', 'incomplete'))

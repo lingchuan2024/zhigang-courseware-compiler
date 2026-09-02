@@ -83,6 +83,7 @@ describe('restricted curriculum review', () => {
 
     const [, prompt, , timeout] = mocks.callChatCompletion.mock.calls[0];
     expect(prompt.maxOutputTokens).toBe(8192);
+    expect((prompt as { reasoningEffort?: string }).reasoningEffort).toBe('minimal');
     expect(prompt.maxStructuredAttempts).toBe(1);
     expect(prompt.maxTransportAttempts).toBe(1);
     expect(timeout).toBe(120_000);

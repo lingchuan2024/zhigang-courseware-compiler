@@ -70,7 +70,8 @@ function buildPrompt(
     stablePrefix: 'course-curriculum-review-v1',
     dynamicInput,
     promptVersion: 'course-curriculum-review-v1',
-    // 同 section-compiler：GLM Responses 把内部推理计入输出预算，需覆盖推理 + JSON。
+    // 课程审查同样是受限操作选择，不需要长思维链。
+    reasoningEffort: 'minimal',
     maxOutputTokens: 8192,
     maxStructuredAttempts: 1,
     maxTransportAttempts: 1,
@@ -91,7 +92,7 @@ export async function reviewCurriculum(
     config,
     buildPrompt(topics, evidenceById),
     'course-curriculum-review',
-    // GLM 强制推理下 20 秒不够，与 section-compile 一致放宽到 120 秒。
+    // 保留网络慢路径上限；minimal reasoning 正常会直接返回受限操作 JSON。
     Math.max(1, Math.min(120_000, timeoutMs)),
     undefined,
     'curriculum-review',

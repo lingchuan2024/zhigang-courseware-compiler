@@ -125,6 +125,7 @@ describe('unified section compiler', () => {
     expect(prompt.system).toContain('beforeTopicLocalId');
     expect(prompt.promptVersion).toBe('course-section-v3');
     expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(8192);
+    expect((prompt as { reasoningEffort?: string }).reasoningEffort).toBe('minimal');
     expect((prompt as { maxStructuredAttempts?: number }).maxStructuredAttempts).toBe(1);
     expect((prompt as { maxTransportAttempts?: number }).maxTransportAttempts).toBe(1);
   });

@@ -65,6 +65,9 @@ function buildCompletionBody(config: ModelConfig, compiled: CompiledPrompt): Rec
       input: compiled.messages,
       max_output_tokens: maxOutputTokens,
       text: { format: { type: 'json_object' } },
+      ...(compiled.reasoningEffort
+        ? { reasoning: { effort: compiled.reasoningEffort } }
+        : {}),
     };
   }
   return {
