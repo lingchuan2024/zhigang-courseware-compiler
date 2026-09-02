@@ -93,6 +93,14 @@ describe('course master note', () => {
     expect(plan[0].framework).toEqual(['C', 'A']);
   });
 
+  it('uses a readable chapter title instead of joining unrelated first and last topics', () => {
+    const topics = [topic('a', '参数模型'), topic('b', '非参数模型'), topic('c', '核方法'), topic('d', 'NW估计量')];
+
+    const plan = planFallbackChapters(topics, topics.map(item => item.id), 4);
+
+    expect(plan[0].title).toBe('参数模型、非参数模型等');
+  });
+
   it('assembles completed chapters and reports uncovered cards', () => {
     const first = chapterPlan('chapter-1', '基础', ['a']);
     const second = chapterPlan('chapter-2', '扩展', ['b']);

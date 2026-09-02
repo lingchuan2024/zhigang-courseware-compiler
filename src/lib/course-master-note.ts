@@ -53,7 +53,9 @@ export function planFallbackChapters(
     const chapterNumber = chapters.length + 1;
     const title = group.length === 1
       ? group[0].name
-      : `${group[0].name}与${group[group.length - 1].name}`;
+      : group.length === 2
+        ? `${group[0].name}与${group[1].name}`
+        : `${group[0].name}、${group[1].name}等`;
     chapters.push({
       id: `chapter-${chapterNumber}`,
       title,

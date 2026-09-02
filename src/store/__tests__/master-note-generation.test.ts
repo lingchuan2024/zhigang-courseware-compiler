@@ -114,8 +114,13 @@ describe('master note store generation', () => {
       expect(useStore.getState().topicSyntheses).toEqual([synthesis]);
       callbacks.onPlan?.([plan]);
       expect(useStore.getState().chapterPlan).toEqual([plan]);
+      expect(useStore.getState().courseMasterNote?.outline).toEqual([plan]);
+      callbacks.onChapterStart?.(plan, 1, 1);
+      expect(useStore.getState().chapterNotes[0]?.status).toBe('generating');
       callbacks.onChapter?.(chapter, 1, 1);
       expect(useStore.getState().chapterNotes).toEqual([chapter]);
+      expect(useStore.getState().courseMasterNote?.chapters).toEqual([chapter]);
+      expect(useStore.getState().pipelineProgress.estimatedProgress).toBeGreaterThan(90);
       return { topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote };
     });
 
@@ -126,6 +131,32 @@ describe('master note store generation', () => {
     expect(state.jobStatus).toBe('completed');
     expect(state.job).toBeNull();
     expect(state.knowledgeBaseVersions.notes).toBe(1);
+  });
+
+  it('passes persisted chapters back to the generator instead of clearing them on resume', async () => {
+    seed(true);
+    const failed: ChapterNote = {
+      ...plan,
+      markdown: '',
+      sourceCardIds: [],
+      status: 'failed',
+      error: 'signal timed out',
+      retryCount: 0,
+    };
+    useStore.setState({
+      chapterPlan: [plan],
+      chapterNotes: [failed],
+      courseMasterNote: { ...masterNote, chapters: [failed], status: 'failed', markdown: '# 测试课程' },
+    });
+    mocks.runMasterNoteGeneration.mockImplementation(async (_config, generationInput) => {
+      expect(generationInput.resumeChapterNotes).toEqual([failed]);
+      expect(useStore.getState().chapterNotes).toEqual([failed]);
+      return { topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote };
+    });
+
+    await act(async () => useStore.getState().startMasterNoteGeneration());
+
+    expect(mocks.runMasterNoteGeneration).toHaveBeenCalledOnce();
   });
 
   it('retries only the requested failed chapter and keeps completed chapters', async () => {

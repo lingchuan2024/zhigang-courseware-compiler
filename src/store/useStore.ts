@@ -669,24 +669,24 @@ export const useStore = create<AppState>((set, get) => ({
 
     set({
       stage: 'notes',
-      job: 'generating-topic-syntheses',
+      job: 'planning-chapters',
       jobStatus: 'running',
       topicSyntheses: [],
-      chapterPlan: [],
-      chapterNotes: [],
-      courseMasterNote: null,
+      // 保留已落盘章节，生成器会按章节主题与卡片集合校验后决定是否复用。
+      chapterPlan: state.chapterPlan,
+      chapterNotes: state.chapterNotes,
+      courseMasterNote: state.courseMasterNote,
       pipelineProgress: {
         operation: 'generate-notes',
         status: 'running',
         steps: [
-          { id: 'topic-synthesis', label: '综合知识卡片', status: 'running' },
-          { id: 'chapter-plan', label: '规划课程框架', status: 'pending' },
+          { id: 'chapter-plan', label: '确定课程框架', status: 'running' },
           { id: 'chapter-generation', label: '逐章生成笔记', status: 'pending' },
           { id: 'master-assembly', label: '组装完整笔记', status: 'pending' },
         ],
-        estimatedProgress: 3,
-        isEstimated: true,
-        message: '正在综合知识卡片',
+        estimatedProgress: 5,
+        isEstimated: false,
+        message: '正在按两层知识结构确定课程框架',
       },
     });
 
@@ -705,18 +705,15 @@ export const useStore = create<AppState>((set, get) => ({
         structureVersion: knowledgeBaseVersions.topicStructure,
         teachingRelations,
         narrativePaths,
+        resumeChapterNotes: state.chapterNotes,
       }, {
         onTopicSynthesis: (synthesis, current, total) => {
           const existing = get().topicSyntheses.filter(item => item.topicId !== synthesis.topicId);
           set({
-            job: 'generating-topic-syntheses',
             topicSyntheses: [...existing, synthesis],
             pipelineProgress: {
               ...get().pipelineProgress,
-              currentItem: current,
-              totalItems: total,
-              currentItemTitle: `综合知识 ${current}/${total}`,
-              message: `正在综合第 ${current}/${total} 个一级知识`,
+              estimatedProgress: 5 + Math.round(current / Math.max(1, total) * 5),
             },
           });
           saveState(get());
@@ -728,27 +725,85 @@ export const useStore = create<AppState>((set, get) => ({
             pipelineProgress: {
               ...get().pipelineProgress,
               steps: get().pipelineProgress.steps.map(step =>
-                step.id === 'topic-synthesis' ? { ...step, status: 'completed' as const }
-                  : step.id === 'chapter-plan' ? { ...step, status: 'completed' as const }
+                step.id === 'chapter-plan' ? { ...step, status: 'completed' as const }
                     : step.id === 'chapter-generation' ? { ...step, status: 'running' as const }
                       : step,
               ),
+              currentItem: 0,
+              totalItems: plan.length,
+              estimatedProgress: 10,
               message: `课程框架已完成，共 ${plan.length} 章`,
+            },
+            courseMasterNote: assembleCourseMasterNote({
+              courseId,
+              title,
+              outline: plan,
+              chapterNotes: get().chapterNotes,
+              knowledgeCards,
+              glossary,
+              formulaIndex: formulaCards,
+              structureVersion: knowledgeBaseVersions.topicStructure,
+            }),
+          });
+          saveState(get());
+        },
+        onChapterStart: (plan, current, total) => {
+          const existingById = new Map(get().chapterNotes.map(chapter => [chapter.id, chapter]));
+          const generating = {
+            ...plan,
+            markdown: '',
+            sourceCardIds: [],
+            status: 'generating' as const,
+            retryCount: existingById.get(plan.id)?.retryCount ?? 0,
+          };
+          existingById.set(plan.id, generating);
+          const orderedChapters = get().chapterPlan
+            .map(chapter => existingById.get(chapter.id))
+            .filter((chapter): chapter is NonNullable<typeof chapter> => Boolean(chapter));
+          const finished = orderedChapters.filter(chapter => chapter.status === 'completed' || chapter.status === 'failed').length;
+          set({
+            job: 'generating-chapter-notes',
+            chapterNotes: orderedChapters,
+            pipelineProgress: {
+              ...get().pipelineProgress,
+              currentItem: finished,
+              totalItems: total,
+              currentItemTitle: plan.title,
+              message: `开始生成第 ${current}/${total} 章：${plan.title}`,
+              estimatedProgress: 10 + Math.round(finished / Math.max(1, total) * 85),
             },
           });
           saveState(get());
         },
         onChapter: (chapter, current, total) => {
-          const existing = get().chapterNotes.filter(item => item.id !== chapter.id);
+          const existingById = new Map(get().chapterNotes.map(item => [item.id, item]));
+          existingById.set(chapter.id, chapter);
+          const orderedChapters = get().chapterPlan
+            .map(item => existingById.get(item.id))
+            .filter((item): item is NonNullable<typeof item> => Boolean(item));
+          const partialMasterNote = assembleCourseMasterNote({
+            courseId,
+            title,
+            outline: get().chapterPlan,
+            chapterNotes: orderedChapters,
+            knowledgeCards,
+            glossary,
+            formulaIndex: formulaCards,
+            structureVersion: knowledgeBaseVersions.topicStructure,
+          });
           set({
             job: 'generating-chapter-notes',
-            chapterNotes: [...existing, chapter],
+            chapterNotes: orderedChapters,
+            courseMasterNote: partialMasterNote,
             pipelineProgress: {
               ...get().pipelineProgress,
               currentItem: current,
               totalItems: total,
               currentItemTitle: chapter.title,
-              message: `正在生成第 ${current}/${total} 章：${chapter.title}`,
+              message: chapter.status === 'completed'
+                ? `已完成 ${current}/${total} 章：${chapter.title}`
+                : `章节“${chapter.title}”生成失败，继续保留其他章节`,
+              estimatedProgress: 10 + Math.round(current / Math.max(1, total) * 85),
             },
           });
           saveState(get());

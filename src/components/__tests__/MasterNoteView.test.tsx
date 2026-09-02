@@ -123,6 +123,28 @@ describe('MasterNoteView complete-note stage', () => {
     expect(retry).toHaveBeenCalledWith('chapter-2');
   });
 
+  it('offers one-click continuation when a partial note has unfinished chapters', () => {
+    const failed: ChapterNote = {
+      ...plan, id: 'chapter-2', title: '模型族比较', markdown: '', sourceCardIds: [], status: 'failed', error: 'signal timed out', retryCount: 0,
+    };
+    const start = vi.fn();
+    const master: CourseMasterNote = {
+      id: 'master-1', title: '机器学习', outline: [plan, failed], chapters: [completedChapter, failed], glossary: [], formulaIndex: [],
+      markdown: '# 机器学习\n\n## 广义线性模型\n\n完整章节正文。',
+      coverage: { totalCardIds: ['card-1'], coveredCardIds: ['card-1'], missingCardIds: [] }, status: 'partial', generatedFromStructureVersion: 2,
+    };
+    useStore.setState({
+      chapterPlan: [plan, failed], chapterNotes: [completedChapter, failed], courseMasterNote: master,
+      startMasterNoteGeneration: start,
+    });
+
+    const container = render();
+    const button = Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes('续跑未完成章节'))!;
+    act(() => button.click());
+
+    expect(start).toHaveBeenCalledOnce();
+  });
+
   it('shows every completed chapter in one document and uses the directory as anchor navigation', () => {
     const secondPlan: ChapterPlanItem = {
       id: 'chapter-2', title: '模型族比较', objective: '比较模型族', topicIds: ['t1'], framework: ['共同目标', '差异维度'],

@@ -128,6 +128,9 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
           )}
           {usableMaster && (
             <>
+              {!isRunning && masterNote?.status !== 'completed' && (
+                <button type="button" onClick={() => void startGeneration()} className="btn-primary">续跑未完成章节</button>
+              )}
               <button type="button" onClick={() => setEvidenceOpen(true)} className="btn-outline">查看本章依据</button>
               <button type="button" onClick={exportMarkdown} className="btn-outline">导出 Markdown</button>
             </>
@@ -183,7 +186,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
             {!usableMaster && !isRunning && (
               <div className="mb-5 rounded-2xl border border-celadon/20 bg-celadon/5 p-5">
                 <h2 className="font-song text-xl font-bold text-space-text">尚未生成完整笔记</h2>
-                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据知识网学习顺序形成的初始课程框架。生成时会先综合并列知识、串联公式与概念，再逐章写作。</p>
+                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据两层知识结构和学习顺序形成的固定课程框架。生成时直接按章写作，已完成章节会立即保存并显示。</p>
               </div>
             )}
             {!usableMaster ? (
