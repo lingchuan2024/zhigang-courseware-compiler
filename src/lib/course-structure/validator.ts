@@ -72,16 +72,17 @@ export function validateCourseStructure(
       });
     }
     const validEvidence = unit.evidenceIds.filter(id => evidenceIds.has(id));
-    if (unit.required && validEvidence.length === 0) {
+    if (validEvidence.length === 0) {
       issues.push({
-        code: 'REQUIRED_UNIT_WITHOUT_EVIDENCE',
+        code: unit.required ? 'REQUIRED_UNIT_WITHOUT_EVIDENCE' : 'TEACHING_UNIT_WITHOUT_EVIDENCE',
         severity: 'error',
-        message: `必要讲解单元“${unit.title}”没有有效原文证据`,
+        message: `${unit.required ? '必要' : '讲解'}单元“${unit.title}”没有有效原文证据`,
         teachingUnitId: unit.id,
       });
     }
   });
 
+  const orderPosition = new Map(input.orderedTopicIds.map((topicId, index) => [topicId, index]));
   input.orderConstraints.forEach(constraint => {
     if (!topicIds.has(constraint.beforeTopicId) || !topicIds.has(constraint.afterTopicId)) {
       corrupt = true;
@@ -89,6 +90,16 @@ export function validateCourseStructure(
         code: 'UNKNOWN_TOPIC',
         severity: 'error',
         message: `顺序约束 ${constraint.id} 引用了不存在的主题`,
+      });
+    } else if (
+      constraint.strength === 'hard' &&
+      (orderPosition.get(constraint.beforeTopicId) ?? Number.POSITIVE_INFINITY) >=
+        (orderPosition.get(constraint.afterTopicId) ?? Number.NEGATIVE_INFINITY)
+    ) {
+      issues.push({
+        code: 'ORDER_CONSTRAINT_VIOLATION',
+        severity: 'error',
+        message: `课程顺序违反前置约束：${constraint.beforeTopicId} 必须先于 ${constraint.afterTopicId}`,
       });
     }
   });

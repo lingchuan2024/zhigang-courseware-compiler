@@ -93,6 +93,15 @@ describe('course master note', () => {
     expect(plan[0].framework).toEqual(['C', 'A']);
   });
 
+  it('keeps each first-layer topic as one stable chapter by default', () => {
+    const topics = [topic('a', '线性回归'), topic('b', '偏差方差'), topic('c', '正则化')];
+
+    const plan = planFallbackChapters(topics, ['a', 'b', 'c']);
+
+    expect(plan.map(item => item.topicIds)).toEqual([['a'], ['b'], ['c']]);
+    expect(plan.map(item => item.title)).toEqual(['线性回归', '偏差方差', '正则化']);
+  });
+
   it('uses a readable chapter title instead of joining unrelated first and last topics', () => {
     const topics = [topic('a', '参数模型'), topic('b', '非参数模型'), topic('c', '核方法'), topic('d', 'NW估计量')];
 

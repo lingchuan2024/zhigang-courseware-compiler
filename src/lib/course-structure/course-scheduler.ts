@@ -92,7 +92,9 @@ export function compileCourseOrder(
   });
 
   let hard = valid.filter(constraint => constraint.strength === 'hard');
-  const soft = valid.filter(constraint => constraint.strength === 'soft');
+  const soft = valid
+    .filter(constraint => constraint.strength === 'soft')
+    .sort((left, right) => right.confidence - left.confidence || left.id.localeCompare(right.id));
   const removedConstraintIds: string[] = [];
   while (hasCycle(topics.map(topic => topic.id), hard)) {
     const removable = hard
@@ -116,9 +118,20 @@ export function compileCourseOrder(
     hard = hard.filter(constraint => constraint.id !== removable.id);
   }
 
+  // 软前置同样表达教学顺序，只是在冲突时允许牺牲。按置信度从高到低
+  // 逐条加入无环图，保证可兼容的软关系真正参与拓扑排序，而不是仅作加分项。
+  const acceptedConstraints = [...hard];
+  for (const constraint of soft) {
+    if (edgeBelongsToCycle(constraint, [...acceptedConstraints, constraint])) {
+      removedConstraintIds.push(constraint.id);
+      continue;
+    }
+    acceptedConstraints.push(constraint);
+  }
+
   const indegree = new Map(topics.map(topic => [topic.id, 0]));
   const outgoing = new Map(topics.map(topic => [topic.id, [] as OrderConstraint[]]));
-  hard.forEach(constraint => {
+  acceptedConstraints.forEach(constraint => {
     indegree.set(constraint.afterTopicId, (indegree.get(constraint.afterTopicId) ?? 0) + 1);
     outgoing.get(constraint.beforeTopicId)?.push(constraint);
   });
@@ -128,12 +141,10 @@ export function compileCourseOrder(
   while (orderedTopicIds.length < topics.length) {
     const candidates = topics.filter(topic => !scheduled.has(topic.id) && indegree.get(topic.id) === 0);
     candidates.sort((left, right) => {
-      const leftSoft = soft.filter(edge => edge.afterTopicId === left.id && scheduled.has(edge.beforeTopicId)).length;
-      const rightSoft = soft.filter(edge => edge.afterTopicId === right.id && scheduled.has(edge.beforeTopicId)).length;
-      return rightSoft - leftSoft
-        || IMPORTANCE_RANK[left.importance] - IMPORTANCE_RANK[right.importance]
+      // 无显式依赖时优先保持教师课件顺序；重要性和难度不能把复习基础挪到高级主题之后。
+      return sectionOrder(left, sectionOrderById) - sectionOrder(right, sectionOrderById)
         || left.difficulty - right.difficulty
-        || sectionOrder(left, sectionOrderById) - sectionOrder(right, sectionOrderById)
+        || IMPORTANCE_RANK[left.importance] - IMPORTANCE_RANK[right.importance]
         || left.stableKey.localeCompare(right.stableKey);
     });
 
@@ -141,7 +152,7 @@ export function compileCourseOrder(
     if (!next) break;
     orderedTopicIds.push(next.id);
     scheduled.add(next.id);
-    const incomingReasons = valid
+    const incomingReasons = acceptedConstraints
       .filter(edge => edge.afterTopicId === next.id && scheduled.has(edge.beforeTopicId))
       .map(edge => edge.reason);
     if (incomingReasons.length > 0) explanations[next.id] = incomingReasons.join('；');

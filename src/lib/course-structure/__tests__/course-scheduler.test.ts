@@ -40,6 +40,22 @@ const hard = (
   confidence,
 });
 
+const soft = (
+  id: string,
+  before: string,
+  after: string,
+  confidence = 0.9,
+): OrderConstraint => ({
+  id,
+  beforeTopicId: before,
+  afterTopicId: after,
+  strength: 'soft',
+  reason: `${before} before ${after}`,
+  evidenceIds: [],
+  source: 'inferred',
+  confidence,
+});
+
 describe('course scheduler', () => {
   it('satisfies hard constraints before pedagogical preferences', () => {
     expect(compileCourseOrder(
@@ -47,6 +63,28 @@ describe('course scheduler', () => {
       [hard('r1', 'basic', 'advanced')],
       new Map([['s1', 0]]),
     ).orderedTopicIds).toEqual(['basic', 'advanced']);
+  });
+
+  it('uses acyclic soft prerequisites as real ordering constraints', () => {
+    const result = compileCourseOrder(
+      [topic('advanced', 1, 'core'), topic('basic', 5, 'supplementary')],
+      [soft('r1', 'basic', 'advanced')],
+      new Map([['s1', 0]]),
+    );
+
+    expect(result.orderedTopicIds).toEqual(['basic', 'advanced']);
+    expect(result.removedConstraintIds).toEqual([]);
+  });
+
+  it('drops the weaker conflicting soft prerequisite and keeps the stronger direction', () => {
+    const result = compileCourseOrder(
+      [topic('a', 1), topic('b', 1)],
+      [soft('strong', 'a', 'b', 0.95), soft('weak', 'b', 'a', 0.35)],
+      new Map([['s1', 0]]),
+    );
+
+    expect(result.orderedTopicIds).toEqual(['a', 'b']);
+    expect(result.removedConstraintIds).toEqual(['weak']);
   });
 
   it('removes the weakest inferred edge in a cycle', () => {

@@ -14,6 +14,7 @@ import { saveState, clearState } from '../lib/persistence';
 import { createExampleCourse } from '../lib/examples';
 import { runKnowledgePipeline, type PipelineResultV2 } from '../lib/knowledge-pipeline-v2';
 import { enrichKnowledgeCards } from '../lib/card-enrichment';
+import { evaluateKnowledgeCardDraft } from '../lib/card-quality';
 import { regenerateChapterNote, runMasterNoteGeneration } from '../lib/master-note-generator';
 import { assembleCourseMasterNote, isCompletedMasterNote } from '../lib/course-master-note';
 import { createSourceDocument } from '../lib/markdown-parser';
@@ -168,7 +169,8 @@ function computeReparseUpdate(
       : chapter,
   );
   const hasStaleChapter = chapterNotes.some(chapter => chapter.status !== 'completed');
-  const courseMasterNote = hasStaleChapter && state.courseMasterNote
+  const hasStaleWork = diff.staleTopicIds.length > 0 || diff.newUncoveredBlockCount > 0;
+  const assembledMasterNote = hasStaleChapter && state.courseMasterNote
     ? assembleCourseMasterNote({
         courseId: state.document?.courseId ?? '',
         title: state.courseMasterNote.title,
@@ -180,8 +182,14 @@ function computeReparseUpdate(
         structureVersion: state.knowledgeBaseVersions.topicStructure,
       })
     : state.courseMasterNote;
+  const courseMasterNote = hasStaleWork && assembledMasterNote
+    ? {
+        ...assembledMasterNote,
+        status: 'partial' as const,
+        error: `课件来源已变化，旧笔记仅供参考：${diff.summary}`,
+      }
+    : assembledMasterNote;
 
-  const hasStaleWork = diff.staleTopicIds.length > 0 || diff.newUncoveredBlockCount > 0;
   return {
     sourceDocuments: [parsed],
     mineruParseResult: {
@@ -414,7 +422,13 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   startKnowledgePipeline: async () => {
-    const { sourceDocuments, modelConfig, courseLearningStructure, courseExtractionSession } = get();
+    const {
+      sourceDocuments,
+      modelConfig,
+      courseLearningStructure,
+      courseExtractionSession,
+      staleMarker,
+    } = get();
 
     if (!modelConfig?.apiKey) {
       set({
@@ -517,6 +531,7 @@ export const useStore = create<AppState>((set, get) => ({
         chapterPlan: [],
         chapterNotes: [],
         courseMasterNote: null,
+      staleMarker: usable ? null : staleMarker,
         glossary: result.glossary,
         formulaCards: result.formulaCards,
         unassignedBlocks: result.unassignedBlocks,
@@ -635,20 +650,6 @@ export const useStore = create<AppState>((set, get) => ({
       knowledgeBaseVersions,
     } = state;
 
-    if (!modelConfig?.apiKey) {
-      set({
-        stage: 'notes',
-        job: null,
-        jobStatus: 'blocked',
-        pipelineProgress: blockProgress(
-          createNoteGenerationProgress(knowledgeTopics.length),
-          '请先配置知识生成模型，再生成完整笔记。',
-        ),
-      });
-      saveState(get());
-      return;
-    }
-
     if (knowledgeTopics.length === 0 || knowledgeCards.length === 0) {
       set({
         stage: 'notes',
@@ -657,6 +658,42 @@ export const useStore = create<AppState>((set, get) => ({
         pipelineProgress: failProgress(
           createNoteGenerationProgress(knowledgeTopics.length),
           '缺少知识结构或知识卡片，无法生成完整笔记。',
+        ),
+      });
+      saveState(get());
+      return;
+    }
+
+    if (state.staleMarker) {
+      set({
+        stage: 'notes',
+        job: null,
+        jobStatus: 'blocked',
+        pipelineProgress: blockProgress(
+          createNoteGenerationProgress(knowledgeTopics.length),
+          `课件与知识结构版本不一致：${state.staleMarker.summary}。请先重新编译知识结构和知识卡片。`,
+        ),
+      });
+      saveState(get());
+      return;
+    }
+
+    const invalidCards = knowledgeCards.filter(card => (
+      card.status !== 'completed' || !evaluateKnowledgeCardDraft({
+        teachingType: card.teachingType,
+        title: card.title,
+        detailedNote: card.detailedNote,
+        sourceRangeCount: card.sourceRanges.length,
+      }).accepted
+    ));
+    if (invalidCards.length > 0) {
+      set({
+        stage: 'notes',
+        job: null,
+        jobStatus: 'blocked',
+        pipelineProgress: blockProgress(
+          createNoteGenerationProgress(knowledgeTopics.length),
+          `知识卡片内容不完整：${invalidCards.length}/${knowledgeCards.length} 张未通过正文与原文证据检查。请先重新深化知识卡片。`,
         ),
       });
       saveState(get());
@@ -843,7 +880,7 @@ export const useStore = create<AppState>((set, get) => ({
     const state = get();
     const plan = state.chapterPlan.find(chapter => chapter.id === chapterId);
     const existing = state.chapterNotes.find(chapter => chapter.id === chapterId);
-    if (!plan || !existing || !state.modelConfig?.apiKey) return;
+    if (!plan || !existing) return;
 
     const planIndex = state.chapterPlan.findIndex(chapter => chapter.id === chapterId);
     const previousPlan = planIndex > 0 ? state.chapterPlan[planIndex - 1] : null;

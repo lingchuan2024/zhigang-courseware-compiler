@@ -173,6 +173,33 @@ describe('course structure compiler integration', () => {
     expect(second.structureVersion).toBe(first.structureVersion);
   });
 
+  it('merges duplicate second-layer units inside the same first-layer topic', async () => {
+    const documents = [multiBlockDocument('duplicate', 2)];
+    const result = await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => {
+        const first = { blockId: batch.blocks[0].id, quote: batch.blocks[0].content, role: 'formula' as const };
+        const second = { blockId: batch.blocks[1].id, quote: batch.blocks[1].content, role: 'formula' as const };
+        return {
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          topicMentions: [{
+            localId: `${batch.id}:kernel`, name: '常用核函数', aliases: [], learningObjective: '掌握常用核函数',
+            scope: '核方法', genre: 'concept', difficulty: 2, importance: 'core', evidence: [first, second], confidence: 0.9,
+          }],
+          teachingUnits: [
+            { localId: `${batch.id}:u1`, topicLocalId: `${batch.id}:kernel`, role: 'formula', title: '多项式核公式 (19)', summary: '多项式核', evidence: [first], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:u2`, topicLocalId: `${batch.id}:kernel`, role: 'formula', title: '多项式核公式 (19)', summary: '多项式核', evidence: [second], required: true, confidence: 0.8 },
+          ],
+          orderClaims: [], unresolvedReferences: [], confidence: 0.9,
+        };
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    expect(result.teachingUnits).toHaveLength(1);
+    expect(result.teachingUnits[0].evidenceIds).toHaveLength(2);
+  });
+
   it('reports zero completed batches before the first long model request finishes', async () => {
     const progress: Array<[number, number]> = [];
     await compileCourseStructure(config, [document('d1', '似然函数用于参数估计。')], 'course-1', {
@@ -336,6 +363,7 @@ describe('course structure compiler integration', () => {
 
     expect(reviewCalls).toBe(0);
     expect(result.topics).toHaveLength(1);
+    expect(result.status).toBe('degraded');
     expect(result.validation.issues.some(issue => issue.message.includes('总处理时限'))).toBe(true);
   });
 

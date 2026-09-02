@@ -205,7 +205,8 @@ export function generateCards(
   const cards: KnowledgeCard[] = [];
   const originalIndex = new Map(teachingBlocks.map((block, index) => [block.id, index]));
   const orderedBlocks = topics.flatMap(topic => {
-    const topicBlocks = teachingBlocks.filter(block => block.topicId === topic.id);
+    // 无原文范围的讲解单元不能伪装成“关联课件原文”的知识卡片。
+    const topicBlocks = teachingBlocks.filter(block => block.topicId === topic.id && block.sourceRanges.length > 0);
     const pathOrder = new Map(
       (narrativePaths?.[topic.id]?.orderedTeachingBlockIds ?? []).map((id, index) => [id, index]),
     );
@@ -254,6 +255,11 @@ export function generateCards(
 
     // 提取公式（仅 formula / derivation 类型）
     const formulas = extractFormulas(block, allBlocks);
+    const sourceExcerpt = getBlocksInRange(block.sourceRanges, allBlocks)
+      .map(sourceBlock => sourceBlock.content.trim())
+      .filter(Boolean)
+      .join('\n\n')
+      .slice(0, 3000);
 
     // 提取误区（仅 misconception 类型）
     const misconceptions =
@@ -271,6 +277,7 @@ export function generateCards(
       title: block.title,
       conciseSummary: block.summary,
       detailedNote: block.detailedExplanation || block.summary,
+      sourceExcerpt,
       sourceRanges: block.sourceRanges,
       keywords,
       aliases: topic.aliases,

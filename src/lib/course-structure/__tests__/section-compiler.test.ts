@@ -123,6 +123,7 @@ describe('unified section compiler', () => {
     const prompt = buildSectionCompilerPrompt(batch);
     expect(prompt.dynamicInput).toContain('b1');
     expect(prompt.system).toContain('beforeTopicLocalId');
+    expect(prompt.stablePrefix).toContain('summary');
     expect(prompt.promptVersion).toBe('course-section-v3');
     expect((prompt as { maxOutputTokens?: number }).maxOutputTokens).toBe(8192);
     expect((prompt as { reasoningEffort?: string }).reasoningEffort).toBe('minimal');

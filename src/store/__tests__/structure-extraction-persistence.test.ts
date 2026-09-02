@@ -65,6 +65,12 @@ beforeEach(() => {
 describe('startKnowledgePipeline persistence', () => {
   it('stores and mirrors a degraded canonical structure as a usable result', async () => {
     seedExtractable();
+    useStore.setState({
+      staleMarker: {
+        reason: 'source-reparsed', affectedTopicIds: [], affectedPackageIds: [], timestamp: 1,
+        summary: '新增内容尚未覆盖',
+      },
+    });
     const canonical: CourseLearningStructure = {
       courseId: 'course-1', sourceVersion: 1, structureVersion: 1, compilerVersion: 'v1',
       topics: [], teachingUnits: [], evidenceSpans: [], orderConstraints: [], orderedTopicIds: [],
@@ -114,6 +120,7 @@ describe('startKnowledgePipeline persistence', () => {
     expect(useStore.getState().courseLearningStructure).toBe(canonical);
     expect(useStore.getState().knowledgePipelineStatus).toBe('degraded');
     expect(useStore.getState().jobStatus).toBe('completed');
+    expect(useStore.getState().staleMarker).toBeNull();
     expect(useStore.getState().structureQuality?.qualityIssues).toEqual(['一个章节批次失败']);
     const mirrored = mirrors.saveLibraryProjectSnapshot.mock.calls.at(-1)?.[2] as Record<string, unknown>;
     expect(mirrored.courseLearningStructure).toEqual(canonical);

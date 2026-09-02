@@ -34,7 +34,7 @@ function dedupeAdjacentMarkdown(markdown: string): string {
 export function planFallbackChapters(
   topics: KnowledgeTopic[],
   orderedTopicIds: string[],
-  maxTopicsPerChapter = 4,
+  maxTopicsPerChapter = 1,
 ): ChapterPlanItem[] {
   const byId = new Map(topics.map(topic => [topic.id, topic]));
   const seen = new Set<string>();

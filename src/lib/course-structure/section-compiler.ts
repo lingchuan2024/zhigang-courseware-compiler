@@ -126,6 +126,7 @@ export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt 
         topicLocalId: 'string，所属 topics[].localId',
         role: 'teachingRoles 之一',
         title: 'string，简短标签',
+        summary: 'string，必须概括原文中这个教学单元的实际内容，不能重复 title',
         evidence: 'anchorItem[]，至少 1 条',
         required: 'boolean',
       }],

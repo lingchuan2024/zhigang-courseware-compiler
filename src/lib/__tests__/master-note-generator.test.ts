@@ -38,7 +38,7 @@ function input(topicCount = 2) {
 }
 
 describe('master note generator', () => {
-  it('uses deterministic synthesis and chapter planning so the model is called only for chapters', async () => {
+  it('assembles the two-layer note deterministically without another model round trip', async () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = vi.fn(async request => {
       requests.push(request);
@@ -47,56 +47,34 @@ describe('master note generator', () => {
 
     const result = await runMasterNoteGeneration(config, input(5), {}, completer);
 
-    expect(requests).toHaveLength(2);
-    expect(requests.every(request => request.kind === 'chapter-note')).toBe(true);
+    expect(requests).toHaveLength(0);
     expect(result.topicSyntheses).toHaveLength(5);
     expect(result.topicSyntheses.every(item => item.status === 'completed')).toBe(true);
     expect(result.chapterPlan.flatMap(chapter => chapter.topicIds)).toEqual([
       'topic-1', 'topic-2', 'topic-3', 'topic-4', 'topic-5',
     ]);
+    expect(result.chapterPlan.map(chapter => chapter.topicIds)).toEqual([
+      ['topic-1'], ['topic-2'], ['topic-3'], ['topic-4'], ['topic-5'],
+    ]);
     expect(result.masterNote.status).toBe('completed');
   });
 
-  it('sends compact chapter material without duplicating synthesis markdown', async () => {
-    const requests: MasterNoteGenerationRequest[] = [];
-    const completer: MasterNoteCompleter = async request => {
-      requests.push(request);
-      return { overview: '第一章导语', transitions: {} };
-    };
+  it('publishes one chapter per first-layer topic in callback order', async () => {
+    const completed: string[] = [];
+    const result = await runMasterNoteGeneration(config, input(4), {
+      onChapter: chapter => completed.push(chapter.id),
+    });
 
-    await runMasterNoteGeneration(config, input(1), {}, completer);
-
-    expect(requests[0].user).toContain('card-1摘要');
-    expect(requests[0].user).not.toContain('原始细节-1');
-    expect(requests[0].user).toContain('课程固定章节顺序');
-    expect(requests[0].user).not.toContain('本章一级知识综合');
-    expect(requests[0].user).not.toContain('sections');
-    expect(requests[0].system).toContain('只返回 JSON：{ overview, transitions }');
+    expect(completed).toEqual(['chapter-1', 'chapter-2', 'chapter-3', 'chapter-4']);
+    expect(result.chapterNotes.map(chapter => chapter.id)).toEqual(completed);
   });
 
-  it('runs at most two chapter requests concurrently and returns chapters in plan order', async () => {
-    let active = 0;
-    let maxActive = 0;
-    const completer: MasterNoteCompleter = async request => {
-      active += 1;
-      maxActive = Math.max(maxActive, active);
-      await new Promise(resolve => setTimeout(resolve, request.subjectId === 'chapter-1' ? 15 : 2));
-      active -= 1;
-      return { overview: `${request.subjectId}导语`, transitions: {} };
-    };
-
-    const result = await runMasterNoteGeneration(config, input(12), {}, completer);
-
-    expect(maxActive).toBe(2);
-    expect(result.chapterNotes.map(chapter => chapter.id)).toEqual(['chapter-1', 'chapter-2', 'chapter-3']);
-  });
-
-  it('reuses completed checkpoint chapters and calls the model only for unfinished chapters', async () => {
+  it('reuses a matching completed checkpoint and locally assembles unfinished chapters', async () => {
     const base = input(8);
     const checkpoint: ChapterNote = {
       id: 'chapter-1', title: '旧标题不影响复用', objective: '旧目标',
-      topicIds: ['topic-1', 'topic-2', 'topic-3', 'topic-4'], framework: [],
-      markdown: '## 已完成章节\n\n保留正文', sourceCardIds: ['card-1', 'card-2', 'card-3', 'card-4'],
+      topicIds: ['topic-1'], framework: [],
+      markdown: '## 已完成章节\n\n保留正文', sourceCardIds: ['card-1'],
       status: 'completed', retryCount: 0,
     };
     const requests: MasterNoteGenerationRequest[] = [];
@@ -107,12 +85,13 @@ describe('master note generator', () => {
 
     const result = await runMasterNoteGeneration(config, { ...base, resumeChapterNotes: [checkpoint] }, {}, completer);
 
-    expect(requests.map(request => request.subjectId)).toEqual(['chapter-2']);
+    expect(requests).toEqual([]);
     expect(result.chapterNotes[0].markdown).toContain('保留正文');
     expect(result.chapterNotes[0].title).toBe(result.chapterPlan[0].title);
+    expect(result.chapterNotes[1].markdown).toContain('原始细节-2');
   });
 
-  it('falls back to locally assembled chapters and stops further AI enhancement after a failed batch', async () => {
+  it('is unaffected when the injected model completer would time out', async () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = async request => {
       requests.push(request);
@@ -121,11 +100,10 @@ describe('master note generator', () => {
 
     const result = await runMasterNoteGeneration(config, input(12), {}, completer);
 
-    expect(requests).toHaveLength(2);
-    expect(result.chapterNotes).toHaveLength(3);
+    expect(requests).toHaveLength(0);
+    expect(result.chapterNotes).toHaveLength(12);
     expect(result.chapterNotes.every(chapter => chapter.status === 'completed')).toBe(true);
-    expect(result.chapterNotes[2].error).toContain('已停止后续 AI 增强');
-    expect(result.chapterNotes[2].markdown).toContain('原始细节-9');
+    expect(result.chapterNotes[8].markdown).toContain('原始细节-9');
     expect(result.masterNote.status).toBe('completed');
   });
 
@@ -138,15 +116,16 @@ describe('master note generator', () => {
     expect(prompt.maxTransportAttempts).toBe(1);
   });
 
-  it('uses a complete local chapter when the AI enhancement response is empty', async () => {
+  it('uses complete local chapters without consuming an empty model response', async () => {
     const completer: MasterNoteCompleter = async request => request.subjectId === 'chapter-1'
       ? { overview: '第一章导语', transitions: {} }
       : {};
 
     const result = await runMasterNoteGeneration(config, input(8), {}, completer);
 
-    expect(result.chapterNotes.map(chapter => chapter.status)).toEqual(['completed', 'completed']);
-    expect(result.chapterNotes[1].error).toContain('AI 章节衔接为空');
+    expect(result.chapterNotes).toHaveLength(8);
+    expect(result.chapterNotes.every(chapter => chapter.status === 'completed')).toBe(true);
+    expect(result.chapterNotes.every(chapter => !chapter.error)).toBe(true);
     expect(result.masterNote.status).toBe('completed');
     expect(result.masterNote.markdown).toContain('原始细节-8');
     expect(result.masterNote.coverage.missingCardIds).toEqual([]);
@@ -173,11 +152,11 @@ describe('master note generator', () => {
       },
     }, {}, completer);
 
-    expect(requests[0].user.indexOf('card-b')).toBeLessThan(requests[0].user.indexOf('card-a'));
     expect(result.topicSyntheses[0].orderedCardIds).toEqual(['card-b', 'card-a']);
+    expect(result.chapterNotes[0].markdown.indexOf('card-b')).toBeLessThan(result.chapterNotes[0].markdown.indexOf('card-a'));
   });
 
-  it('combines a short AI overview with the complete local card content', async () => {
+  it('uses the learning objective as a source-backed chapter overview', async () => {
     const completer: MasterNoteCompleter = async () => ({
       overview: '本章先建立直觉，再进入公式。',
       transitions: ['下面进入第一个知识主题。'],
@@ -185,8 +164,8 @@ describe('master note generator', () => {
 
     const result = await runMasterNoteGeneration(config, input(1), {}, completer);
 
-    expect(result.chapterNotes[0].markdown).toContain('本章先建立直觉');
-    expect(result.chapterNotes[0].markdown).toContain('下面进入第一个知识主题');
+    expect(result.chapterNotes[0].markdown).toContain('理解知识1');
+    expect(result.chapterNotes[0].markdown).not.toContain('本章先建立直觉');
     expect(result.chapterNotes[0].markdown).toContain('原始细节-1');
   });
 });

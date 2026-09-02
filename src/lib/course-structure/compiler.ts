@@ -7,7 +7,7 @@ import { resolveEvidenceSpan } from './evidence-span';
 import { preserveCorrectedObjects } from './incremental-reconcile';
 import { buildSectionBatches, type SectionBatch } from './section-batching';
 import { compileSectionBatch } from './section-compiler';
-import { constraintStableKey, teachingUnitStableKey } from './stable-identity';
+import { constraintStableKey, normalizeStableText, teachingUnitStableKey } from './stable-identity';
 import { compileTeachingPath } from './teaching-path-compiler';
 import type {
   CourseLearningStructure,
@@ -175,21 +175,22 @@ function applyCurriculumOperations(
 }
 
 function dedupeTeachingUnits(units: TeachingUnit[]): TeachingUnit[] {
-  const byId = new Map<string, TeachingUnit>();
+  const bySemanticIdentity = new Map<string, TeachingUnit>();
   units.forEach(unit => {
-    const existing = byId.get(unit.id);
+    const key = `${unit.topicId}:${unit.role}:${normalizeStableText(unit.title)}`;
+    const existing = bySemanticIdentity.get(key);
     if (!existing) {
-      byId.set(unit.id, unit);
+      bySemanticIdentity.set(key, unit);
       return;
     }
-    byId.set(unit.id, {
+    bySemanticIdentity.set(key, {
       ...(existing.confidence >= unit.confidence ? existing : unit),
       evidenceIds: unionInOrder(existing.evidenceIds, unit.evidenceIds),
       required: existing.required || unit.required,
       confidence: Math.max(existing.confidence, unit.confidence),
     });
   });
-  return [...byId.values()].sort((left, right) => left.stableKey.localeCompare(right.stableKey));
+  return [...bySemanticIdentity.values()].sort((left, right) => left.stableKey.localeCompare(right.stableKey));
 }
 
 function dedupeConstraints(constraints: OrderConstraint[]): OrderConstraint[] {
@@ -414,7 +415,7 @@ export async function compileCourseStructure(
     if (remainingReviewMs === 0) {
       issues.push({
         code: 'CURRICULUM_REVIEW_FAILED',
-        severity: 'warning',
+        severity: 'error',
         message: '已达到总处理时限，跳过课程级审查并使用确定性结果继续编译',
       });
     } else {
@@ -428,7 +429,7 @@ export async function compileCourseStructure(
       } catch {
         issues.push({
           code: 'CURRICULUM_REVIEW_FAILED',
-          severity: 'warning',
+          severity: 'error',
           message: '课程级审查失败，已使用确定性结果继续编译',
         });
       }

@@ -40,6 +40,8 @@ const MARKDOWN_V2_REVISED = MARKDOWN_V1.replace(
   '似然函数 L(θ) = p(D|θ)，即联合概率密度。',
 );
 
+const MARKDOWN_V2_ADDED = `${MARKDOWN_V1}\n\n## 3. 贝叶斯估计\n\n贝叶斯估计结合先验分布与似然函数。\n`;
+
 function buildProject(markdown: string) {
   const doc = createSourceDocument(markdown, 'course-rp', '概率模型基础');
   const ordered = [...doc.blocks].sort((a, b) => a.orderIndex - b.orderIndex);
@@ -210,5 +212,23 @@ describe('MinerU 重解析增量保留', () => {
     expect(state.courseMasterNote?.status).toBe('completed');
     // 版本计数推进（内容来源已更新）
     expect(state.knowledgeBaseVersions.source).toBe(2);
+  });
+
+  it('有新增未覆盖内容时把旧完整笔记降级为 partial', async () => {
+    const project = buildProject(MARKDOWN_V1);
+    useStore.setState({
+      ...project,
+      stage: 'document', job: null, jobStatus: 'idle', staleMarker: null, mineruParseResult: null,
+      modelConfig: null,
+      mineruConfig: { apiKey: 'mineru-key', endpoint: 'https://mineru.net/api/v4', modelVersion: 'vlm', language: 'chinese', enableFormula: true, enableTable: true },
+    });
+    sourceMock.loadDocumentSource.mockResolvedValue(new ArrayBuffer(8));
+    mineruMock.runMinerUParse.mockResolvedValue({ markdown: MARKDOWN_V2_ADDED, assets: [] });
+
+    await useStore.getState().startMinerUParse();
+
+    const state = useStore.getState();
+    expect(state.staleMarker?.summary).toContain('新增内容块');
+    expect(state.courseMasterNote?.status).toBe('partial');
   });
 });

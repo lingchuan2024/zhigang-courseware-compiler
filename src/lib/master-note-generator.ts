@@ -12,7 +12,6 @@ import type {
   TopicRelation,
   TopicSynthesis,
 } from '../types';
-import { callChatCompletion } from './model-v2';
 import { normalizeGeneratedMarkdown } from './markdown-normalization';
 import { validateGeneratedMarkdown } from './markdown-validation';
 import type { CompiledPrompt } from './prompt-builder';
@@ -69,22 +68,6 @@ export interface RegenerateChapterNoteInput {
   terminology: Record<string, unknown>;
   symbols: Record<string, unknown>;
   previousRetryCount: number;
-}
-
-const MAX_CONCURRENT_CHAPTERS = 2;
-
-const CHAPTER_NOTE_SYSTEM = [
-  '你只负责为已经确定内容的课程章节生成简短导语和知识主题之间的过渡语，不负责生成整章正文。',
-  '章节和一级知识顺序已经固定，不得重新规划、遗漏或重复一级知识。',
-  'overview 不超过 300 个中文字符，只说明本章目标、主线和各主题关系。',
-  'transitions 是以 topicId 为键的对象，每条不超过 100 个中文字符；只写承上启下的话，不复述知识正文。',
-  '不得补充新的知识事实，不得输出 Markdown 正文；只返回 JSON：{ overview, transitions }。',
-].join('\n');
-
-function record(value: unknown): Record<string, unknown> {
-  return value && typeof value === 'object' && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : {};
 }
 
 function normalizeMarkdown(markdown: string): string {
@@ -151,55 +134,6 @@ function deterministicSynthesis(topic: KnowledgeTopic, cards: KnowledgeCard[]): 
   };
 }
 
-function chapterEnhancementMaterials(
-  plan: ChapterPlanItem,
-  syntheses: TopicSynthesis[],
-  knowledgeCards: KnowledgeCard[],
-): Array<Record<string, unknown>> {
-  const synthesisByTopic = new Map(syntheses.map(item => [item.topicId, item]));
-  const cardsById = new Map(knowledgeCards.map(item => [item.id, item]));
-
-  return plan.topicIds.map(topicId => {
-    const synthesis = synthesisByTopic.get(topicId);
-    const cards = (synthesis?.orderedCardIds ?? [])
-      .map(cardId => cardsById.get(cardId))
-      .filter((card): card is KnowledgeCard => Boolean(card));
-    return {
-      topicId,
-      topicName: cards[0]?.topicName ?? topicId,
-      framework: synthesis?.framework ?? cards.map(card => card.title),
-      cards: cards.map(card => ({
-        id: card.id,
-        title: card.title,
-        type: card.teachingType,
-        summary: card.conciseSummary.slice(0, 300),
-      })),
-    };
-  });
-}
-
-interface ChapterEnhancement {
-  overview: string;
-  transitions: Record<string, string>;
-}
-
-function parseChapterEnhancement(value: unknown, topicIds: string[]): ChapterEnhancement | null {
-  const data = record(value);
-  const overview = typeof data.overview === 'string' ? data.overview.trim() : '';
-  const transitions = Array.isArray(data.transitions)
-    ? Object.fromEntries(data.transitions.flatMap((transition, index) =>
-        typeof transition === 'string' && transition.trim() && topicIds[index]
-          ? [[topicIds[index], transition.trim()]]
-          : [],
-      ))
-    : Object.fromEntries(
-        Object.entries(record(data.transitions))
-          .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim().length > 0)
-          .map(([topicId, transition]) => [topicId, transition.trim()]),
-      );
-  return overview || Object.keys(transitions).length > 0 ? { overview, transitions } : null;
-}
-
 function listSection(title: string, values: string[] | undefined): string[] {
   const items = values?.map(value => value.trim()).filter(Boolean) ?? [];
   return items.length > 0 ? [`**${title}**`, ...items.map(value => `- ${value}`)] : [];
@@ -216,7 +150,6 @@ function localChapterMarkdown(
   plan: ChapterPlanItem,
   syntheses: TopicSynthesis[],
   knowledgeCards: KnowledgeCard[],
-  enhancement?: ChapterEnhancement | null,
 ): string {
   const synthesisByTopic = new Map(syntheses.map(item => [item.topicId, item]));
   const cardsById = new Map(knowledgeCards.map(item => [item.id, item]));
@@ -226,9 +159,7 @@ function localChapterMarkdown(
       .map(cardId => cardsById.get(cardId))
       .filter((card): card is KnowledgeCard => Boolean(card));
     const topicName = cards[0]?.topicName ?? plan.framework[topicIndex] ?? topicId;
-    const transition = enhancement?.transitions[topicId];
     return [
-      transition ? `> ${transition}` : '',
       `### ${topicName}`,
       synthesis?.framework.length
         ? `**本节路径：** ${synthesis.framework.join(' → ')}`
@@ -246,39 +177,10 @@ function localChapterMarkdown(
   });
   return normalizeMarkdown([
     `## ${plan.title}`,
-    enhancement?.overview || plan.objective,
+    plan.objective,
     plan.framework.length > 0 ? `### 本章框架\n\n${plan.framework.map(item => `- ${item}`).join('\n')}` : '',
     ...body,
   ].filter(Boolean).join('\n\n'));
-}
-
-function chapterRequest(
-  title: string,
-  plan: ChapterPlanItem,
-  chapterPlan: ChapterPlanItem[],
-  syntheses: TopicSynthesis[],
-  knowledgeCards: KnowledgeCard[],
-  terminology: Record<string, unknown>,
-  symbols: Record<string, unknown>,
-): MasterNoteGenerationRequest {
-  const chapterIndex = chapterPlan.findIndex(chapter => chapter.id === plan.id);
-  const adjacent = chapterPlan
-    .slice(Math.max(0, chapterIndex - 1), chapterIndex + 2)
-    .map(chapter => ({ id: chapter.id, title: chapter.title, objective: chapter.objective, topicIds: chapter.topicIds }));
-  return {
-    kind: 'chapter-note',
-    subjectId: plan.id,
-    system: CHAPTER_NOTE_SYSTEM,
-    user: [
-      `课程：${title}`,
-      `课程固定章节顺序：${JSON.stringify(chapterPlan.map(chapter => ({ id: chapter.id, title: chapter.title, topicIds: chapter.topicIds })))}`,
-      `当前章节及相邻章节：${JSON.stringify(adjacent)}`,
-      `当前章节：${JSON.stringify({ title: plan.title, objective: plan.objective, framework: plan.framework })}`,
-      `本章主题摘要：${JSON.stringify(chapterEnhancementMaterials(plan, syntheses, knowledgeCards))}`,
-      `全局术语表：${JSON.stringify(terminology)}`,
-      `全局符号表：${JSON.stringify(symbols)}`,
-    ].join('\n\n'),
-  };
 }
 
 export function buildMasterNotePrompt(request: MasterNoteGenerationRequest): CompiledPrompt {
@@ -298,19 +200,6 @@ export function buildMasterNotePrompt(request: MasterNoteGenerationRequest): Com
   };
 }
 
-function buildModelCompleter(config: ModelConfig): MasterNoteCompleter {
-  return async request => {
-    const { data } = await callChatCompletion<unknown>(
-      config,
-      buildMasterNotePrompt(request),
-      'note-generation',
-      30_000,
-      request.subjectId,
-    );
-    return data;
-  };
-}
-
 function sameStrings(left: string[], right: string[]): boolean {
   return left.length === right.length && left.every((value, index) => value === right[index]);
 }
@@ -327,69 +216,29 @@ function reusableChapter(
   return { ...checkpoint, ...plan, sourceCardIds };
 }
 
-async function generateChapter(
-  complete: MasterNoteCompleter,
-  request: MasterNoteGenerationRequest,
-  plan: ChapterPlanItem,
-  syntheses: TopicSynthesis[],
-  knowledgeCards: KnowledgeCard[],
-  sourceCardIds: string[],
-  retryCount: number,
-): Promise<ChapterNote> {
-  let enhancement: ChapterEnhancement | null = null;
-  let enhancementError: string | undefined;
-  try {
-    enhancement = parseChapterEnhancement(await complete(request), plan.topicIds);
-    if (!enhancement) enhancementError = 'AI 章节衔接为空，已使用本地完整正文';
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    enhancementError = `AI 章节衔接失败，已使用本地完整正文：${message}`;
-  }
-  return {
-    ...plan,
-    markdown: localChapterMarkdown(plan, syntheses, knowledgeCards, enhancement),
-    sourceCardIds,
-    status: 'completed',
-    error: enhancementError,
-    retryCount,
-  };
-}
-
 export async function regenerateChapterNote(
-  config: ModelConfig,
+  _config: ModelConfig | null,
   input: RegenerateChapterNoteInput,
-  injectedCompleter?: MasterNoteCompleter,
+  _injectedCompleter?: MasterNoteCompleter,
 ): Promise<ChapterNote> {
   const sourceCardIds = input.plan.topicIds.flatMap(topicId =>
     input.syntheses.find(synthesis => synthesis.topicId === topicId)?.orderedCardIds ?? [],
   );
-  const request = chapterRequest(
-    '课程完整笔记',
-    input.plan,
-    [input.plan],
-    input.syntheses,
-    input.knowledgeCards,
-    input.terminology,
-    input.symbols,
-  );
-  return generateChapter(
-    injectedCompleter ?? buildModelCompleter(config),
-    request,
-    input.plan,
-    input.syntheses,
-    input.knowledgeCards,
+  return {
+    ...input.plan,
+    markdown: localChapterMarkdown(input.plan, input.syntheses, input.knowledgeCards),
     sourceCardIds,
-    input.previousRetryCount + 1,
-  );
+    status: 'completed',
+    retryCount: input.previousRetryCount + 1,
+  };
 }
 
 export async function runMasterNoteGeneration(
-  config: ModelConfig,
+  _config: ModelConfig | null,
   input: MasterNoteGenerationInput,
   callbacks: MasterNoteGenerationCallbacks = {},
-  injectedCompleter?: MasterNoteCompleter,
+  _injectedCompleter?: MasterNoteCompleter,
 ): Promise<MasterNoteGenerationResult> {
-  const complete = injectedCompleter ?? buildModelCompleter(config);
   const topics = orderedTopics(input);
   const topicSyntheses = topics.map((topic, index) => {
     const synthesis = deterministicSynthesis(topic, orderedCardsForTopic(input, topic.id));
@@ -403,73 +252,29 @@ export async function runMasterNoteGeneration(
   callbacks.onPlan?.(chapterPlan);
 
   const synthesisByTopic = new Map(topicSyntheses.map(synthesis => [synthesis.topicId, synthesis]));
-  const chapterNotes: ChapterNote[] = new Array(chapterPlan.length);
-  const pendingIndices: number[] = [];
-  let completedCount = 0;
-
+  const chapterNotes: ChapterNote[] = [];
   chapterPlan.forEach((plan, index) => {
     const sourceCardIds = plan.topicIds.flatMap(topicId => synthesisByTopic.get(topicId)?.orderedCardIds ?? []);
     const checkpoint = reusableChapter(plan, sourceCardIds, input.resumeChapterNotes);
     if (checkpoint) {
-      chapterNotes[index] = checkpoint;
-      completedCount += 1;
-      callbacks.onChapter?.(checkpoint, completedCount, chapterPlan.length);
-    } else {
-      pendingIndices.push(index);
+      chapterNotes.push(checkpoint);
+      callbacks.onChapter?.(checkpoint, index + 1, chapterPlan.length);
+      return;
     }
+    callbacks.onChapterStart?.(plan, index + 1, chapterPlan.length);
+    const syntheses = plan.topicIds
+      .map(topicId => synthesisByTopic.get(topicId))
+      .filter((value): value is TopicSynthesis => Boolean(value));
+    const chapter: ChapterNote = {
+      ...plan,
+      markdown: localChapterMarkdown(plan, syntheses, input.knowledgeCards),
+      sourceCardIds,
+      status: 'completed',
+      retryCount: input.resumeChapterNotes?.find(item => item.id === plan.id)?.retryCount ?? 0,
+    };
+    chapterNotes.push(chapter);
+    callbacks.onChapter?.(chapter, index + 1, chapterPlan.length);
   });
-
-  for (let offset = 0; offset < pendingIndices.length; offset += MAX_CONCURRENT_CHAPTERS) {
-    const batchIndices = pendingIndices.slice(offset, offset + MAX_CONCURRENT_CHAPTERS);
-    batchIndices.forEach(index => callbacks.onChapterStart?.(chapterPlan[index], index + 1, chapterPlan.length));
-    const batch = await Promise.all(batchIndices.map(index => {
-      const plan = chapterPlan[index];
-      const syntheses = plan.topicIds
-        .map(topicId => synthesisByTopic.get(topicId))
-        .filter((value): value is TopicSynthesis => Boolean(value));
-      const sourceCardIds = syntheses.flatMap(synthesis => synthesis.orderedCardIds);
-      const previousRetryCount = input.resumeChapterNotes?.find(chapter => chapter.id === plan.id)?.retryCount ?? 0;
-      return generateChapter(
-        complete,
-        chapterRequest(input.title, plan, chapterPlan, syntheses, input.knowledgeCards, input.terminology, input.symbols),
-        plan,
-        syntheses,
-        input.knowledgeCards,
-        sourceCardIds,
-        previousRetryCount,
-      );
-    }));
-
-    batch.forEach((chapter, batchIndex) => {
-      chapterNotes[batchIndices[batchIndex]] = chapter;
-      completedCount += 1;
-      callbacks.onChapter?.(chapter, completedCount, chapterPlan.length);
-    });
-
-    if (batch.every(chapter => Boolean(chapter.error)) && offset + MAX_CONCURRENT_CHAPTERS < pendingIndices.length) {
-      const lastError = batch[batch.length - 1]?.error ?? 'AI 章节衔接连续失败';
-      const unscheduled = pendingIndices.slice(offset + MAX_CONCURRENT_CHAPTERS);
-      unscheduled.forEach(index => {
-        const plan = chapterPlan[index];
-        const syntheses = plan.topicIds
-          .map(topicId => synthesisByTopic.get(topicId))
-          .filter((value): value is TopicSynthesis => Boolean(value));
-        const sourceCardIds = syntheses.flatMap(synthesis => synthesis.orderedCardIds);
-        const chapter: ChapterNote = {
-          ...plan,
-          markdown: localChapterMarkdown(plan, syntheses, input.knowledgeCards),
-          sourceCardIds,
-          status: 'completed',
-          error: `前一批 AI 章节衔接全部失败，已停止后续 AI 增强并使用本地完整正文。最后错误：${lastError}`,
-          retryCount: input.resumeChapterNotes?.find(item => item.id === plan.id)?.retryCount ?? 0,
-        };
-        chapterNotes[index] = chapter;
-        completedCount += 1;
-        callbacks.onChapter?.(chapter, completedCount, chapterPlan.length);
-      });
-      break;
-    }
-  }
 
   const masterNote = assembleCourseMasterNote({
     courseId: input.courseId,

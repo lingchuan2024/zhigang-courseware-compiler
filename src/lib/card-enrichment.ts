@@ -189,6 +189,7 @@ async function enrichOne(
     let detailedNote = prepareGeneratedMarkdown(sanitizeText(data.detailedNote ?? ''));
     let quality = evaluateKnowledgeCardDraft({
       teachingType: teachingBlock.type,
+      title: card.title,
       detailedNote,
       sourceRangeCount: card.sourceRanges.length,
     });
@@ -206,6 +207,7 @@ async function enrichOne(
       detailedNote = prepareGeneratedMarkdown(sanitizeText(data.detailedNote ?? ''));
       quality = evaluateKnowledgeCardDraft({
         teachingType: teachingBlock.type,
+        title: card.title,
         detailedNote,
         sourceRangeCount: card.sourceRanges.length,
       });
@@ -231,7 +233,13 @@ async function enrichOne(
     };
   } catch (error) {
     console.warn(`知识卡片深化失败（${card.title}）:`, error);
-    if (card.status === 'completed' && card.detailedNote.trim()) {
+    const existingQuality = evaluateKnowledgeCardDraft({
+      teachingType: card.teachingType,
+      title: card.title,
+      detailedNote: card.detailedNote,
+      sourceRangeCount: card.sourceRanges.length,
+    });
+    if (card.status === 'completed' && existingQuality.accepted) {
       return {
         card: { ...card, sourceExcerpt: excerpt },
         failed: true,

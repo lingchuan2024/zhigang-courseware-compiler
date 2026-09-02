@@ -45,6 +45,24 @@ describe('course structure validator', () => {
     })).status).toBe('degraded');
   });
 
+  it('degrades when any second-layer teaching unit cannot be traced to source evidence', () => {
+    expect(validateCourseStructure(input({
+      teachingUnits: [{ ...unit, required: false, evidenceIds: [] }],
+    })).status).toBe('degraded');
+  });
+
+  it('degrades when the published order violates a prerequisite constraint', () => {
+    const second = { ...topic, id: 't2', stableKey: 't2', name: '高级主题' };
+    expect(validateCourseStructure(input({
+      topics: [topic, second],
+      orderedTopicIds: ['t2', 't1'],
+      orderConstraints: [{
+        id: 'r1', beforeTopicId: 't1', afterTopicId: 't2', strength: 'hard', reason: '前置',
+        evidenceIds: ['e1'], source: 'explicit', confidence: 1,
+      }],
+    })).status).toBe('degraded');
+  });
+
   it('degrades on unresolved corrected hard cycles', () => {
     expect(validateCourseStructure(input({
       schedulerIssues: [{ code: 'HARD_ORDER_CYCLE', severity: 'error', message: 'cycle' }],
