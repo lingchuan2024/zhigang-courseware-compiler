@@ -142,11 +142,15 @@ function deriveSections(document: SourceDocument): SectionSlice[] {
   return result;
 }
 
-function splitOversizedSection(section: SectionSlice, maxTokens: number): SectionSlice[] {
+function splitOversizedSection(
+  section: SectionSlice,
+  maxTokens: number,
+  maxAtomTokens: number,
+): SectionSlice[] {
   const parts: SectionSlice[] = [];
   let current: SectionBatchBlock[] = [];
   let currentTokens = 0;
-  section.blocks.flatMap(block => atomizeOversizedBlock(block, maxTokens)).forEach(block => {
+  section.blocks.flatMap(block => atomizeOversizedBlock(block, maxAtomTokens)).forEach(block => {
     const blockTokens = estimateTokens(block.content);
     if (current.length > 0 && currentTokens + blockTokens > maxTokens) {
       parts.push({ id: section.id, blocks: current });
@@ -183,12 +187,14 @@ function toBatch(document: SourceDocument, parts: SectionSlice[], batchIndex: nu
 export function buildSectionBatches(
   documents: SourceDocument[],
   maxTokens = 6000,
+  maxAtomTokens = maxTokens,
 ): SectionBatch[] {
   const safeLimit = Math.max(1, maxTokens);
+  const safeAtomLimit = Math.max(1, Math.min(safeLimit, maxAtomTokens));
   const batches: SectionBatch[] = [];
   documents.forEach(document => {
     const parts = deriveSections(document)
-      .flatMap(section => splitOversizedSection(section, safeLimit));
+      .flatMap(section => splitOversizedSection(section, safeLimit, safeAtomLimit));
     let pending: SectionSlice[] = [];
     let pendingTokens = 0;
     let documentBatchIndex = 0;

@@ -33,7 +33,7 @@ export interface CourseCompilerDependencies {
   onUnitCheckpoint?: (checkpoint: CourseExtractionUnitCheckpoint) => void;
   onExtractionProgress?: (progress: CourseExtractionProgress) => void;
   resumeCheckpoints?: CourseExtractionUnitCheckpoint[];
-  /** 默认只允许前台语义识别启动 60 秒；课程合并与校验另有固定预算。 */
+  /** 覆盖当前模型配置对应的前台语义识别启动预算。 */
   foregroundBudgetMs?: number;
   totalBudgetMs?: number;
   concurrency?: number;
@@ -54,6 +54,38 @@ interface ResolvedClaimDraft {
   evidenceIds: string[];
   source: 'explicit' | 'inferred';
   confidence: number;
+}
+
+interface CompilerRuntimeProfile {
+  batchTokens: number;
+  atomTokens: number;
+  concurrency: number;
+  foregroundBudgetMs: number;
+  totalBudgetMs: number;
+}
+
+function runtimeProfile(config: ModelConfig): CompilerRuntimeProfile {
+  if (config.apiMode === 'responses') {
+    return {
+      // Agent Plan 的 GLM 有固定推理开销。继续使用 1000-token 小请求会让
+      // 推理开销和排队时间被重复支付；3000 仍保持输入有界，同时把典型
+      // 课件的请求数量压缩到原来的约三分之一。
+      batchTokens: 3000,
+      atomTokens: 1000,
+      // Agent Plan 同一 Token 的第三路并发容易排队到客户端截止时间。
+      concurrency: 2,
+      // 单请求允许 120 秒，因此全局调度不能在 60/90 秒提前中止它。
+      foregroundBudgetMs: 120_000,
+      totalBudgetMs: 150_000,
+    };
+  }
+  return {
+    batchTokens: 1000,
+    atomTokens: 1000,
+    concurrency: 3,
+    foregroundBudgetMs: 60_000,
+    totalBudgetMs: 90_000,
+  };
 }
 
 async function mapConcurrent<T, R>(
@@ -196,8 +228,10 @@ export async function compileCourseStructure(
   dependencies: CourseCompilerDependencies = {},
 ): Promise<CourseLearningStructure> {
   dependencies.onStage?.('batching');
-  // 请求前就将证据单元限制在约 1000 token，不再等超时后递归拆分。
-  const batches = buildSectionBatches(documents, 1000);
+  const profile = runtimeProfile(config);
+  // 请求前完成有界分批，不再等超时后递归拆分。Agent Plan 会合并轻量
+  // 证据单元，以摊薄推理模型每次请求的固定开销。
+  const batches = buildSectionBatches(documents, profile.batchTokens, profile.atomTokens);
   const previous = dependencies.previous ?? null;
   const previousByCacheKey = new Map(
     (previous?.checkpoints ?? []).map(checkpoint => [checkpoint.cacheKey, checkpoint]),
@@ -210,9 +244,12 @@ export async function compileCourseStructure(
   const issues: CourseStructureIssue[] = [];
   const now = dependencies.now ?? Date.now;
   const startedAt = now();
-  const foregroundBudgetMs = Math.max(1, dependencies.foregroundBudgetMs ?? 60_000);
+  const foregroundBudgetMs = Math.max(1, dependencies.foregroundBudgetMs ?? profile.foregroundBudgetMs);
   const deadlineAt = startedAt + foregroundBudgetMs;
-  const totalDeadlineAt = startedAt + Math.max(foregroundBudgetMs, dependencies.totalBudgetMs ?? 90_000);
+  const totalDeadlineAt = startedAt + Math.max(
+    foregroundBudgetMs,
+    dependencies.totalBudgetMs ?? profile.totalBudgetMs,
+  );
   const compileBatch = dependencies.compileBatch
     ?? ((batch, timeoutMs) => compileSectionBatch(config, batch, timeoutMs));
   let completedBatches = 0;
@@ -232,58 +269,62 @@ export async function compileCourseStructure(
   dependencies.onStage?.('compiling');
   dependencies.onBatchProgress?.(0, batches.length);
   emitProgress();
-  const checkpointResults = await mapConcurrent(batches, Math.max(1, dependencies.concurrency ?? 3), async batch => {
-    const cacheKey = effectiveCacheKey(batch, config);
-    const resumed = resumedByCacheKey.get(cacheKey);
-    const reusableResult = resumed?.result ?? previousByCacheKey.get(cacheKey)?.result;
-    let unitCheckpoint: CourseExtractionUnitCheckpoint;
-    let attempted = false;
-    try {
-      if (!reusableResult && now() >= deadlineAt) {
-        throw new ExtractionError('api-timeout', 'section-compile', '已达到前台处理时限，剩余证据单元待下次续跑');
+  const checkpointResults = await mapConcurrent(
+    batches,
+    Math.max(1, dependencies.concurrency ?? profile.concurrency),
+    async batch => {
+      const cacheKey = effectiveCacheKey(batch, config);
+      const resumed = resumedByCacheKey.get(cacheKey);
+      const reusableResult = resumed?.result ?? previousByCacheKey.get(cacheKey)?.result;
+      let unitCheckpoint: CourseExtractionUnitCheckpoint;
+      let attempted = false;
+      try {
+        if (!reusableResult && now() >= deadlineAt) {
+          throw new ExtractionError('api-timeout', 'section-compile', '已达到前台处理时限，剩余证据单元待下次续跑');
+        }
+        attempted = !reusableResult;
+        const remainingTotalMs = Math.max(1, totalDeadlineAt - now());
+        const result = reusableResult ?? await compileBatch(batch, Math.min(120_000, remainingTotalMs));
+        successfulBatches += 1;
+        discoveredTopicMentions += result.topicMentions.length;
+        unitCheckpoint = {
+          cacheKey,
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          status: 'succeeded',
+          attempts: reusableResult ? 0 : 1,
+          result,
+          completedAt: now(),
+        };
+        if (!reusableResult) dependencies.onUnitCheckpoint?.(unitCheckpoint);
+        return { cacheKey, batchId: batch.id, sectionIds: batch.sectionIds, result } satisfies SectionCompilationCheckpoint;
+      } catch (error) {
+        const message = batchFailureMessage(batch, error);
+        failedBatches += 1;
+        unitCheckpoint = {
+          cacheKey,
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          status: 'failed',
+          attempts: attempted ? 1 : 0,
+          error: message,
+          completedAt: now(),
+        };
+        dependencies.onUnitCheckpoint?.(unitCheckpoint);
+        issues.push({
+          code: 'FAILED_SECTION_BATCH',
+          severity: 'error',
+          message,
+          batchId: batch.id,
+        });
+        return null;
+      } finally {
+        completedBatches += 1;
+        dependencies.onBatchProgress?.(completedBatches, batches.length);
+        emitProgress();
       }
-      attempted = !reusableResult;
-      const remainingTotalMs = Math.max(1, totalDeadlineAt - now());
-      const result = reusableResult ?? await compileBatch(batch, Math.min(120_000, remainingTotalMs));
-      successfulBatches += 1;
-      discoveredTopicMentions += result.topicMentions.length;
-      unitCheckpoint = {
-        cacheKey,
-        batchId: batch.id,
-        sectionIds: batch.sectionIds,
-        status: 'succeeded',
-        attempts: reusableResult ? 0 : 1,
-        result,
-        completedAt: now(),
-      };
-      if (!reusableResult) dependencies.onUnitCheckpoint?.(unitCheckpoint);
-      return { cacheKey, batchId: batch.id, sectionIds: batch.sectionIds, result } satisfies SectionCompilationCheckpoint;
-    } catch (error) {
-      const message = batchFailureMessage(batch, error);
-      failedBatches += 1;
-      unitCheckpoint = {
-        cacheKey,
-        batchId: batch.id,
-        sectionIds: batch.sectionIds,
-        status: 'failed',
-        attempts: attempted ? 1 : 0,
-        error: message,
-        completedAt: now(),
-      };
-      dependencies.onUnitCheckpoint?.(unitCheckpoint);
-      issues.push({
-        code: 'FAILED_SECTION_BATCH',
-        severity: 'error',
-        message,
-        batchId: batch.id,
-      });
-      return null;
-    } finally {
-      completedBatches += 1;
-      dependencies.onBatchProgress?.(completedBatches, batches.length);
-      emitProgress();
-    }
-  });
+    },
+  );
   const checkpoints = checkpointResults.filter((item): item is SectionCompilationCheckpoint => item !== null);
 
   const evidenceById = new Map<string, EvidenceSpan>();

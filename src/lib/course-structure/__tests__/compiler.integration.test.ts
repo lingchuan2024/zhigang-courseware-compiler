@@ -371,10 +371,10 @@ describe('course structure compiler integration', () => {
       'course-1',
       {
         compileBatch: async batch => {
-          seenFragments.push({
-            blockId: batch.blocks[0].id,
-            contentLength: batch.blocks[0].content.length,
-          });
+          seenFragments.push(...batch.blocks.map(block => ({
+            blockId: block.id,
+            contentLength: block.content.length,
+          })));
           return compilationForBatch(batch);
         },
         review: async () => ({ operations: [], constraints: [], warnings: [] }),
@@ -385,31 +385,41 @@ describe('course structure compiler integration', () => {
     expect(seenFragments.every(fragment => fragment.contentLength <= 1000)).toBe(true);
     expect(new Set(seenFragments.map(fragment => fragment.blockId)))
       .toEqual(new Set(['single-large-b1']));
-    expect(result.checkpoints).toHaveLength(seenFragments.length);
+    expect(result.checkpoints).toHaveLength(1);
     expect(result.validation.issues.some(issue => issue.code === 'FAILED_SECTION_BATCH')).toBe(false);
   });
 
-  it('Agent Plan 初始语义单元限制为约 1000 tokens', async () => {
-    const documents = [multiBlockDocument('token-heavy', 4)];
+  it('Agent Plan 合并轻量证据单元并限制为两路并发', async () => {
+    const documents = [multiBlockDocument('token-heavy', 6)];
     documents[0].blocks.forEach((block, index) => {
       block.content = `片段${index}${'知'.repeat(994)}`;
     });
     const seenBatchSizes: number[] = [];
+    const requestBudgets: Array<number | undefined> = [];
+    let activeRequests = 0;
+    let peakActiveRequests = 0;
 
     await compileCourseStructure(
       { ...config, apiMode: 'responses' },
       documents,
       'course-1',
       {
-        compileBatch: async batch => {
+        compileBatch: async (batch, timeoutMs) => {
           seenBatchSizes.push(batch.blocks.length);
+          requestBudgets.push(timeoutMs);
+          activeRequests += 1;
+          peakActiveRequests = Math.max(peakActiveRequests, activeRequests);
+          await new Promise(resolve => setTimeout(resolve, 0));
+          activeRequests -= 1;
           return compilationForBatch(batch);
         },
         review: async () => ({ operations: [], constraints: [], warnings: [] }),
       },
     );
 
-    expect(seenBatchSizes).toEqual([1, 1, 1, 1]);
+    expect(seenBatchSizes).toEqual([3, 3]);
+    expect(peakActiveRequests).toBe(2);
+    expect(requestBudgets).toEqual([120_000, 120_000]);
   });
 
   it('不可再拆的失败批次向界面保留真实错误', async () => {
