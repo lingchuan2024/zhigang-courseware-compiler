@@ -186,7 +186,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
             {!usableMaster && !isRunning && (
               <div className="mb-5 rounded-2xl border border-celadon/20 bg-celadon/5 p-5">
                 <h2 className="font-song text-xl font-bold text-space-text">尚未生成完整笔记</h2>
-                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据两层知识结构和学习顺序形成的固定课程框架。生成时直接按章写作，已完成章节会立即保存并显示。</p>
+                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据两层知识结构和学习顺序形成的固定课程框架。完整正文由知识卡片可靠组装，AI 只补充简短导语与过渡；每章完成后会立即保存并显示。</p>
               </div>
             )}
             {!usableMaster ? (

@@ -72,17 +72,13 @@ export interface RegenerateChapterNoteInput {
 }
 
 const MAX_CONCURRENT_CHAPTERS = 2;
-const CHAPTER_CARD_DETAIL_BUDGET = 30_000;
 
 const CHAPTER_NOTE_SYSTEM = [
-  '你负责根据已确定的两层课程知识结构，生成一章完整、连贯、适合学习的课程笔记。',
+  '你只负责为已经确定内容的课程章节生成简短导语和知识主题之间的过渡语，不负责生成整章正文。',
   '章节和一级知识顺序已经固定，不得重新规划、遗漏或重复一级知识。',
-  '每个一级知识内部必须遵循给定的二级卡片顺序；不能把卡片标题机械拼接。',
-  '并列知识先总结共同目标和分类依据，再分别讲解、比较差异并给出选择条件。',
-  '复杂概念先直觉后形式化；公式写出假设、符号、起点、连续步骤、结论和适用条件。',
-  '允许补充通用教材解释、典型例子或课件省略的基础推导，但必须使用引用块：',
-  '> AI 教学补充：以下内容用于补足课件省略的解释或推导，不属于课件原文。',
-  '不得改变知识事实，不得伪造原文；只返回 JSON：{ markdown }。',
+  'overview 不超过 300 个中文字符，只说明本章目标、主线和各主题关系。',
+  'transitions 是以 topicId 为键的对象，每条不超过 100 个中文字符；只写承上启下的话，不复述知识正文。',
+  '不得补充新的知识事实，不得输出 Markdown 正文；只返回 JSON：{ overview, transitions }。',
 ].join('\n');
 
 function record(value: unknown): Record<string, unknown> {
@@ -155,23 +151,13 @@ function deterministicSynthesis(topic: KnowledgeTopic, cards: KnowledgeCard[]): 
   };
 }
 
-function truncate(value: string | undefined, maxLength: number): string {
-  if (!value) return '';
-  return value.length <= maxLength ? value : `${value.slice(0, maxLength)}…`;
-}
-
-function chapterMaterials(
+function chapterEnhancementMaterials(
   plan: ChapterPlanItem,
   syntheses: TopicSynthesis[],
   knowledgeCards: KnowledgeCard[],
 ): Array<Record<string, unknown>> {
   const synthesisByTopic = new Map(syntheses.map(item => [item.topicId, item]));
   const cardsById = new Map(knowledgeCards.map(item => [item.id, item]));
-  const chapterCardCount = plan.topicIds.reduce(
-    (sum, topicId) => sum + (synthesisByTopic.get(topicId)?.orderedCardIds.length ?? 0),
-    0,
-  );
-  const detailLimit = Math.max(600, Math.min(2_400, Math.floor(CHAPTER_CARD_DETAIL_BUDGET / Math.max(1, chapterCardCount))));
 
   return plan.topicIds.map(topicId => {
     const synthesis = synthesisByTopic.get(topicId);
@@ -186,16 +172,84 @@ function chapterMaterials(
         id: card.id,
         title: card.title,
         type: card.teachingType,
-        summary: truncate(card.conciseSummary, 500),
-        detail: truncate(card.detailedNote, detailLimit),
-        keyPoints: card.keyPoints,
-        applicableConditions: card.applicableConditions,
-        examples: card.examples,
-        misconceptions: card.misconceptions,
-        formulas: card.formulas?.map(formula => formula.formula) ?? [],
+        summary: card.conciseSummary.slice(0, 300),
       })),
     };
   });
+}
+
+interface ChapterEnhancement {
+  overview: string;
+  transitions: Record<string, string>;
+}
+
+function parseChapterEnhancement(value: unknown, topicIds: string[]): ChapterEnhancement | null {
+  const data = record(value);
+  const overview = typeof data.overview === 'string' ? data.overview.trim() : '';
+  const transitions = Array.isArray(data.transitions)
+    ? Object.fromEntries(data.transitions.flatMap((transition, index) =>
+        typeof transition === 'string' && transition.trim() && topicIds[index]
+          ? [[topicIds[index], transition.trim()]]
+          : [],
+      ))
+    : Object.fromEntries(
+        Object.entries(record(data.transitions))
+          .filter((entry): entry is [string, string] => typeof entry[1] === 'string' && entry[1].trim().length > 0)
+          .map(([topicId, transition]) => [topicId, transition.trim()]),
+      );
+  return overview || Object.keys(transitions).length > 0 ? { overview, transitions } : null;
+}
+
+function listSection(title: string, values: string[] | undefined): string[] {
+  const items = values?.map(value => value.trim()).filter(Boolean) ?? [];
+  return items.length > 0 ? [`**${title}**`, ...items.map(value => `- ${value}`)] : [];
+}
+
+function formulaSections(card: KnowledgeCard): string[] {
+  return (card.formulas ?? []).flatMap(formula => [
+    formula.description ? `**公式：${formula.description}**` : '**公式**',
+    formula.formula,
+  ]).filter(Boolean);
+}
+
+function localChapterMarkdown(
+  plan: ChapterPlanItem,
+  syntheses: TopicSynthesis[],
+  knowledgeCards: KnowledgeCard[],
+  enhancement?: ChapterEnhancement | null,
+): string {
+  const synthesisByTopic = new Map(syntheses.map(item => [item.topicId, item]));
+  const cardsById = new Map(knowledgeCards.map(item => [item.id, item]));
+  const body = plan.topicIds.flatMap((topicId, topicIndex) => {
+    const synthesis = synthesisByTopic.get(topicId);
+    const cards = (synthesis?.orderedCardIds ?? [])
+      .map(cardId => cardsById.get(cardId))
+      .filter((card): card is KnowledgeCard => Boolean(card));
+    const topicName = cards[0]?.topicName ?? plan.framework[topicIndex] ?? topicId;
+    const transition = enhancement?.transitions[topicId];
+    return [
+      transition ? `> ${transition}` : '',
+      `### ${topicName}`,
+      synthesis?.framework.length
+        ? `**本节路径：** ${synthesis.framework.join(' → ')}`
+        : '',
+      ...cards.flatMap(card => [
+        `#### ${card.title}`,
+        card.detailedNote || card.conciseSummary,
+        ...listSection('要点', card.keyPoints),
+        ...listSection('适用条件', card.applicableConditions),
+        ...formulaSections(card),
+        ...listSection('例子', card.examples),
+        ...listSection('常见误区', card.misconceptions),
+      ]),
+    ];
+  });
+  return normalizeMarkdown([
+    `## ${plan.title}`,
+    enhancement?.overview || plan.objective,
+    plan.framework.length > 0 ? `### 本章框架\n\n${plan.framework.map(item => `- ${item}`).join('\n')}` : '',
+    ...body,
+  ].filter(Boolean).join('\n\n'));
 }
 
 function chapterRequest(
@@ -220,7 +274,7 @@ function chapterRequest(
       `课程固定章节顺序：${JSON.stringify(chapterPlan.map(chapter => ({ id: chapter.id, title: chapter.title, topicIds: chapter.topicIds })))}`,
       `当前章节及相邻章节：${JSON.stringify(adjacent)}`,
       `当前章节：${JSON.stringify({ title: plan.title, objective: plan.objective, framework: plan.framework })}`,
-      `本章有序教学材料：${JSON.stringify(chapterMaterials(plan, syntheses, knowledgeCards))}`,
+      `本章主题摘要：${JSON.stringify(chapterEnhancementMaterials(plan, syntheses, knowledgeCards))}`,
       `全局术语表：${JSON.stringify(terminology)}`,
       `全局符号表：${JSON.stringify(symbols)}`,
     ].join('\n\n'),
@@ -232,8 +286,8 @@ export function buildMasterNotePrompt(request: MasterNoteGenerationRequest): Com
     system: request.system,
     stablePrefix: request.system,
     dynamicInput: request.user,
-    promptVersion: `master-note-${request.kind}-v2`,
-    maxOutputTokens: 8192,
+    promptVersion: `master-note-${request.kind}-v3`,
+    maxOutputTokens: 1536,
     reasoningEffort: 'minimal',
     maxStructuredAttempts: 1,
     maxTransportAttempts: 1,
@@ -250,7 +304,7 @@ function buildModelCompleter(config: ModelConfig): MasterNoteCompleter {
       config,
       buildMasterNotePrompt(request),
       'note-generation',
-      90_000,
+      30_000,
       request.subjectId,
     );
     return data;
@@ -277,24 +331,28 @@ async function generateChapter(
   complete: MasterNoteCompleter,
   request: MasterNoteGenerationRequest,
   plan: ChapterPlanItem,
+  syntheses: TopicSynthesis[],
+  knowledgeCards: KnowledgeCard[],
   sourceCardIds: string[],
   retryCount: number,
 ): Promise<ChapterNote> {
+  let enhancement: ChapterEnhancement | null = null;
+  let enhancementError: string | undefined;
   try {
-    const response = record(await complete(request));
-    const markdown = typeof response.markdown === 'string' ? normalizeMarkdown(response.markdown) : '';
-    if (!markdown) throw new Error('模型返回的章节 Markdown 为空');
-    return { ...plan, markdown, sourceCardIds, status: 'completed', retryCount };
+    enhancement = parseChapterEnhancement(await complete(request), plan.topicIds);
+    if (!enhancement) enhancementError = 'AI 章节衔接为空，已使用本地完整正文';
   } catch (error) {
-    return {
-      ...plan,
-      markdown: '',
-      sourceCardIds: [],
-      status: 'failed',
-      error: error instanceof Error ? error.message : String(error),
-      retryCount,
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    enhancementError = `AI 章节衔接失败，已使用本地完整正文：${message}`;
   }
+  return {
+    ...plan,
+    markdown: localChapterMarkdown(plan, syntheses, knowledgeCards, enhancement),
+    sourceCardIds,
+    status: 'completed',
+    error: enhancementError,
+    retryCount,
+  };
 }
 
 export async function regenerateChapterNote(
@@ -302,9 +360,9 @@ export async function regenerateChapterNote(
   input: RegenerateChapterNoteInput,
   injectedCompleter?: MasterNoteCompleter,
 ): Promise<ChapterNote> {
-  const sourceCardIds = input.knowledgeCards
-    .filter(card => input.plan.topicIds.includes(card.topicId))
-    .map(card => card.id);
+  const sourceCardIds = input.plan.topicIds.flatMap(topicId =>
+    input.syntheses.find(synthesis => synthesis.topicId === topicId)?.orderedCardIds ?? [],
+  );
   const request = chapterRequest(
     '课程完整笔记',
     input.plan,
@@ -318,6 +376,8 @@ export async function regenerateChapterNote(
     injectedCompleter ?? buildModelCompleter(config),
     request,
     input.plan,
+    input.syntheses,
+    input.knowledgeCards,
     sourceCardIds,
     input.previousRetryCount + 1,
   );
@@ -373,6 +433,8 @@ export async function runMasterNoteGeneration(
         complete,
         chapterRequest(input.title, plan, chapterPlan, syntheses, input.knowledgeCards, input.terminology, input.symbols),
         plan,
+        syntheses,
+        input.knowledgeCards,
         sourceCardIds,
         previousRetryCount,
       );
@@ -384,17 +446,21 @@ export async function runMasterNoteGeneration(
       callbacks.onChapter?.(chapter, completedCount, chapterPlan.length);
     });
 
-    if (batch.every(chapter => chapter.status === 'failed') && offset + MAX_CONCURRENT_CHAPTERS < pendingIndices.length) {
-      const lastError = batch[batch.length - 1]?.error ?? '模型服务连续失败';
+    if (batch.every(chapter => Boolean(chapter.error)) && offset + MAX_CONCURRENT_CHAPTERS < pendingIndices.length) {
+      const lastError = batch[batch.length - 1]?.error ?? 'AI 章节衔接连续失败';
       const unscheduled = pendingIndices.slice(offset + MAX_CONCURRENT_CHAPTERS);
       unscheduled.forEach(index => {
         const plan = chapterPlan[index];
+        const syntheses = plan.topicIds
+          .map(topicId => synthesisByTopic.get(topicId))
+          .filter((value): value is TopicSynthesis => Boolean(value));
+        const sourceCardIds = syntheses.flatMap(synthesis => synthesis.orderedCardIds);
         const chapter: ChapterNote = {
           ...plan,
-          markdown: '',
-          sourceCardIds: [],
-          status: 'failed',
-          error: `前一批章节全部失败，已停止后续生成，避免继续等待。最后错误：${lastError}`,
+          markdown: localChapterMarkdown(plan, syntheses, input.knowledgeCards),
+          sourceCardIds,
+          status: 'completed',
+          error: `前一批 AI 章节衔接全部失败，已停止后续 AI 增强并使用本地完整正文。最后错误：${lastError}`,
           retryCount: input.resumeChapterNotes?.find(item => item.id === plan.id)?.retryCount ?? 0,
         };
         chapterNotes[index] = chapter;

@@ -42,7 +42,7 @@ describe('master note generator', () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = vi.fn(async request => {
       requests.push(request);
-      return { markdown: `## ${request.subjectId}\n\n完整章节正文` };
+      return { overview: `${request.subjectId}导语`, transitions: {} };
     });
 
     const result = await runMasterNoteGeneration(config, input(5), {}, completer);
@@ -61,16 +61,17 @@ describe('master note generator', () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = async request => {
       requests.push(request);
-      return { markdown: '## 第一章\n\n正文' };
+      return { overview: '第一章导语', transitions: {} };
     };
 
     await runMasterNoteGeneration(config, input(1), {}, completer);
 
-    expect(requests[0].user).toContain('原始细节-1');
+    expect(requests[0].user).toContain('card-1摘要');
+    expect(requests[0].user).not.toContain('原始细节-1');
     expect(requests[0].user).toContain('课程固定章节顺序');
     expect(requests[0].user).not.toContain('本章一级知识综合');
     expect(requests[0].user).not.toContain('sections');
-    expect(requests[0].system).toContain('只返回 JSON：{ markdown }');
+    expect(requests[0].system).toContain('只返回 JSON：{ overview, transitions }');
   });
 
   it('runs at most two chapter requests concurrently and returns chapters in plan order', async () => {
@@ -81,7 +82,7 @@ describe('master note generator', () => {
       maxActive = Math.max(maxActive, active);
       await new Promise(resolve => setTimeout(resolve, request.subjectId === 'chapter-1' ? 15 : 2));
       active -= 1;
-      return { markdown: `## ${request.subjectId}\n\n正文` };
+      return { overview: `${request.subjectId}导语`, transitions: {} };
     };
 
     const result = await runMasterNoteGeneration(config, input(12), {}, completer);
@@ -101,7 +102,7 @@ describe('master note generator', () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = async request => {
       requests.push(request);
-      return { markdown: '## 新章节\n\n新正文' };
+      return { overview: '新章节导语', transitions: {} };
     };
 
     const result = await runMasterNoteGeneration(config, { ...base, resumeChapterNotes: [checkpoint] }, {}, completer);
@@ -111,7 +112,7 @@ describe('master note generator', () => {
     expect(result.chapterNotes[0].title).toBe(result.chapterPlan[0].title);
   });
 
-  it('stops scheduling more chapters when the first concurrent batch completely fails', async () => {
+  it('falls back to locally assembled chapters and stops further AI enhancement after a failed batch', async () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = async request => {
       requests.push(request);
@@ -122,30 +123,33 @@ describe('master note generator', () => {
 
     expect(requests).toHaveLength(2);
     expect(result.chapterNotes).toHaveLength(3);
-    expect(result.chapterNotes[2].error).toContain('已停止后续生成');
-    expect(result.masterNote.status).toBe('failed');
+    expect(result.chapterNotes.every(chapter => chapter.status === 'completed')).toBe(true);
+    expect(result.chapterNotes[2].error).toContain('已停止后续 AI 增强');
+    expect(result.chapterNotes[2].markdown).toContain('原始细节-9');
+    expect(result.masterNote.status).toBe('completed');
   });
 
   it('configures Agent Plan chapter calls for minimal reasoning and one attempt', () => {
     const prompt = buildMasterNotePrompt({ kind: 'chapter-note', subjectId: 'chapter-1', system: 'system', user: 'user' });
 
     expect(prompt.reasoningEffort).toBe('minimal');
-    expect(prompt.maxOutputTokens).toBe(8192);
+    expect(prompt.maxOutputTokens).toBe(1536);
     expect(prompt.maxStructuredAttempts).toBe(1);
     expect(prompt.maxTransportAttempts).toBe(1);
   });
 
-  it('keeps completed chapters when another chapter returns empty markdown', async () => {
+  it('uses a complete local chapter when the AI enhancement response is empty', async () => {
     const completer: MasterNoteCompleter = async request => request.subjectId === 'chapter-1'
-      ? { markdown: '## 第一章\n\n第一章正文' }
-      : { markdown: '   ' };
+      ? { overview: '第一章导语', transitions: {} }
+      : {};
 
     const result = await runMasterNoteGeneration(config, input(8), {}, completer);
 
-    expect(result.chapterNotes.map(chapter => chapter.status)).toEqual(['completed', 'failed']);
-    expect(result.masterNote.status).toBe('partial');
-    expect(result.masterNote.markdown).toContain('第一章正文');
-    expect(result.masterNote.coverage.missingCardIds).toEqual(['card-5', 'card-6', 'card-7', 'card-8']);
+    expect(result.chapterNotes.map(chapter => chapter.status)).toEqual(['completed', 'completed']);
+    expect(result.chapterNotes[1].error).toContain('AI 章节衔接为空');
+    expect(result.masterNote.status).toBe('completed');
+    expect(result.masterNote.markdown).toContain('原始细节-8');
+    expect(result.masterNote.coverage.missingCardIds).toEqual([]);
   });
 
   it('orders cards by the second-layer narrative path in chapter material', async () => {
@@ -155,7 +159,7 @@ describe('master note generator', () => {
     const requests: MasterNoteGenerationRequest[] = [];
     const completer: MasterNoteCompleter = async request => {
       requests.push(request);
-      return { markdown: '## 知识1\n\n完整正文' };
+      return { overview: '知识1导语', transitions: {} };
     };
 
     const result = await runMasterNoteGeneration(config, {
@@ -171,5 +175,18 @@ describe('master note generator', () => {
 
     expect(requests[0].user.indexOf('card-b')).toBeLessThan(requests[0].user.indexOf('card-a'));
     expect(result.topicSyntheses[0].orderedCardIds).toEqual(['card-b', 'card-a']);
+  });
+
+  it('combines a short AI overview with the complete local card content', async () => {
+    const completer: MasterNoteCompleter = async () => ({
+      overview: '本章先建立直觉，再进入公式。',
+      transitions: ['下面进入第一个知识主题。'],
+    });
+
+    const result = await runMasterNoteGeneration(config, input(1), {}, completer);
+
+    expect(result.chapterNotes[0].markdown).toContain('本章先建立直觉');
+    expect(result.chapterNotes[0].markdown).toContain('下面进入第一个知识主题');
+    expect(result.chapterNotes[0].markdown).toContain('原始细节-1');
   });
 });
