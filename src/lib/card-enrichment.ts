@@ -12,8 +12,8 @@ import { prepareGeneratedMarkdown } from './generated-markdown';
 import { callChatCompletion } from './model-v2';
 import { sanitizeText, truncateText } from './utils';
 
-const MAX_CONCURRENT_CARDS = 3;
-const MAX_SOURCE_CHARS = 12000;
+const MAX_CONCURRENT_CARDS = 2;
+const MAX_SOURCE_CHARS = 8000;
 const MAX_EXCERPT_CHARS = 3000;
 
 interface RawEnrichedCard {
@@ -64,7 +64,7 @@ function sourceText(blocks: MarkdownBlock[]): string {
   return truncateText(blocks.map(block => `[${block.id}]\n${block.content}`).join('\n\n'), MAX_SOURCE_CHARS);
 }
 
-function buildPrompt(
+export function buildCardEnrichmentPrompt(
   topic: KnowledgeTopic,
   teachingBlock: TeachingBlock,
   relations: TeachingRelation[],
@@ -88,7 +88,8 @@ function buildPrompt(
 5. conciseSummary 为 60～180 字；detailedNote 通常为 400～1200 字。证据不足时必须明确写出“课件证据不足”，再谨慎补充。
 6. 公式使用 $...$ 或 $$...$$，不要使用方括号伪公式。
 7. 自检问题必须能由本卡片内容回答。
-8. 只返回 JSON：{ conciseSummary, detailedNote, keyPoints, applicableConditions, examples, misconceptions, selfCheckQuestions }。`;
+8. 只返回 JSON：{ conciseSummary, detailedNote, keyPoints, applicableConditions, examples, misconceptions, selfCheckQuestions }。
+9. JSON 字符串内的 Markdown 换行必须写成 \\n，LaTeX 反斜杠必须双写，不得输出未转义的控制字符。`;
   const blockById = new Map(allTeachingBlocks.map(block => [block.id, block]));
   const relationContext = [...relations]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -126,6 +127,10 @@ function buildPrompt(
     stablePrefix: system,
     dynamicInput: user,
     promptVersion: 'knowledge-card-enrichment-v2',
+    reasoningEffort: 'minimal',
+    maxOutputTokens: 4096,
+    maxStructuredAttempts: 1,
+    maxTransportAttempts: 1,
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -145,7 +150,7 @@ async function generateCardDraft(
 ): Promise<RawEnrichedCard> {
   const { data } = await callChatCompletion<RawEnrichedCard>(
     config,
-    buildPrompt(topic, teachingBlock, relations, teachingBlocks, source, repairReasons),
+    buildCardEnrichmentPrompt(topic, teachingBlock, relations, teachingBlocks, source, repairReasons),
     'note-generation',
     120000,
     card.topicId,
@@ -189,6 +194,7 @@ async function enrichOne(
     let detailedNote = prepareGeneratedMarkdown(sanitizeText(data.detailedNote ?? ''));
     let quality = evaluateKnowledgeCardDraft({
       teachingType: teachingBlock.type,
+      title: card.title,
       detailedNote,
       sourceRangeCount: card.sourceRanges.length,
     });
@@ -206,6 +212,7 @@ async function enrichOne(
       detailedNote = prepareGeneratedMarkdown(sanitizeText(data.detailedNote ?? ''));
       quality = evaluateKnowledgeCardDraft({
         teachingType: teachingBlock.type,
+        title: card.title,
         detailedNote,
         sourceRangeCount: card.sourceRanges.length,
       });
@@ -231,7 +238,13 @@ async function enrichOne(
     };
   } catch (error) {
     console.warn(`知识卡片深化失败（${card.title}）:`, error);
-    if (card.status === 'completed' && card.detailedNote.trim()) {
+    const existingQuality = evaluateKnowledgeCardDraft({
+      teachingType: card.teachingType,
+      title: card.title,
+      detailedNote: card.detailedNote,
+      sourceRangeCount: card.sourceRanges.length,
+    });
+    if (card.status === 'completed' && existingQuality.accepted) {
       return {
         card: { ...card, sourceExcerpt: excerpt },
         failed: true,

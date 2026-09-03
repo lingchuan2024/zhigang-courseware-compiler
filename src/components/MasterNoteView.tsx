@@ -68,6 +68,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
   const isRunning = jobStatus === 'running';
   const estimatedProgress = progress.estimatedProgress ?? 0;
   const isPartial = usableMaster && masterNote?.status === 'partial';
+  const isBlocked = !isRunning && (progress.status === 'blocked' || progress.status === 'failed');
   const activeCards = activeChapter
     ? cards.filter(card => activeChapter.sourceCardIds.includes(card.id))
     : [];
@@ -128,6 +129,9 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
           )}
           {usableMaster && (
             <>
+              {!isRunning && masterNote?.status !== 'completed' && (
+                <button type="button" onClick={() => void startGeneration()} className="btn-primary">续跑未完成章节</button>
+              )}
               <button type="button" onClick={() => setEvidenceOpen(true)} className="btn-outline">查看本章依据</button>
               <button type="button" onClick={exportMarkdown} className="btn-outline">导出 Markdown</button>
             </>
@@ -142,6 +146,13 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
             <span className="font-mono text-xs">{Math.round(estimatedProgress)}%</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-space-750"><div className="h-full rounded-full bg-celadon transition-all" style={{ width: `${Math.max(3, estimatedProgress)}%` }} /></div>
+        </div>
+      )}
+
+      {isBlocked && progress.message && (
+        <div className="flex items-center justify-between gap-4 border-b border-rose-400/25 bg-rose-400/10 px-5 py-3 text-sm text-rose-200" role="alert">
+          <span>{progress.message}</span>
+          <button type="button" onClick={() => navigateToStage('cards')} className="flex-shrink-0 rounded-lg border border-rose-300/30 px-3 py-1.5 text-xs hover:bg-rose-300/10">返回深化知识卡片</button>
         </div>
       )}
 
@@ -183,7 +194,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
             {!usableMaster && !isRunning && (
               <div className="mb-5 rounded-2xl border border-celadon/20 bg-celadon/5 p-5">
                 <h2 className="font-song text-xl font-bold text-space-text">尚未生成完整笔记</h2>
-                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据知识网学习顺序形成的初始课程框架。生成时会先综合并列知识、串联公式与概念，再逐章写作。</p>
+                <p className="mt-2 text-sm leading-6 text-space-muted">下面是根据两层知识结构和学习顺序形成的固定课程框架。完整正文由知识卡片可靠组装，AI 只补充简短导语与过渡；每章完成后会立即保存并显示。</p>
               </div>
             )}
             {!usableMaster ? (

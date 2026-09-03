@@ -66,4 +66,16 @@ describe('knowledge card quality gate', () => {
 
     expect(result.reasons).toContain('缺少课件证据说明');
   });
+
+  it('rejects a card whose body merely repeats its title', () => {
+    const result = evaluateKnowledgeCardDraft({
+      teachingType: 'formula',
+      title: '复合函数 Jacobian 链式法则',
+      detailedNote: '复合函数 Jacobian 链式法则',
+      sourceRangeCount: 1,
+    });
+
+    expect(result.accepted).toBe(false);
+    expect(result.reasons).toContain('正文只是重复卡片标题');
+  });
 });

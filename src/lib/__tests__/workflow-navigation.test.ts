@@ -275,6 +275,9 @@ describe('workflow-navigation', () => {
       expect(isStageCompleted('cards', makeParsedState({
         knowledgeCards: [makeKnowledgeCard()],
       }))).toBe(true);
+      expect(isStageCompleted('cards', makeParsedState({
+        knowledgeCards: [{ ...makeKnowledgeCard(), status: 'partial' }],
+      }))).toBe(false);
       expect(isStageCompleted('cards', makeParsedState())).toBe(false);
     });
 

@@ -10,10 +10,12 @@ import {
   WorkflowStage,
 } from '../types';
 import type { SourceDocument } from '../types';
+import type { KnowledgeCard } from '../types';
 import { saveState, clearState } from '../lib/persistence';
 import { createExampleCourse } from '../lib/examples';
 import { runKnowledgePipeline, type PipelineResultV2 } from '../lib/knowledge-pipeline-v2';
 import { enrichKnowledgeCards } from '../lib/card-enrichment';
+import { evaluateKnowledgeCardDraft } from '../lib/card-quality';
 import { regenerateChapterNote, runMasterNoteGeneration } from '../lib/master-note-generator';
 import { assembleCourseMasterNote, isCompletedMasterNote } from '../lib/course-master-note';
 import { createSourceDocument } from '../lib/markdown-parser';
@@ -28,9 +30,9 @@ import {
   failProgress,
   failProgressWithStage,
   completeProgress,
-  updateCurrentItem,
   updateWindowProgress,
-  tickEstimatedProgress,
+  updateExtractionProgress,
+  updateCompilerProgress,
 } from '../lib/pipeline-progress';
 import {
   canNavigateToStage,
@@ -49,6 +51,52 @@ const initialMemory: CourseGenerationMemory = {
   generatedTopicSummaries: {},
 };
 
+function normalizeCardText(value: string): string {
+  return value.replace(/[-#>*_`\s：:。！？!? ，,；;（）()]/g, '').toLocaleLowerCase();
+}
+
+function prepareKnowledgeCardsForNotes(cards: KnowledgeCard[]): {
+  cards: KnowledgeCard[];
+  invalidCardIds: string[];
+} {
+  const invalidCardIds: string[] = [];
+  const prepared = cards.map(card => {
+    const enrichedQuality = evaluateKnowledgeCardDraft({
+      teachingType: card.teachingType,
+      title: card.title,
+      detailedNote: card.detailedNote,
+      sourceRangeCount: card.sourceRanges.length,
+    });
+    if (card.status === 'completed' && enrichedQuality.accepted) return card;
+
+    const excerpt = card.sourceExcerpt?.trim() ?? '';
+    const current = card.detailedNote.trim();
+    const currentIsSubstantive = current.length >= 80
+      && normalizeCardText(current) !== normalizeCardText(card.title);
+    const hasTraceableSource = card.sourceRanges.length > 0 && excerpt.length >= 12;
+    if (
+      card.status === 'failed'
+      || card.status === 'stale'
+      || card.status === 'generating'
+      || (!currentIsSubstantive && !hasTraceableSource)
+    ) {
+      invalidCardIds.push(card.id);
+      return card;
+    }
+
+    if (currentIsSubstantive) return card;
+    return {
+      ...card,
+      detailedNote: [
+        card.conciseSummary,
+        '**课件原文：**',
+        excerpt,
+      ].filter(Boolean).join('\n\n'),
+    };
+  });
+  return { cards: prepared, invalidCardIds };
+}
+
 const initialState: ProjectState = {
   stage: 'upload',
   job: null,
@@ -65,6 +113,8 @@ const initialState: ProjectState = {
   generationMemory: initialMemory,
   // v6 新架构
   sourceDocuments: [],
+  courseLearningStructure: null,
+  courseExtractionSession: null,
   knowledgeTopics: [],
   topicRelations: [],
   teachingBlocks: [],
@@ -124,6 +174,7 @@ function buildStructureQuality(validation: PipelineResultV2['validation'] | unde
     assignedBlocks: validation.coverage.assignedBlocks,
     topicCount: validation.topicStats.totalTopics,
     topicsWithTeachingBlocks: validation.topicStats.topicsWithTeachingBlocks,
+    qualityIssues: validation.qualityIssues,
   };
 }
 
@@ -165,7 +216,8 @@ function computeReparseUpdate(
       : chapter,
   );
   const hasStaleChapter = chapterNotes.some(chapter => chapter.status !== 'completed');
-  const courseMasterNote = hasStaleChapter && state.courseMasterNote
+  const hasStaleWork = diff.staleTopicIds.length > 0 || diff.newUncoveredBlockCount > 0;
+  const assembledMasterNote = hasStaleChapter && state.courseMasterNote
     ? assembleCourseMasterNote({
         courseId: state.document?.courseId ?? '',
         title: state.courseMasterNote.title,
@@ -177,8 +229,14 @@ function computeReparseUpdate(
         structureVersion: state.knowledgeBaseVersions.topicStructure,
       })
     : state.courseMasterNote;
+  const courseMasterNote = hasStaleWork && assembledMasterNote
+    ? {
+        ...assembledMasterNote,
+        status: 'partial' as const,
+        error: `课件来源已变化，旧笔记仅供参考：${diff.summary}`,
+      }
+    : assembledMasterNote;
 
-  const hasStaleWork = diff.staleTopicIds.length > 0 || diff.newUncoveredBlockCount > 0;
   return {
     sourceDocuments: [parsed],
     mineruParseResult: {
@@ -224,6 +282,8 @@ export const useStore = create<AppState>((set, get) => ({
       staleMarker: null,
       viewMode: 'view',
       sourceDocuments: doc.fileType === 'markdown' ? get().sourceDocuments : [],
+      courseLearningStructure: null,
+      courseExtractionSession: null,
       mineruParseResult: doc.fileType === 'markdown' ? get().mineruParseResult : null,
       knowledgeTopics: [],
       topicRelations: [],
@@ -338,8 +398,23 @@ export const useStore = create<AppState>((set, get) => ({
     const { document, mineruConfig } = get();
     if (!document) return;
 
-    if (document.fileType === 'markdown' && get().sourceDocuments.length > 0) {
-      set({ stage: 'mineru' });
+    if (document.fileType === 'markdown') {
+      if (get().sourceDocuments.length === 0) {
+        // 异常状态（上传后源文档丢失）：从 document.pages 重建，保证流程可继续
+        const markdown = document.pages.map(page => page.text).join('\n\n');
+        const doc = createSourceDocument(markdown, document.courseId ?? document.id, document.title);
+        set({ sourceDocuments: [doc] });
+      }
+      const first = get().sourceDocuments[0];
+      // 「确认 Markdown」必须把解析结果置为 completed，
+      // 否则「确认并提取知识结构」按钮（依赖 isCompleted）永远不会出现。
+      set({
+        stage: 'mineru',
+        mineruParseResult: {
+          status: 'completed', progress: 100, markdown: first?.markdown ?? '',
+          assets: [], sourceFileName: document.fileName, completedAt: Date.now(),
+        },
+      });
       saveState(get());
       return;
     }
@@ -394,7 +469,13 @@ export const useStore = create<AppState>((set, get) => ({
   },
 
   startKnowledgePipeline: async () => {
-    const { sourceDocuments, modelConfig } = get();
+    const {
+      sourceDocuments,
+      modelConfig,
+      courseLearningStructure,
+      courseExtractionSession,
+      staleMarker,
+    } = get();
 
     if (!modelConfig?.apiKey) {
       set({
@@ -413,22 +494,16 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
-    // 启动进度计时器
-    let progressTimer: ReturnType<typeof setInterval> | null = null;
-    const startProgressTimer = () => {
-      if (progressTimer) clearInterval(progressTimer);
-      progressTimer = setInterval(() => {
-        const current = get().pipelineProgress;
-        if (current.status === 'running') {
-          set({ pipelineProgress: tickEstimatedProgress(current) });
-        }
-      }, 800);
-    };
-    const stopProgressTimer = () => {
-      if (progressTimer) {
-        clearInterval(progressTimer);
-        progressTimer = null;
-      }
+    const courseId = sourceDocuments[0]?.courseId ?? `course_${Date.now()}`;
+    const startedAt = Date.now();
+    const extractionSession = {
+      id: `extract_${courseId}_${startedAt}`,
+      courseId,
+      startedAt,
+      deadlineAt: startedAt + 60_000,
+      checkpoints: courseExtractionSession?.courseId === courseId
+        ? courseExtractionSession.checkpoints
+        : [],
     };
 
     set({
@@ -439,54 +514,58 @@ export const useStore = create<AppState>((set, get) => ({
       pipelineProgress: {
         ...createStructureExtractionProgress(),
         status: 'running',
-        estimatedProgress: 2,
-        isEstimated: true,
+        estimatedProgress: 5,
+        isEstimated: false,
       },
+      courseExtractionSession: extractionSession,
     });
-    startProgressTimer();
+    // 立即落盘：提取中途刷新/中断时，工作区应恢复到 structure 阶段（含 running→idle 降级），
+    // 而不是退回 mineru 阶段重看解析结果。
+    saveState(get());
 
     try {
       const markdownTexts = sourceDocuments.map(doc => ({
         markdown: doc.markdown,
         title: doc.title,
       }));
-      const courseId = sourceDocuments[0]?.courseId ?? `course_${Date.now()}`;
-
       const result = await runKnowledgePipeline(modelConfig, markdownTexts, courseId, {
+        sourceDocuments,
+        previousStructure: courseLearningStructure,
+        resumeCheckpoints: extractionSession.checkpoints,
+        onUnitCheckpoint: (checkpoint) => {
+          const current = get().courseExtractionSession;
+          if (!current || current.id !== extractionSession.id) return;
+          const checkpoints = [
+            ...current.checkpoints.filter(item => item.cacheKey !== checkpoint.cacheKey),
+            checkpoint,
+          ];
+          set({ courseExtractionSession: { ...current, checkpoints } });
+          saveState(get());
+        },
+        onExtractionProgress: (event) => {
+          set({ pipelineProgress: updateExtractionProgress(get().pipelineProgress, event) });
+        },
         onStatusChange: (status) => {
           set({ knowledgePipelineStatus: status });
+        },
+        onCompilerStage: (stage) => {
+          set({ pipelineProgress: updateCompilerProgress(get().pipelineProgress, stage) });
         },
         onWindowProgress: (current, total) => {
           const p = get().pipelineProgress;
           set({ pipelineProgress: updateWindowProgress(p, current, total) });
         },
-        onTopicProgress: (current, total) => {
-          set({
-            pipelineProgress: updateCurrentItem(
-              get().pipelineProgress,
-              current,
-              total,
-              `提取讲解结构 ${current}/${total}`,
-            ),
-          });
-        },
-        onNoteProgress: (current, total) => {
-          set({
-            pipelineProgress: updateCurrentItem(
-              get().pipelineProgress,
-              current,
-              total,
-              `生成笔记 ${current}/${total}`,
-            ),
-          });
-        },
       });
 
-      stopProgressTimer();
+      const usable = (result.status === 'ready' || result.status === 'degraded')
+        && result.topics.length > 0;
 
       set({
         knowledgePipelineStatus: result.status,
+        structureExtractionStatus: usable ? 'ready' : 'failed',
+        extractionErrors: result.errors,
         sourceDocuments: result.sourceDocuments,
+        courseLearningStructure: result.courseLearningStructure,
         knowledgeTopics: result.topics,
         topicRelations: result.topicRelations,
         teachingBlocks: result.teachingBlocks,
@@ -499,19 +578,19 @@ export const useStore = create<AppState>((set, get) => ({
         chapterPlan: [],
         chapterNotes: [],
         courseMasterNote: null,
+      staleMarker: usable ? null : staleMarker,
         glossary: result.glossary,
         formulaCards: result.formulaCards,
         unassignedBlocks: result.unassignedBlocks,
         knowledgeBaseVersions: result.versions,
         structureQuality: buildStructureQuality(result.validation),
-        jobStatus: result.status === 'ready' ? 'completed' : 'failed',
-        pipelineProgress: result.status === 'ready'
+        jobStatus: usable ? 'completed' : 'failed',
+        pipelineProgress: usable
           ? completeProgress(get().pipelineProgress)
           : failProgress(get().pipelineProgress, result.errors.join('; ')),
       });
       saveState(get());
     } catch (e) {
-      stopProgressTimer();
       const msg = e instanceof Error ? e.message : String(e);
       set({
         knowledgePipelineStatus: 'failed',
@@ -618,20 +697,6 @@ export const useStore = create<AppState>((set, get) => ({
       knowledgeBaseVersions,
     } = state;
 
-    if (!modelConfig?.apiKey) {
-      set({
-        stage: 'notes',
-        job: null,
-        jobStatus: 'blocked',
-        pipelineProgress: blockProgress(
-          createNoteGenerationProgress(knowledgeTopics.length),
-          '请先配置知识生成模型，再生成完整笔记。',
-        ),
-      });
-      saveState(get());
-      return;
-    }
-
     if (knowledgeTopics.length === 0 || knowledgeCards.length === 0) {
       set({
         stage: 'notes',
@@ -646,30 +711,61 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
+    if (state.staleMarker) {
+      set({
+        stage: 'notes',
+        job: null,
+        jobStatus: 'blocked',
+        pipelineProgress: blockProgress(
+          createNoteGenerationProgress(knowledgeTopics.length),
+          `课件与知识结构版本不一致：${state.staleMarker.summary}。请先重新编译知识结构和知识卡片。`,
+        ),
+      });
+      saveState(get());
+      return;
+    }
+
+    // AI 深化是可选增强，不应成为完整笔记的必经网络关卡。
+    // 基础卡片只要能追溯到 MinerU 原文，就可以直接参与确定性笔记组装。
+    const preparedCards = prepareKnowledgeCardsForNotes(knowledgeCards);
+    if (preparedCards.invalidCardIds.length > 0) {
+      set({
+        stage: 'notes',
+        job: null,
+        jobStatus: 'blocked',
+        pipelineProgress: blockProgress(
+          createNoteGenerationProgress(knowledgeTopics.length),
+          `知识卡片内容不完整：${preparedCards.invalidCardIds.length}/${knowledgeCards.length} 张既没有可用正文，也无法定位到课件原文。请先重新编译知识结构。`,
+        ),
+      });
+      saveState(get());
+      return;
+    }
+
     const courseId = sourceDocuments[0]?.courseId ?? knowledgeTopics[0].courseId;
     const title = sourceDocuments[0]?.title ?? get().document?.title ?? '课程完整笔记';
     const orderedTopicIds = courseLearningPath?.orderedTopicIds ?? knowledgeTopics.map(topic => topic.id);
 
     set({
       stage: 'notes',
-      job: 'generating-topic-syntheses',
+      job: 'planning-chapters',
       jobStatus: 'running',
       topicSyntheses: [],
-      chapterPlan: [],
-      chapterNotes: [],
-      courseMasterNote: null,
+      // 保留已落盘章节，生成器会按章节主题与卡片集合校验后决定是否复用。
+      chapterPlan: state.chapterPlan,
+      chapterNotes: state.chapterNotes,
+      courseMasterNote: state.courseMasterNote,
       pipelineProgress: {
         operation: 'generate-notes',
         status: 'running',
         steps: [
-          { id: 'topic-synthesis', label: '综合知识卡片', status: 'running' },
-          { id: 'chapter-plan', label: '规划课程框架', status: 'pending' },
+          { id: 'chapter-plan', label: '确定课程框架', status: 'running' },
           { id: 'chapter-generation', label: '逐章生成笔记', status: 'pending' },
           { id: 'master-assembly', label: '组装完整笔记', status: 'pending' },
         ],
-        estimatedProgress: 3,
-        isEstimated: true,
-        message: '正在综合知识卡片',
+        estimatedProgress: 5,
+        isEstimated: false,
+        message: '正在按两层知识结构确定课程框架',
       },
     });
 
@@ -680,7 +776,7 @@ export const useStore = create<AppState>((set, get) => ({
         topics: knowledgeTopics,
         topicRelations,
         orderedTopicIds,
-        knowledgeCards,
+        knowledgeCards: preparedCards.cards,
         glossary,
         formulaIndex: formulaCards,
         terminology: generationMemory.terminology,
@@ -688,18 +784,15 @@ export const useStore = create<AppState>((set, get) => ({
         structureVersion: knowledgeBaseVersions.topicStructure,
         teachingRelations,
         narrativePaths,
+        resumeChapterNotes: state.chapterNotes,
       }, {
         onTopicSynthesis: (synthesis, current, total) => {
           const existing = get().topicSyntheses.filter(item => item.topicId !== synthesis.topicId);
           set({
-            job: 'generating-topic-syntheses',
             topicSyntheses: [...existing, synthesis],
             pipelineProgress: {
               ...get().pipelineProgress,
-              currentItem: current,
-              totalItems: total,
-              currentItemTitle: `综合知识 ${current}/${total}`,
-              message: `正在综合第 ${current}/${total} 个一级知识`,
+              estimatedProgress: 5 + Math.round(current / Math.max(1, total) * 5),
             },
           });
           saveState(get());
@@ -711,27 +804,85 @@ export const useStore = create<AppState>((set, get) => ({
             pipelineProgress: {
               ...get().pipelineProgress,
               steps: get().pipelineProgress.steps.map(step =>
-                step.id === 'topic-synthesis' ? { ...step, status: 'completed' as const }
-                  : step.id === 'chapter-plan' ? { ...step, status: 'completed' as const }
+                step.id === 'chapter-plan' ? { ...step, status: 'completed' as const }
                     : step.id === 'chapter-generation' ? { ...step, status: 'running' as const }
                       : step,
               ),
+              currentItem: 0,
+              totalItems: plan.length,
+              estimatedProgress: 10,
               message: `课程框架已完成，共 ${plan.length} 章`,
+            },
+            courseMasterNote: assembleCourseMasterNote({
+              courseId,
+              title,
+              outline: plan,
+              chapterNotes: get().chapterNotes,
+              knowledgeCards,
+              glossary,
+              formulaIndex: formulaCards,
+              structureVersion: knowledgeBaseVersions.topicStructure,
+            }),
+          });
+          saveState(get());
+        },
+        onChapterStart: (plan, current, total) => {
+          const existingById = new Map(get().chapterNotes.map(chapter => [chapter.id, chapter]));
+          const generating = {
+            ...plan,
+            markdown: '',
+            sourceCardIds: [],
+            status: 'generating' as const,
+            retryCount: existingById.get(plan.id)?.retryCount ?? 0,
+          };
+          existingById.set(plan.id, generating);
+          const orderedChapters = get().chapterPlan
+            .map(chapter => existingById.get(chapter.id))
+            .filter((chapter): chapter is NonNullable<typeof chapter> => Boolean(chapter));
+          const finished = orderedChapters.filter(chapter => chapter.status === 'completed' || chapter.status === 'failed').length;
+          set({
+            job: 'generating-chapter-notes',
+            chapterNotes: orderedChapters,
+            pipelineProgress: {
+              ...get().pipelineProgress,
+              currentItem: finished,
+              totalItems: total,
+              currentItemTitle: plan.title,
+              message: `开始生成第 ${current}/${total} 章：${plan.title}`,
+              estimatedProgress: 10 + Math.round(finished / Math.max(1, total) * 85),
             },
           });
           saveState(get());
         },
         onChapter: (chapter, current, total) => {
-          const existing = get().chapterNotes.filter(item => item.id !== chapter.id);
+          const existingById = new Map(get().chapterNotes.map(item => [item.id, item]));
+          existingById.set(chapter.id, chapter);
+          const orderedChapters = get().chapterPlan
+            .map(item => existingById.get(item.id))
+            .filter((item): item is NonNullable<typeof item> => Boolean(item));
+          const partialMasterNote = assembleCourseMasterNote({
+            courseId,
+            title,
+            outline: get().chapterPlan,
+            chapterNotes: orderedChapters,
+            knowledgeCards,
+            glossary,
+            formulaIndex: formulaCards,
+            structureVersion: knowledgeBaseVersions.topicStructure,
+          });
           set({
             job: 'generating-chapter-notes',
-            chapterNotes: [...existing, chapter],
+            chapterNotes: orderedChapters,
+            courseMasterNote: partialMasterNote,
             pipelineProgress: {
               ...get().pipelineProgress,
               currentItem: current,
               totalItems: total,
               currentItemTitle: chapter.title,
-              message: `正在生成第 ${current}/${total} 章：${chapter.title}`,
+              message: chapter.status === 'completed'
+                ? `已完成 ${current}/${total} 章：${chapter.title}`
+                : `章节“${chapter.title}”生成失败，继续保留其他章节`,
+              estimatedProgress: 10 + Math.round(current / Math.max(1, total) * 85),
             },
           });
           saveState(get());
@@ -771,7 +922,7 @@ export const useStore = create<AppState>((set, get) => ({
     const state = get();
     const plan = state.chapterPlan.find(chapter => chapter.id === chapterId);
     const existing = state.chapterNotes.find(chapter => chapter.id === chapterId);
-    if (!plan || !existing || !state.modelConfig?.apiKey) return;
+    if (!plan || !existing) return;
 
     const planIndex = state.chapterPlan.findIndex(chapter => chapter.id === chapterId);
     const previousPlan = planIndex > 0 ? state.chapterPlan[planIndex - 1] : null;
@@ -856,6 +1007,8 @@ export const useStore = create<AppState>((set, get) => ({
   resetKnowledgeBase: () => {
     set({
       sourceDocuments: [],
+      courseLearningStructure: null,
+      courseExtractionSession: null,
       knowledgeTopics: [],
       topicRelations: [],
       teachingBlocks: [],
@@ -893,6 +1046,8 @@ export const useStore = create<AppState>((set, get) => ({
     set({
       document: example.document,
       sourceDocuments: example.sourceDocuments,
+      courseLearningStructure: null,
+      courseExtractionSession: null,
       knowledgeTopics: example.knowledgeTopics,
       topicRelations: example.topicRelations,
       teachingBlocks: example.teachingBlocks,

@@ -101,6 +101,20 @@ describe('MasterNoteView complete-note stage', () => {
     expect(start).toHaveBeenCalledOnce();
   });
 
+  it('shows the concrete blocking reason when note generation rejects incomplete cards', () => {
+    useStore.setState({
+      jobStatus: 'blocked',
+      pipelineProgress: {
+        operation: 'generate-notes', status: 'blocked', steps: [], estimatedProgress: 0, isEstimated: false,
+        message: '知识卡片内容不完整：1/1 张未通过正文与原文证据检查。请先重新深化知识卡片。',
+      },
+    });
+
+    const container = render();
+    expect(container.textContent).toContain('知识卡片内容不完整：1/1');
+    expect(container.textContent).toContain('返回深化知识卡片');
+  });
+
   it('keeps successful chapters visible and retries only a failed chapter', () => {
     const failed: ChapterNote = {
       ...plan, id: 'chapter-2', title: '模型族比较', markdown: '', sourceCardIds: [], status: 'failed', error: '模型返回为空', retryCount: 0,
@@ -121,6 +135,28 @@ describe('MasterNoteView complete-note stage', () => {
     const button = Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes('重试本章'))!;
     act(() => button.click());
     expect(retry).toHaveBeenCalledWith('chapter-2');
+  });
+
+  it('offers one-click continuation when a partial note has unfinished chapters', () => {
+    const failed: ChapterNote = {
+      ...plan, id: 'chapter-2', title: '模型族比较', markdown: '', sourceCardIds: [], status: 'failed', error: 'signal timed out', retryCount: 0,
+    };
+    const start = vi.fn();
+    const master: CourseMasterNote = {
+      id: 'master-1', title: '机器学习', outline: [plan, failed], chapters: [completedChapter, failed], glossary: [], formulaIndex: [],
+      markdown: '# 机器学习\n\n## 广义线性模型\n\n完整章节正文。',
+      coverage: { totalCardIds: ['card-1'], coveredCardIds: ['card-1'], missingCardIds: [] }, status: 'partial', generatedFromStructureVersion: 2,
+    };
+    useStore.setState({
+      chapterPlan: [plan, failed], chapterNotes: [completedChapter, failed], courseMasterNote: master,
+      startMasterNoteGeneration: start,
+    });
+
+    const container = render();
+    const button = Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes('续跑未完成章节'))!;
+    act(() => button.click());
+
+    expect(start).toHaveBeenCalledOnce();
   });
 
   it('shows every completed chapter in one document and uses the directory as anchor navigation', () => {

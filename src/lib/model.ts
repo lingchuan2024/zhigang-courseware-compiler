@@ -15,7 +15,11 @@ export function validateModelConfig(config: ModelConfig | null): { valid: boolea
     return { valid: false, message: '请输入API Key' };
   }
   try {
-    new URL(config.endpoint);
+    if (config.endpoint.startsWith('/')) {
+      if (!config.endpoint.startsWith('/api/')) throw new Error('Unsupported relative endpoint');
+    } else {
+      new URL(config.endpoint);
+    }
   } catch {
     return { valid: false, message: 'API端点格式无效' };
   }

@@ -42,6 +42,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const jobStatus = useStore(state => state.jobStatus);
   const pipelineProgress = useStore(state => state.pipelineProgress);
   const navigateToStage = useStore(state => state.navigateToStage);
+  const startKnowledgePipeline = useStore(state => state.startKnowledgePipeline);
   const staleMarker = useStore(state => state.staleMarker);
   const structureQuality = useStore(state => state.structureQuality);
 
@@ -54,6 +55,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   const isRunning = jobStatus === 'running';
   const isBlocked = knowledgePipelineStatus === 'model-required';
   const isFailed = knowledgePipelineStatus === 'failed' || structureExtractionStatus === 'failed';
+  const isDegraded = knowledgePipelineStatus === 'degraded';
 
   const courseNetwork = useMemo(
     () => buildCourseNetwork(knowledgeTopics, topicRelations, courseLearningPath),
@@ -143,6 +145,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
         errors={extractionErrors.length > 0 ? extractionErrors : pipelineProgress.message ? [pipelineProgress.message] : ['知识提取失败']}
         failedStage={pipelineProgress.failedStage}
         failedWindowIndex={pipelineProgress.failedWindowIndex}
+        onRetry={() => void startKnowledgePipeline()}
         onBack={() => navigateToStage('mineru')}
         backLabel="返回 MinerU 解析"
       />
@@ -150,11 +153,21 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
   }
 
   if (courseNetwork.nodes.length === 0) {
+    const interrupted = knowledgePipelineStatus !== 'idle';
     return (
       <div className="grid flex-1 place-items-center bg-space-950/[0.56]">
         <div className="text-center">
-          <p className="mb-4 text-space-muted">暂无知识结构数据</p>
-          <button className="btn-primary" onClick={() => navigateToStage('mineru')}>返回 MinerU 解析</button>
+          <p className="mb-4 text-space-muted">
+            {interrupted ? '上次提取未完成，可以重新开始提取' : '暂无知识结构数据'}
+          </p>
+          <div className="flex items-center justify-center gap-3">
+            {sourceDocuments.length > 0 && (
+              <button className="btn-primary" onClick={() => void startKnowledgePipeline()}>
+                {interrupted ? '重新提取知识结构' : '开始提取知识结构'}
+              </button>
+            )}
+            <button className={sourceDocuments.length > 0 ? 'btn-outline' : 'btn-primary'} onClick={() => navigateToStage('mineru')}>返回 MinerU 解析</button>
+          </div>
         </div>
       </div>
     );
@@ -229,6 +242,17 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
           <button type="button" onClick={() => navigateToStage('cards')} className="btn-primary">查看知识卡片</button>
         </div>
       </header>
+
+      {isDegraded && (
+        <div className="flex flex-shrink-0 items-start gap-2 border-b border-amber-400/20 bg-amber-400/10 px-5 py-2 text-xs text-amber-200" role="status">
+          <span className="font-semibold">课程结构已降级</span>
+          <span>
+            {structureQuality?.qualityIssues?.length
+              ? structureQuality.qualityIssues.join('；')
+              : '部分章节或证据未通过校验，当前可用结构已保留。'}
+          </span>
+        </div>
+      )}
 
       <div className="flex min-h-0 flex-1">
         <main className="relative min-w-0 flex-1">

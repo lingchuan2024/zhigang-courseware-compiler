@@ -55,6 +55,13 @@ const approvedPresets = [
     apiKeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apikey',
   },
   {
+    id: 'volcengine-agent-plan',
+    label: '火山方舟 Agent Plan',
+    endpoint: '/api/ark-agent-plan/v3',
+    defaultModel: 'glm-5-3-flash-260901',
+    apiKeyUrl: 'https://console.volcengine.com/ark/region:ark+cn-beijing/apikey',
+  },
+  {
     id: 'siliconflow',
     label: '硅基流动',
     endpoint: 'https://api.siliconflow.cn/v1',
@@ -86,6 +93,7 @@ describe('model provider presets', () => {
       'zhipu',
       'kimi',
       'volcengine-ark',
+      'volcengine-agent-plan',
       'siliconflow',
       'openai',
       'openrouter',
@@ -103,7 +111,13 @@ describe('model provider presets', () => {
 
     expect(preset).toMatchObject(expected);
     expect(Object.values(preset).every(value => value.trim().length > 0)).toBe(true);
-    expect(preset.endpoint).toMatch(/^https:\/\//);
+    if (preset.id === 'volcengine-agent-plan') {
+      expect(preset.endpoint).toBe('/api/ark-agent-plan/v3');
+      expect(preset.apiMode).toBe('responses');
+    } else {
+      expect(preset.endpoint).toMatch(/^https:\/\//);
+      expect(preset.apiMode).toBe('chat-completions');
+    }
     expect(preset.apiKeyUrl).toMatch(/^https:\/\//);
   });
 

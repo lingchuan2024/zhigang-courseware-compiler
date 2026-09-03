@@ -82,6 +82,25 @@ describe('callChatCompletion 瞬时错误退避', () => {
     expect(sleeps).toEqual([1000, 2000]);
   });
 
+  it('allows latency-sensitive prompts to disable transport replay', async () => {
+    const sleeps: number[] = [];
+    const fetchMock = vi.fn().mockResolvedValue(new Response('boom', { status: 503 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(callChatCompletion(
+      config,
+      { ...makePrompt(), maxTransportAttempts: 1 },
+      'topic-merge',
+      5000,
+      undefined,
+      'section-compile',
+      async ms => { sleeps.push(ms); },
+    )).rejects.toMatchObject({ code: 'api-http-error' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleeps).toEqual([]);
+  });
+
   it('非瞬时状态码（401）不重试，直接抛出', async () => {
     const sleeps: number[] = [];
     const sleep = async (ms: number) => { sleeps.push(ms); };
@@ -93,6 +112,23 @@ describe('callChatCompletion 瞬时错误退避', () => {
     await expect(
       callChatCompletion(config, makePrompt(), 'topic-merge', 5000, undefined, undefined, sleep),
     ).rejects.toMatchObject({ code: 'api-http-error' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleeps).toEqual([]);
+  });
+
+  it('代理 504 被识别为超时并立即交给上层拆批', async () => {
+    const sleeps: number[] = [];
+    const sleep = async (ms: number) => { sleeps.push(ms); };
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code: 'agent-plan-proxy-timeout',
+      message: 'Agent Plan proxy request timed out',
+    }), { status: 504, headers: { 'Content-Type': 'application/json' } }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      callChatCompletion(config, makePrompt(), 'topic-merge', 5000, undefined, 'section-compile', sleep),
+    ).rejects.toMatchObject({ code: 'api-timeout', stage: 'section-compile' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(sleeps).toEqual([]);
@@ -111,6 +147,22 @@ describe('callChatCompletion 瞬时错误退避', () => {
 
     expect(result.data).toEqual({ value: 1 });
     expect(sleeps).toEqual([1000]);
+  });
+
+  it('请求超时不在传输层盲目重试', async () => {
+    const sleeps: number[] = [];
+    const sleep = async (ms: number) => { sleeps.push(ms); };
+    const timeout = new DOMException('The operation was aborted due to timeout', 'TimeoutError');
+    const fetchMock = vi.fn().mockRejectedValue(timeout);
+
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      callChatCompletion(config, makePrompt(), 'topic-merge', 5000, undefined, 'section-compile', sleep),
+    ).rejects.toMatchObject({ code: 'api-timeout', stage: 'section-compile' });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(sleeps).toEqual([]);
   });
 
   it('429 携带 Retry-After 时优先按其等待', async () => {

@@ -4,6 +4,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useStore } from '../../store/useStore';
 import { SettingsModal } from '../SettingsModal';
 
+const verifyMock = vi.hoisted(() => vi.fn());
+vi.mock('../../lib/model-v2', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../lib/model-v2')>();
+  return { ...actual, verifyModelConfig: verifyMock };
+});
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 const roots: Root[] = [];
 const storage = new Map<string, string>();
@@ -20,6 +26,8 @@ Object.defineProperty(globalThis, 'localStorage', {
 
 beforeEach(() => {
   storage.clear();
+  verifyMock.mockReset();
+  verifyMock.mockResolvedValue({ ok: true });
   act(() => useStore.setState({ mineruConfig: null, modelConfig: null }));
 });
 
@@ -110,6 +118,7 @@ describe('SettingsModal model provider presets', () => {
       '智谱 BigModel',
       'Kimi',
       '火山方舟',
+      '火山方舟 Agent Plan',
       '硅基流动',
       'OpenAI',
       'OpenRouter',
@@ -194,18 +203,109 @@ describe('SettingsModal model provider presets', () => {
       .toBe('https://platform.kimi.com/console/api-keys');
   });
 
-  it('saves only the existing three model configuration fields', () => {
+  it('saves chat-completions mode with an existing provider', async () => {
     const { container } = renderModal({ mode: 'default' });
     setSelect(container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!, 'modelark');
     setInput(container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!, 'modelark-key');
     const save = Array.from(container.querySelectorAll('button'))
       .find(button => button.textContent === '保存配置')!;
-    act(() => save.click());
+    await act(async () => save.click());
 
+    expect(verifyMock).toHaveBeenCalledWith(expect.objectContaining({
+      endpoint: 'https://ai.gitee.com/v1',
+      model: 'GLM-5',
+      apiKey: 'modelark-key',
+    }));
     expect(useStore.getState().modelConfig).toStrictEqual({
       endpoint: 'https://ai.gitee.com/v1',
       model: 'GLM-5',
       apiKey: 'modelark-key',
+      apiMode: 'chat-completions',
     });
+  });
+
+  it('selects Agent Plan as a Responses provider with its exact model id', async () => {
+    const { container } = renderModal({ mode: 'default' });
+    setSelect(
+      container.querySelector<HTMLSelectElement>('[aria-label="API 平台"]')!,
+      'volcengine-agent-plan',
+    );
+    setInput(container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!, 'agent-plan-test-key');
+
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成 API 地址"]')?.value)
+      .toBe('/api/ark-agent-plan/v3');
+    expect(container.querySelector<HTMLInputElement>('[aria-label="知识生成模型名称"]')?.value)
+      .toBe('glm-5-3-flash-260901');
+    expect(container.querySelector('#model-provider-hint')?.textContent).toContain('Responses');
+
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    await act(async () => save.click());
+
+    expect(verifyMock).toHaveBeenCalledWith({
+      endpoint: '/api/ark-agent-plan/v3',
+      model: 'glm-5-3-flash-260901',
+      apiKey: 'agent-plan-test-key',
+      apiMode: 'responses',
+    });
+  });
+});
+
+describe('SettingsModal model verification on save', () => {
+  it('blocks saving and surfaces the rejection reason when the key is rejected', async () => {
+    verifyMock.mockResolvedValueOnce({ ok: false, error: 'API Key 无效或被服务端拒绝（HTTP 401）' });
+    const { container, onClose, onSaved } = renderModal({ mode: 'default' });
+    setInput(container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!, 'bad-key');
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    await act(async () => save.click());
+
+    expect(container.querySelector('[data-testid="model-verify-error"]')?.textContent)
+      .toContain('API Key 无效或被服务端拒绝（HTTP 401）');
+    expect(useStore.getState().modelConfig).toBeNull();
+    expect(onClose).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it('saves and closes after verification passes with the trimmed config', async () => {
+    const { container, onClose } = renderModal({ mode: 'default' });
+    const key = container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!;
+    setInput(key, '  good-key  ');
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    await act(async () => save.click());
+
+    expect(verifyMock).toHaveBeenCalledWith(expect.objectContaining({
+      endpoint: 'https://api.deepseek.com',
+      model: 'deepseek-v4-flash',
+      apiKey: 'good-key',
+    }));
+    expect(useStore.getState().modelConfig?.apiKey).toBe('good-key');
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears the verification error when the key is edited after a failure', async () => {
+    verifyMock.mockResolvedValueOnce({ ok: false, error: 'API Key 无效或被服务端拒绝（HTTP 401）' });
+    const { container } = renderModal({ mode: 'default' });
+    const key = container.querySelector<HTMLInputElement>('#knowledge-model-api-key')!;
+    setInput(key, 'bad-key');
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    await act(async () => save.click());
+    expect(container.querySelector('[data-testid="model-verify-error"]')).not.toBeNull();
+
+    setInput(key, 'another-key');
+    expect(container.querySelector('[data-testid="model-verify-error"]')).toBeNull();
+  });
+
+  it('skips verification when no API key is filled', async () => {
+    const { container, onClose } = renderModal({ mode: 'default' });
+    const save = Array.from(container.querySelectorAll('button'))
+      .find(button => button.textContent === '保存配置')!;
+    await act(async () => save.click());
+
+    expect(verifyMock).not.toHaveBeenCalled();
+    expect(useStore.getState().modelConfig).toBeNull();
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 });

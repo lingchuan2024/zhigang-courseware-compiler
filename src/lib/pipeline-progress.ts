@@ -5,17 +5,15 @@ import {
   StructureExtractionStatus,
   WorkflowStage,
 } from '../types';
+import type { CourseExtractionProgress } from './course-structure/types';
 
 // ========== 常量 ==========
 
 export const STRUCTURE_EXTRACTION_STEPS: PipelineProgressStep[] = [
   { id: 'prepare-evidence', label: '准备证据', status: 'pending' },
-  { id: 'extract-topics', label: '分窗口提取候选知识点', status: 'pending' },
-  { id: 'merge-topics', label: '分层合并知识点', status: 'pending' },
-  { id: 'quality-check', label: '本地质量检查', status: 'pending' },
-  { id: 'targeted-repair', label: '定向修复问题知识点', status: 'pending' },
-  { id: 'extract-relations', label: '分析知识点关系', status: 'pending' },
-  { id: 'extract-internal', label: '生成知识点内部结构', status: 'pending' },
+  { id: 'extract-two-layer', label: '识别两层知识', status: 'pending' },
+  { id: 'compile-course', label: '合并知识点与学习顺序', status: 'pending' },
+  { id: 'validate-structure', label: '校验课程结构', status: 'pending' },
 ];
 
 export const NOTE_GENERATION_STEPS: PipelineProgressStep[] = [
@@ -40,12 +38,9 @@ export const IDLE_PROGRESS: PipelineProgress = {
  */
 export const STAGE_PROGRESS_RANGES: Record<string, [number, number]> = {
   'prepare-evidence': [1, 5],
-  'extract-topics': [5, 45],
-  'merge-topics': [45, 62],
-  'quality-check': [62, 68],
-  'targeted-repair': [68, 78],
-  'extract-relations': [78, 85],
-  'extract-internal': [85, 98],
+  'extract-two-layer': [5, 75],
+  'compile-course': [75, 90],
+  'validate-structure': [90, 99],
   // 笔记生成
   'prepare-packages': [1, 5],
   'generate-notes': [5, 95],
@@ -209,14 +204,14 @@ export function updateCurrentItem(
 
 /**
  * 更新窗口进度（分窗口提取时使用）。
- * 窗口完成数量驱动 5%~45% 的真实进度。
+ * 语义提取单元完成数量驱动 5%~75% 的真实进度。
  */
 export function updateWindowProgress(
   progress: PipelineProgress,
   current: number,
   total: number,
 ): PipelineProgress {
-  const range = STAGE_PROGRESS_RANGES['extract-topics'];
+  const range = STAGE_PROGRESS_RANGES['extract-two-layer'];
   if (!range) return progress;
 
   const ratio = total > 0 ? current / total : 0;
@@ -226,7 +221,26 @@ export function updateWindowProgress(
     ...progress,
     windowProgress: { current, total },
     estimatedProgress: Math.round(realProgress * 10) / 10,
-    isEstimated: false, // 窗口进度是真实的
+    isEstimated: false,
+    message: `已完成 ${current}/${total} 个证据单元`,
+  };
+}
+
+/** 使用编译器真实事件刷新计数与进度，不按时间伪造百分比。 */
+export function updateExtractionProgress(
+  progress: PipelineProgress,
+  event: CourseExtractionProgress,
+): PipelineProgress {
+  const updated = updateWindowProgress(progress, event.completedUnits, event.totalUnits);
+  const elapsedSeconds = Math.max(0, Math.round(event.elapsedMs / 1000));
+  return {
+    ...updated,
+    successfulItems: event.successfulUnits,
+    failedItems: event.failedUnits,
+    discoveredItems: event.discoveredTopicMentions,
+    elapsedMs: event.elapsedMs,
+    message: `已完成 ${event.completedUnits}/${event.totalUnits} · 成功 ${event.successfulUnits} · 失败 ${event.failedUnits} · 发现 ${event.discoveredTopicMentions} 个知识点 · ${elapsedSeconds} 秒`,
+    isEstimated: false,
   };
 }
 
@@ -266,13 +280,48 @@ export function tickEstimatedProgress(progress: PipelineProgress): PipelineProgr
 // ========== 从 StructureExtractionStatus 推导进度 ==========
 
 const STATUS_TO_STEP: Record<string, string> = {
-  'extracting-topics': 'extract-topics',
-  'repairing-topics': 'merge-topics',
-  'extracting-relations': 'extract-relations',
-  'extracting-internal-structures': 'extract-internal',
-  'quality-checking': 'quality-check',
-  'quality-repairing': 'targeted-repair',
+  'extracting-topics': 'extract-two-layer',
+  'repairing-topics': 'compile-course',
+  'extracting-relations': 'compile-course',
+  'extracting-internal-structures': 'validate-structure',
+  'quality-checking': 'compile-course',
+  'quality-repairing': 'validate-structure',
 };
+
+const COMPILER_STAGE_TO_STEP: Record<string, string> = {
+  batching: 'prepare-evidence',
+  compiling: 'extract-two-layer',
+  normalizing: 'compile-course',
+  reviewing: 'compile-course',
+  scheduling: 'compile-course',
+  validating: 'validate-structure',
+};
+
+/** 根据课程结构编译器的真实阶段推进进度。 */
+export function updateCompilerProgress(
+  progress: PipelineProgress,
+  stage: 'batching' | 'compiling' | 'normalizing' | 'reviewing' | 'scheduling' | 'validating',
+): PipelineProgress {
+  const currentStepId = COMPILER_STAGE_TO_STEP[stage];
+  const stepIndex = progress.steps.findIndex(step => step.id === currentStepId);
+  if (stepIndex < 0) return progress;
+
+  const steps = progress.steps.map((step, index) => {
+    if (index < stepIndex) {
+      return step.status === 'skipped' ? step : { ...step, status: 'completed' as const };
+    }
+    if (index === stepIndex) return { ...step, status: 'running' as const };
+    return { ...step, status: 'pending' as const };
+  });
+  const range = STAGE_PROGRESS_RANGES[currentStepId];
+  return {
+    ...progress,
+    status: 'running',
+    steps,
+    estimatedProgress: range?.[0] ?? progress.estimatedProgress,
+    isEstimated: false,
+  };
+}
 
 export function deriveStructureProgress(
   status: StructureExtractionStatus,

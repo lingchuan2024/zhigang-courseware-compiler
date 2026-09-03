@@ -1,65 +1,68 @@
 /**
- * 知识管线 V2 — 基于 Markdown 的 8 阶段处理流程
+ * 知识管线 V2。
  *
- * 阶段：
- * 1. Markdown Normalizer — 标准化 MinerU Markdown
- * 2. Window Understanding — 分析连续内容窗口
- * 3. Topic Extraction — 提取候选知识
- * 4. Topic Reconciliation — 合并和消歧候选知识
- * 5. Teaching Structure Extraction — 提取每个知识的讲法结构
- * 6. Learning Order Generation — 生成两层学习顺序
- * 7. Card and Note Generation — 生成知识卡片与笔记
- * 8. Validation — 检查覆盖、结构和事实一致性
+ * 课程结构只由 course-structure compiler 生成；旧类型仅作为现有 UI 的兼容投影。
+ * 卡片在这里仅生成确定性的基础版本，AI 深化由独立的卡片增强操作负责。
  */
-
-import {
+import type {
+  CourseKnowledgeBase,
+  CourseLearningPath,
+  FormulaCard,
+  GlossaryItem,
+  KnowledgeBaseVersions,
+  KnowledgeCard,
+  KnowledgePipelineStatus,
+  KnowledgeTopic,
+  MarkdownBlock,
   ModelConfig,
   SourceDocument,
-  MarkdownBlock,
-  KnowledgeTopic,
-  TopicRelation,
   TeachingBlock,
   TeachingRelation,
-  CourseLearningPath,
   TopicNarrativePath,
-  KnowledgeCard,
   TopicNote,
-  GlossaryItem,
-  FormulaCard,
-  KnowledgePipelineStatus,
-  KnowledgeBaseVersions,
-  CourseKnowledgeBase,
+  TopicRelation,
+  V2PipelineStage,
 } from '../types';
 import { createSourceDocument } from './markdown-parser';
-import { extractCandidatesFromAllWindows } from './topic-extraction-v2';
-import { reconcileTopics } from './topic-reconciliation';
-import { extractTeachingRelationGraph, extractTopicRelationGraph } from './knowledge-relation-traversal';
-import { extractTeachingStructureForAllTopics } from './teaching-structure';
-import { generateCourseLearningPath, generateNarrativePaths } from './learning-order';
 import { generateCards } from './card-generator';
-import { enrichKnowledgeCards } from './card-enrichment';
-import { validateKnowledgeStructure, ValidationReport } from './knowledge-validation';
-import { generateId } from './utils';
-import { ExtractionError } from './extraction-errors';
+import type { ValidationIssue, ValidationReport } from './knowledge-validation';
+import { compileCourseStructure } from './course-structure/compiler';
+import { projectLegacyStructure } from './course-structure/legacy-adapter';
+import type {
+  CourseExtractionProgress,
+  CourseExtractionUnitCheckpoint,
+  CourseLearningStructure,
+  CourseStructureIssue,
+  CourseStructureStatus,
+} from './course-structure/types';
 
-// ========== 管线选项 ==========
+export type CourseCompilerStage =
+  | 'batching'
+  | 'compiling'
+  | 'normalizing'
+  | 'reviewing'
+  | 'scheduling'
+  | 'validating';
 
 export interface PipelineOptionsV2 {
-  /** 进度回调 */
   onStatusChange?: (status: KnowledgePipelineStatus) => void;
-  /** 窗口提取进度 */
   onWindowProgress?: (current: number, total: number) => void;
-  /** 主题进度 */
+  /** @deprecated 结构编译不再逐知识点调用模型。 */
   onTopicProgress?: (current: number, total: number) => void;
-  /** 笔记进度 */
+  /** @deprecated 笔记生成不属于结构编译。 */
   onNoteProgress?: (current: number, total: number) => void;
+  onCompilerStage?: (stage: CourseCompilerStage) => void;
+  sourceDocuments?: SourceDocument[];
+  previousStructure?: CourseLearningStructure | null;
+  resumeCheckpoints?: CourseExtractionUnitCheckpoint[];
+  onUnitCheckpoint?: (checkpoint: CourseExtractionUnitCheckpoint) => void;
+  onExtractionProgress?: (progress: CourseExtractionProgress) => void;
 }
-
-// ========== 管线结果 ==========
 
 export interface PipelineResultV2 {
   sourceDocuments: SourceDocument[];
   allBlocks: MarkdownBlock[];
+  courseLearningStructure: CourseLearningStructure | null;
   topics: KnowledgeTopic[];
   topicRelations: TopicRelation[];
   teachingBlocks: TeachingBlock[];
@@ -78,312 +81,165 @@ export interface PipelineResultV2 {
   status: KnowledgePipelineStatus;
 }
 
-// ========== 主入口 ==========
+const AUTH_ERROR_HINT = ' —— API Key 无效或被服务端拒绝，请在「服务配置」中检查知识生成模型密钥';
 
-/**
- * 执行完整的知识提取管线。
- *
- * 输入：MinerU Markdown 文本
- * 输出：完整的知识库结构
- */
+const COMPILER_STATUS: Record<CourseCompilerStage, V2PipelineStage> = {
+  batching: 'normalizing',
+  compiling: 'compiling-sections',
+  normalizing: 'normalizing-topics',
+  reviewing: 'ordering',
+  scheduling: 'ordering',
+  validating: 'validation',
+};
+
+function compilerFailureMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  const hint = /401|Unauthorized|invalid[_ ]?api[_ ]?key|Incorrect API key|api key not valid/i.test(message)
+    ? AUTH_ERROR_HINT
+    : '';
+  return `课程结构编译失败：${message}${hint}`;
+}
+
+function toValidationIssue(issue: CourseStructureIssue): ValidationIssue {
+  return {
+    code: issue.code,
+    message: issue.message,
+    topicId: issue.topicId,
+    blockId: issue.blockId,
+    severity: issue.severity,
+  };
+}
+
+function buildValidationReport(
+  structure: CourseLearningStructure,
+  teachingBlocks: TeachingBlock[],
+  unassignedBlocks: string[],
+): ValidationReport {
+  const issues = structure.validation.issues.map(toValidationIssue);
+  const topicsWithTeachingBlocks = new Set(teachingBlocks.map(block => block.topicId)).size;
+  return {
+    errors: issues.filter(issue => issue.severity === 'error'),
+    warnings: issues.filter(issue => issue.severity === 'warning'),
+    coverage: {
+      totalBlocks: structure.validation.meaningfulBlockCount,
+      assignedBlocks: structure.validation.coveredMeaningfulBlockCount,
+      unassignedBlocks,
+      coverageRate: structure.validation.coverageRate,
+    },
+    topicStats: {
+      totalTopics: structure.topics.length,
+      topicsWithTeachingBlocks,
+      avgTeachingBlocksPerTopic: structure.topics.length === 0
+        ? 0
+        : teachingBlocks.length / structure.topics.length,
+    },
+    qualityIssues: issues.map(issue => issue.message),
+  };
+}
+
+function versionsFor(structure: CourseLearningStructure, cardCount: number): KnowledgeBaseVersions {
+  return {
+    source: structure.sourceVersion,
+    normalization: structure.sourceVersion,
+    topicStructure: structure.structureVersion,
+    teachingStructure: structure.structureVersion,
+    ordering: structure.structureVersion,
+    cards: cardCount > 0 ? 1 : 0,
+    notes: 0,
+    embeddings: 0,
+  };
+}
+
+function resolveSourceDocuments(
+  markdownTexts: Array<{ markdown: string; title: string }>,
+  courseId: string,
+  provided?: SourceDocument[],
+): SourceDocument[] {
+  if (provided) return provided;
+  return markdownTexts.map(({ markdown, title }) => createSourceDocument(markdown, courseId, title));
+}
+
 export async function runKnowledgePipeline(
   config: ModelConfig | null,
   markdownTexts: Array<{ markdown: string; title: string }>,
   courseId: string,
-  options: PipelineOptionsV2 = {}
+  options: PipelineOptionsV2 = {},
 ): Promise<PipelineResultV2> {
-  const warnings: string[] = [];
-  const errors: string[] = [];
-  const versions: KnowledgeBaseVersions = {
-    source: 0,
-    normalization: 0,
-    topicStructure: 0,
-    teachingStructure: 0,
-    ordering: 0,
-    cards: 0,
-    notes: 0,
-    embeddings: 0,
-  };
-
-  // 检查模型配置
-  if (!config?.apiKey) {
-    return createEmptyResult([], [], warnings, errors, 'model-required');
-  }
-
-  // ========== 阶段 1: Markdown Normalizer ==========
-
   options.onStatusChange?.('normalizing');
-  const sourceDocuments: SourceDocument[] = [];
-  const allBlocks: MarkdownBlock[] = [];
+  const sourceDocuments = resolveSourceDocuments(markdownTexts, courseId, options.sourceDocuments);
+  const allBlocks = sourceDocuments.flatMap(document => document.blocks);
+  const warnings = [`已准备 ${sourceDocuments.length} 个文档，共 ${allBlocks.length} 个内容块`];
+  const errors: string[] = [];
 
-  for (const { markdown, title } of markdownTexts) {
-    const doc = createSourceDocument(markdown, courseId, title);
-    sourceDocuments.push(doc);
-    allBlocks.push(...doc.blocks);
-    versions.source++;
-    versions.normalization++;
-  }
-  warnings.push(`已标准化 ${sourceDocuments.length} 个文档，共 ${allBlocks.length} 个内容块`);
-
-  // ========== 阶段 2 + 3: Window Understanding + Topic Extraction ==========
-
-  options.onStatusChange?.('window-analysis');
-  const { analyses, windowCount, failedWindows } =
-    await extractCandidatesFromAllWindows(
-      config,
-      allBlocks,
-      options.onWindowProgress,
-    );
-
-  if (failedWindows.length > 0) {
-    warnings.push(`${failedWindows.length}/${windowCount} 个窗口提取失败，已跳过`);
+  if (!config?.apiKey) {
+    return createEmptyResult(sourceDocuments, allBlocks, warnings, errors, 'model-required');
   }
 
-  // 收集所有候选知识
-  const allCandidates = analyses.flatMap(a => a.candidateTopics);
-
-  if (allCandidates.length === 0) {
-    errors.push('候选知识点提取为空');
+  let structure: CourseLearningStructure;
+  try {
+    structure = await compileCourseStructure(config, sourceDocuments, courseId, {
+      previous: options.previousStructure ?? null,
+      resumeCheckpoints: options.resumeCheckpoints,
+      onUnitCheckpoint: options.onUnitCheckpoint,
+      onExtractionProgress: options.onExtractionProgress,
+      onBatchProgress: options.onWindowProgress,
+      onStage: stage => {
+        options.onCompilerStage?.(stage);
+        options.onStatusChange?.(COMPILER_STATUS[stage]);
+      },
+    });
+  } catch (error) {
+    errors.push(compilerFailureMessage(error));
+    options.onStatusChange?.('failed');
     return createEmptyResult(sourceDocuments, allBlocks, warnings, errors, 'failed');
   }
 
-  warnings.push(`候选提取阶段共获得 ${allCandidates.length} 个候选知识点`);
-
-  // ========== 阶段 4: Topic Reconciliation ==========
-
-  options.onStatusChange?.('topic-reconciliation');
-  let topics: KnowledgeTopic[] = [];
-  let topicRelations: TopicRelation[] = [];
-
-  try {
-    const reconciled = await reconcileTopics(config, allCandidates, allBlocks);
-    topics = reconciled.topics;
-    topicRelations = reconciled.relations;
-    warnings.push(...reconciled.mergeWarnings);
-    versions.topicStructure++;
-
-    if (topics.length === 0) {
-      errors.push('全局合并后知识点为空');
-      return createEmptyResult(sourceDocuments, allBlocks, warnings, errors, 'failed');
-    }
-
-    warnings.push(`全局合并后得到 ${topics.length} 个知识点`);
-
-    // 候选合并与关系建网分离：先确定第一层节点，再让 AI 遍历完整目录建边。
-    try {
-      const traversedRelations = await extractTopicRelationGraph(config, topics);
-      if (traversedRelations.length > 0) {
-        topicRelations = traversedRelations;
-        warnings.push(`遍历第一层节点后建立 ${topicRelations.length} 条课程关系`);
-      } else if (topicRelations.length > 0) {
-        warnings.push('第一层独立关系遍历未产生新边，已保留合并阶段关系');
-      }
-    } catch (relationError) {
-      warnings.push(`第一层关系遍历失败，已保留现有关系：${relationError instanceof Error ? relationError.message : String(relationError)}`);
-    }
-  } catch (e) {
-    const msg = e instanceof ExtractionError
-      ? e.toUserMessage()
-      : e instanceof Error ? e.message : String(e);
-    errors.push(`知识点合并失败: ${msg}`);
-    return createEmptyResult(sourceDocuments, allBlocks, warnings, errors, 'failed');
-  }
-
-  // ========== 阶段 5: Teaching Structure Extraction ==========
-
-  options.onStatusChange?.('teaching-extraction');
-  let teachingBlocks: TeachingBlock[] = [];
-  let teachingRelations: TeachingRelation[] = [];
-  let narrativePaths: Record<string, TopicNarrativePath> = {};
-
-  try {
-    const teachingResult = await extractTeachingStructureForAllTopics(
-      config,
-      topics,
-      allBlocks,
-      options.onTopicProgress,
-    );
-    teachingBlocks = teachingResult.allTeachingBlocks;
-    teachingRelations = teachingResult.allTeachingRelations;
-    narrativePaths = teachingResult.narrativePaths;
-    versions.teachingStructure++;
-
-    warnings.push(`提取了 ${teachingBlocks.length} 个讲解块`);
-
-    // 节点提取完成后，逐个知识点遍历其第二层节点建网。
-    const traversedTeachingRelations: TeachingRelation[] = [];
-    for (const topic of topics) {
-      const topicBlocks = teachingBlocks.filter(block => block.topicId === topic.id);
-      const existing = teachingRelations.filter(relation => relation.topicId === topic.id);
-      try {
-        const traversed = await extractTeachingRelationGraph(config, topic, topicBlocks);
-        traversedTeachingRelations.push(...(traversed.length > 0 ? traversed : existing));
-      } catch (relationError) {
-        traversedTeachingRelations.push(...existing);
-        warnings.push(`“${topic.name}”内部关系遍历失败，已保留提取阶段关系：${relationError instanceof Error ? relationError.message : String(relationError)}`);
-      }
-    }
-    teachingRelations = traversedTeachingRelations;
-    warnings.push(`遍历第二层节点后建立 ${teachingRelations.length} 条内部关系`);
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    warnings.push(`讲解结构提取失败: ${msg}，使用降级结构`);
-    // 创建降级讲解块
-    teachingBlocks = topics.map(t => ({
-      id: generateId('tb'),
-      topicId: t.id,
-      type: 'conclusion' as const,
-      title: t.name,
-      sourceRanges: t.sourceRanges,
-      summary: t.summary,
-      importance: 'required' as const,
-      confidence: 0.5,
-    }));
-    narrativePaths = {};
-    for (const t of topics) {
-      narrativePaths[t.id] = {
-        topicId: t.id,
-        orderedTeachingBlockIds: teachingBlocks.filter(b => b.topicId === t.id).map(b => b.id),
-        rationale: '降级结构',
-      };
-    }
-  }
-
-  // ========== 阶段 6: Learning Order Generation ==========
-
-  options.onStatusChange?.('ordering');
-  let courseLearningPath: CourseLearningPath;
-
-  try {
-    courseLearningPath = generateCourseLearningPath(topics, topicRelations);
-    narrativePaths = generateNarrativePaths(topics, teachingBlocks, teachingRelations);
-    versions.ordering++;
-    warnings.push('学习顺序生成完成');
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    warnings.push(`学习顺序生成失败: ${msg}，使用原始顺序`);
-    courseLearningPath = {
-      orderedTopicIds: topics.map(t => t.id),
-      steps: topics.map(t => ({
-        topicId: t.id,
-        reason: '原始顺序',
-        prerequisiteTopicIds: [],
-      })),
-    };
-  }
-
-  // ========== 阶段 7: Knowledge Card Generation ==========
+  const projected = projectLegacyStructure(structure, allBlocks);
+  const meaningfulBlockIds = new Set(allBlocks
+    .filter(block => block.type !== 'heading' && block.content.trim().length > 0)
+    .map(block => block.id));
+  const assignedBlockIds = new Set(structure.evidenceSpans
+    .map(evidence => evidence.blockId)
+    .filter(blockId => meaningfulBlockIds.has(blockId)));
+  const unassignedBlocks = [...meaningfulBlockIds].filter(blockId => !assignedBlockIds.has(blockId));
+  const validation = buildValidationReport(structure, projected.teachingBlocks, unassignedBlocks);
+  errors.push(...validation.errors.map(issue => issue.message));
+  warnings.push(...validation.warnings.map(issue => issue.message));
 
   options.onStatusChange?.('card-generation');
   let knowledgeCards: KnowledgeCard[] = [];
-  const topicNotes: TopicNote[] = [];
-  const glossary: GlossaryItem[] = [];
-  const formulaCards: FormulaCard[] = [];
-
   try {
-    const baseCards = generateCards(topics, teachingBlocks, allBlocks, topicRelations, narrativePaths);
-    const enriched = await enrichKnowledgeCards(
-      config,
-      baseCards,
-      topics,
-      teachingBlocks,
-      teachingRelations,
+    knowledgeCards = generateCards(
+      projected.topics,
+      projected.teachingBlocks,
       allBlocks,
-      options.onNoteProgress,
+      projected.topicRelations,
+      projected.narrativePaths,
     );
-    knowledgeCards = enriched.cards;
-    if (enriched.failedCardIds.length > 0) {
-      warnings.push(`${enriched.failedCardIds.length} 张知识卡片深化失败，已保留基础卡片`);
-    }
-    versions.cards++;
-    warnings.push(`生成了 ${knowledgeCards.length} 张知识卡片`);
-  } catch (e) {
-    warnings.push(`知识卡片生成失败: ${e instanceof Error ? e.message : String(e)}`);
+    warnings.push(`生成了 ${knowledgeCards.length} 张基础知识卡片`);
+  } catch (error) {
+    warnings.push(`基础知识卡片生成失败：${error instanceof Error ? error.message : String(error)}`);
   }
 
-  // ========== 阶段 8: Validation ==========
-
-  options.onStatusChange?.('validation');
-  const validation = validateKnowledgeStructure(
-    allBlocks,
-    topics,
-    teachingBlocks,
-    topicRelations,
-    topicNotes,
-  );
-
-  // 收集未分配的块
-  const assignedBlockIds = new Set<string>();
-  for (const topic of topics) {
-    for (const range of topic.sourceRanges) {
-      collectBlockIdsInRange(range, allBlocks, assignedBlockIds);
-    }
-  }
-  for (const tb of teachingBlocks) {
-    for (const range of tb.sourceRanges) {
-      collectBlockIdsInRange(range, allBlocks, assignedBlockIds);
-    }
-  }
-  const unassignedBlocks = allBlocks
-    .filter(b => !assignedBlockIds.has(b.id) && b.type !== 'heading')
-    .map(b => b.id);
-
-  if (validation.errors.length > 0) {
-    errors.push(...validation.errors.map(e => e.message));
-  }
-  warnings.push(...validation.warnings.map(w => w.message));
-
-  options.onStatusChange?.('ready');
-
+  options.onStatusChange?.(structure.status);
   return {
     sourceDocuments,
     allBlocks,
-    topics,
-    topicRelations,
-    teachingBlocks,
-    teachingRelations,
-    courseLearningPath,
-    narrativePaths,
+    courseLearningStructure: structure,
+    ...projected,
     knowledgeCards,
-    topicNotes,
-    glossary,
-    formulaCards,
+    topicNotes: [],
+    glossary: [],
+    formulaCards: [],
     unassignedBlocks,
-    versions,
+    versions: versionsFor(structure, knowledgeCards.length),
     validation,
     warnings,
     errors,
-    status: 'ready',
+    status: structure.status,
   };
 }
 
-// ========== 辅助函数 ==========
-
-/**
- * 收集 SourceRange 中的所有块 ID。
- */
-function collectBlockIdsInRange(
-  range: { documentId: string; startBlockId: string; endBlockId: string },
-  allBlocks: MarkdownBlock[],
-  result: Set<string>,
-): void {
-  const docBlocks = allBlocks.filter(b => b.documentId === range.documentId);
-  const startIdx = docBlocks.findIndex(b => b.id === range.startBlockId);
-  const endIdx = docBlocks.findIndex(b => b.id === range.endBlockId);
-
-  if (startIdx === -1 || endIdx === -1) return;
-
-  const lo = Math.min(startIdx, endIdx);
-  const hi = Math.max(startIdx, endIdx);
-
-  for (let i = lo; i <= hi; i++) {
-    result.add(docBlocks[i].id);
-  }
-}
-
-/**
- * 创建空结果（用于失败或无模型情况）。
- */
 function createEmptyResult(
   sourceDocuments: SourceDocument[],
   allBlocks: MarkdownBlock[],
@@ -391,9 +247,13 @@ function createEmptyResult(
   errors: string[],
   status: KnowledgePipelineStatus,
 ): PipelineResultV2 {
+  const unassignedBlocks = allBlocks
+    .filter(block => block.type !== 'heading' && block.content.trim().length > 0)
+    .map(block => block.id);
   return {
     sourceDocuments,
     allBlocks,
+    courseLearningStructure: null,
     topics: [],
     topicRelations: [],
     teachingBlocks: [],
@@ -404,31 +264,18 @@ function createEmptyResult(
     topicNotes: [],
     glossary: [],
     formulaCards: [],
-    unassignedBlocks: allBlocks.filter(b => b.type !== 'heading').map(b => b.id),
+    unassignedBlocks,
     versions: {
-      source: 0,
-      normalization: 0,
-      topicStructure: 0,
-      teachingStructure: 0,
-      ordering: 0,
-      cards: 0,
-      notes: 0,
-      embeddings: 0,
+      source: 0, normalization: 0, topicStructure: 0, teachingStructure: 0,
+      ordering: 0, cards: 0, notes: 0, embeddings: 0,
     },
     validation: {
-      errors: [],
-      warnings: [],
+      errors: [], warnings: [],
       coverage: {
-        totalBlocks: allBlocks.length,
-        assignedBlocks: 0,
-        unassignedBlocks: allBlocks.filter(b => b.type !== 'heading').map(b => b.id),
-        coverageRate: 0,
+        totalBlocks: unassignedBlocks.length, assignedBlocks: 0,
+        unassignedBlocks, coverageRate: unassignedBlocks.length === 0 ? 1 : 0,
       },
-      topicStats: {
-        totalTopics: 0,
-        topicsWithTeachingBlocks: 0,
-        avgTeachingBlocksPerTopic: 0,
-      },
+      topicStats: { totalTopics: 0, topicsWithTeachingBlocks: 0, avgTeachingBlocksPerTopic: 0 },
       qualityIssues: [],
     },
     warnings,
@@ -437,9 +284,6 @@ function createEmptyResult(
   };
 }
 
-/**
- * 从 PipelineResultV2 构建 CourseKnowledgeBase。
- */
 export function buildKnowledgeBase(
   result: PipelineResultV2,
   courseId: string,
@@ -462,4 +306,8 @@ export function buildKnowledgeBase(
     unassignedBlocks: result.unassignedBlocks,
     versions: result.versions,
   };
+}
+
+export function isSuccessfulStructureStatus(status: CourseStructureStatus): boolean {
+  return status === 'ready' || status === 'degraded';
 }

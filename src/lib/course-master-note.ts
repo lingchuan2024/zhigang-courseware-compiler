@@ -34,7 +34,7 @@ function dedupeAdjacentMarkdown(markdown: string): string {
 export function planFallbackChapters(
   topics: KnowledgeTopic[],
   orderedTopicIds: string[],
-  maxTopicsPerChapter = 4,
+  maxTopicsPerChapter = 1,
 ): ChapterPlanItem[] {
   const byId = new Map(topics.map(topic => [topic.id, topic]));
   const seen = new Set<string>();
@@ -53,7 +53,9 @@ export function planFallbackChapters(
     const chapterNumber = chapters.length + 1;
     const title = group.length === 1
       ? group[0].name
-      : `${group[0].name}与${group[group.length - 1].name}`;
+      : group.length === 2
+        ? `${group[0].name}与${group[1].name}`
+        : `${group[0].name}、${group[1].name}等`;
     chapters.push({
       id: `chapter-${chapterNumber}`,
       title,

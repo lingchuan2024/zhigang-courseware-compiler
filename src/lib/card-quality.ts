@@ -1,5 +1,6 @@
 export interface KnowledgeCardDraftQualityInput {
   teachingType: string;
+  title?: string;
   detailedNote: string;
   sourceRangeCount: number;
 }
@@ -30,8 +31,13 @@ export function evaluateKnowledgeCardDraft(
 ): KnowledgeCardQualityResult {
   const text = input.detailedNote.trim();
   const reasons: string[] = [];
+  const normalizedText = text.replace(/[-#>*_`\s：:。！？!?，,；;（）()]/g, '').toLowerCase();
+  const normalizedTitle = (input.title ?? '')
+    .replace(/[-#>*_`\s：:。！？!?，,；;（）()]/g, '')
+    .toLowerCase();
 
   if (text.length < 120) reasons.push('正文过短，尚未形成可独立学习的讲解');
+  if (normalizedTitle && normalizedText === normalizedTitle) reasons.push('正文只是重复卡片标题');
   if (PLACEHOLDER_PATTERNS.some(pattern => pattern.test(text))) {
     reasons.push('正文包含空泛占位表达');
   }

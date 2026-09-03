@@ -72,6 +72,7 @@ function seed(modelConfigured: boolean) {
     stage: 'cards',
     job: null,
     jobStatus: 'idle',
+    staleMarker: null,
     modelConfig: modelConfigured ? { endpoint: 'https://api.example.com/v1', model: 'test', apiKey: 'key' } : null,
     sourceDocuments: [{ id: 'doc-1', courseId: 'course-1', title: '测试课程', markdown: '# 课程', blocks: [], outline: [], contentHash: 'h', createdAt: '', updatedAt: '' }],
     knowledgeTopics: [topic],
@@ -89,6 +90,14 @@ function seed(modelConfigured: boolean) {
   });
 }
 
+function substantiveCard(): KnowledgeCard {
+  return {
+    ...card,
+    detailedNote: 'GLM 使用连接函数把响应变量分布的均值与输入的线性预测子联系起来。'.repeat(6),
+    sourceRanges: [{ documentId: 'doc-1', startBlockId: 'source-1', endBlockId: 'source-1' }],
+  };
+}
+
 describe('master note store generation', () => {
   beforeEach(() => {
     localStorage.clear();
@@ -97,25 +106,84 @@ describe('master note store generation', () => {
     mocks.enrichKnowledgeCards.mockReset();
   });
 
-  it('blocks complete-note generation when the knowledge model is missing', async () => {
+  it('assembles a complete note without another model call once cards are complete', async () => {
     seed(false);
+    useStore.setState({ knowledgeCards: [substantiveCard()] });
+    mocks.runMasterNoteGeneration.mockResolvedValue({
+      topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote,
+    });
 
     await act(async () => useStore.getState().startMasterNoteGeneration());
 
-    expect(useStore.getState().stage).toBe('notes');
+    expect(useStore.getState().jobStatus).toBe('completed');
+    expect(mocks.runMasterNoteGeneration).toHaveBeenCalledOnce();
+  });
+
+  it('blocks complete-note generation while the course structure is stale', async () => {
+    seed(true);
+    useStore.setState({
+      knowledgeCards: [substantiveCard()],
+      staleMarker: {
+        reason: 'source-reparsed', affectedTopicIds: [], affectedPackageIds: [], timestamp: 1,
+        summary: '320 个新增内容块未被现有结构覆盖',
+      },
+    });
+
+    await act(async () => useStore.getState().startMasterNoteGeneration());
+
     expect(useStore.getState().jobStatus).toBe('blocked');
+    expect(useStore.getState().pipelineProgress.message).toContain('320 个新增内容块');
     expect(mocks.runMasterNoteGeneration).not.toHaveBeenCalled();
+  });
+
+  it('blocks complete-note generation when cards are title-only shells', async () => {
+    seed(true);
+    useStore.setState({ knowledgeCards: [{ ...card, detailedNote: card.title }] });
+
+    await act(async () => useStore.getState().startMasterNoteGeneration());
+
+    expect(useStore.getState().jobStatus).toBe('blocked');
+    expect(useStore.getState().pipelineProgress.message).toContain('知识卡片内容不完整');
+    expect(mocks.runMasterNoteGeneration).not.toHaveBeenCalled();
+  });
+
+  it('builds notes directly from traceable base cards without waiting for optional AI enrichment', async () => {
+    seed(true);
+    const baseCard = {
+      ...card,
+      status: 'partial' as const,
+      detailedNote: card.title,
+      sourceExcerpt: '课件原文说明 GLM 使用连接函数把响应变量分布的均值与输入的线性预测子联系起来。',
+      sourceRanges: [{ documentId: 'doc-1', startBlockId: 'source-1', endBlockId: 'source-1' }],
+    };
+    useStore.setState({ knowledgeCards: [baseCard] });
+    mocks.runMasterNoteGeneration.mockImplementation(async (_config, input) => {
+      expect(input.knowledgeCards[0].detailedNote).toContain('课件原文');
+      expect(input.knowledgeCards[0].detailedNote).toContain('GLM 使用连接函数');
+      return { topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote };
+    });
+
+    await act(async () => useStore.getState().startMasterNoteGeneration());
+
+    expect(mocks.runMasterNoteGeneration).toHaveBeenCalledOnce();
+    expect(useStore.getState().jobStatus).toBe('completed');
   });
 
   it('persists topic, plan, and chapter progress before publishing the master note', async () => {
     seed(true);
+    useStore.setState({ knowledgeCards: [substantiveCard()] });
     mocks.runMasterNoteGeneration.mockImplementation(async (_config, _input, callbacks) => {
       callbacks.onTopicSynthesis?.(synthesis, 1, 1);
       expect(useStore.getState().topicSyntheses).toEqual([synthesis]);
       callbacks.onPlan?.([plan]);
       expect(useStore.getState().chapterPlan).toEqual([plan]);
+      expect(useStore.getState().courseMasterNote?.outline).toEqual([plan]);
+      callbacks.onChapterStart?.(plan, 1, 1);
+      expect(useStore.getState().chapterNotes[0]?.status).toBe('generating');
       callbacks.onChapter?.(chapter, 1, 1);
       expect(useStore.getState().chapterNotes).toEqual([chapter]);
+      expect(useStore.getState().courseMasterNote?.chapters).toEqual([chapter]);
+      expect(useStore.getState().pipelineProgress.estimatedProgress).toBeGreaterThan(90);
       return { topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote };
     });
 
@@ -126,6 +194,33 @@ describe('master note store generation', () => {
     expect(state.jobStatus).toBe('completed');
     expect(state.job).toBeNull();
     expect(state.knowledgeBaseVersions.notes).toBe(1);
+  });
+
+  it('passes persisted chapters back to the generator instead of clearing them on resume', async () => {
+    seed(true);
+    useStore.setState({ knowledgeCards: [substantiveCard()] });
+    const failed: ChapterNote = {
+      ...plan,
+      markdown: '',
+      sourceCardIds: [],
+      status: 'failed',
+      error: 'signal timed out',
+      retryCount: 0,
+    };
+    useStore.setState({
+      chapterPlan: [plan],
+      chapterNotes: [failed],
+      courseMasterNote: { ...masterNote, chapters: [failed], status: 'failed', markdown: '# 测试课程' },
+    });
+    mocks.runMasterNoteGeneration.mockImplementation(async (_config, generationInput) => {
+      expect(generationInput.resumeChapterNotes).toEqual([failed]);
+      expect(useStore.getState().chapterNotes).toEqual([failed]);
+      return { topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote };
+    });
+
+    await act(async () => useStore.getState().startMasterNoteGeneration());
+
+    expect(mocks.runMasterNoteGeneration).toHaveBeenCalledOnce();
   });
 
   it('retries only the requested failed chapter and keeps completed chapters', async () => {

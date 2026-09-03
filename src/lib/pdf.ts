@@ -3,7 +3,7 @@ import { CoursePage, SourceTextItem, SourceTextBlock } from '../types';
 // 文件验证
 export const MAX_FILE_SIZE = 20 * 1024 * 1024; // 20MB
 export const PPTX_MIME_TYPE = 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-export const ALLOWED_TYPES = ['application/pdf', PPTX_MIME_TYPE];
+export const ALLOWED_TYPES = ['application/pdf', PPTX_MIME_TYPE, 'text/markdown'];
 
 export function validateFile(file: File): { valid: boolean; error?: string } {
   if (!file) {
@@ -17,8 +17,10 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
     !ALLOWED_TYPES.includes(file.type)
     && !extension.endsWith('.pdf')
     && !extension.endsWith('.pptx')
+    && !extension.endsWith('.md')
+    && !extension.endsWith('.markdown')
   ) {
-    return { valid: false, error: '只支持 PDF 或 PPTX 文件' };
+    return { valid: false, error: '只支持 PDF、PPTX 或 Markdown 文件' };
   }
   if (file.size > MAX_FILE_SIZE) {
     return { valid: false, error: `文件大小不能超过${MAX_FILE_SIZE / 1024 / 1024}MB` };

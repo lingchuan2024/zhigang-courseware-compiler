@@ -142,6 +142,24 @@ describe('KnowledgeStructureView two-layer network', () => {
     act(() => useStore.setState({ structureQuality: null }));
   });
 
+  it('keeps a degraded structure browsable and shows its quality warning', () => {
+    act(() => useStore.setState({
+      knowledgePipelineStatus: 'degraded',
+      jobStatus: 'completed',
+      structureQuality: {
+        coverageRate: 0.6, totalBlocks: 10, assignedBlocks: 6,
+        topicCount: 2, topicsWithTeachingBlocks: 1,
+        qualityIssues: ['一个章节批次失败'],
+      },
+    }));
+
+    const { container } = renderView();
+    expect(container.querySelector('[data-testid="knowledge-network-canvas"]')).not.toBeNull();
+    expect(container.textContent).toContain('课程结构已降级');
+    expect(container.textContent).toContain('一个章节批次失败');
+    expect(container.textContent).not.toContain('处理失败');
+  });
+
   it('marks reparse-affected topics with a stale badge', () => {
     act(() => useStore.setState({
       staleMarker: {
@@ -169,5 +187,60 @@ describe('KnowledgeStructureView two-layer network', () => {
     act(() => next.click());
 
     expect(useStore.getState().stage).toBe('cards');
+  });
+});
+
+describe('KnowledgeStructureView recovery', () => {
+  function button(container: HTMLElement, label: string): HTMLButtonElement {
+    const match = Array.from(container.querySelectorAll('button')).find(item => item.textContent?.includes(label));
+    if (!match) throw new Error(`button not found: ${label}`);
+    return match;
+  }
+
+  it('offers a direct retry on the failure screen without going back to MinerU', () => {
+    const retry = vi.fn();
+    act(() => useStore.setState({
+      knowledgeTopics: [],
+      knowledgePipelineStatus: 'failed',
+      jobStatus: 'failed',
+      pipelineProgress: { ...useStore.getState().pipelineProgress, status: 'failed', message: '候选知识点提取为空' },
+      startKnowledgePipeline: retry,
+    }));
+    const { container } = renderView();
+
+    expect(container.textContent).toContain('处理失败');
+    expect(container.textContent).toContain('候选知识点提取为空');
+    act(() => button(container, '重新提取').click());
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers to resume extraction when restored mid-run without topics', () => {
+    const retry = vi.fn();
+    act(() => useStore.setState({
+      knowledgeTopics: [],
+      knowledgePipelineStatus: 'window-analysis',
+      jobStatus: 'idle',
+      startKnowledgePipeline: retry,
+    }));
+    const { container } = renderView();
+
+    expect(container.textContent).toContain('上次提取未完成');
+    act(() => button(container, '重新提取知识结构').click());
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('offers to start extraction when entering the structure stage fresh', () => {
+    const retry = vi.fn();
+    act(() => useStore.setState({
+      knowledgeTopics: [],
+      knowledgePipelineStatus: 'idle',
+      jobStatus: 'idle',
+      startKnowledgePipeline: retry,
+    }));
+    const { container } = renderView();
+
+    expect(container.textContent).toContain('暂无知识结构数据');
+    act(() => button(container, '开始提取知识结构').click());
+    expect(retry).toHaveBeenCalledTimes(1);
   });
 });

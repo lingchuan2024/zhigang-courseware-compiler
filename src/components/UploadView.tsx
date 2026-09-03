@@ -30,6 +30,22 @@ export function UploadView() {
     try {
       const docId = generateId('doc');
       const isPptx = file.name.toLowerCase().endsWith('.pptx') || file.type === PPTX_MIME_TYPE;
+      const isMarkdown = /\.markdown?$/i.test(file.name);
+      if (isMarkdown) {
+        // Markdown 无需 MinerU：读文本 → 单页预览 → 直接进入 MinerU 确认页
+        const text = await file.text();
+        setDocument({
+          id: docId,
+          courseId: activeCourseId ?? undefined,
+          title: file.name.replace(/\.markdown?$/i, ''),
+          fileName: file.name,
+          fileType: 'markdown' as const,
+          sourceKey: docId,
+          pages: [{ pageNumber: 1, text }],
+          uploadedAt: Date.now(),
+        });
+        return;
+      }
       let pages;
       const source = await file.arrayBuffer();
       if (isPptx) {
@@ -73,7 +89,7 @@ export function UploadView() {
         <div className="text-center mb-8">
           <h2 className="font-song text-3xl font-bold text-ink mb-3">上传课件</h2>
           <p className="text-space-muted">
-            上传 PDF/PPTX 后先预览课件，再通过 MinerU 转换为 Markdown
+            上传 PDF/PPTX/Markdown 后先预览课件，再通过 MinerU 转换为 Markdown
           </p>
         </div>
 
@@ -92,7 +108,7 @@ export function UploadView() {
           <input
             ref={fileInputRef}
             type="file"
-            accept={`.pdf,.pptx,application/pdf,${PPTX_MIME_TYPE}`}
+            accept={`.pdf,.pptx,.md,.markdown,application/pdf,${PPTX_MIME_TYPE},text/markdown`}
             className="hidden"
             onChange={e => {
               const f = e.target.files?.[0];
@@ -119,10 +135,10 @@ export function UploadView() {
                   </svg>
                 </div>
                 <p className="font-song text-lg text-ink mb-2">
-                  拖拽 PDF 或 PPTX 文件到此处，或点击选择文件
+                  拖拽 PDF、PPTX 或 Markdown 文件到此处，或点击选择文件
                 </p>
                 <p className="text-sm text-space-muted">
-                  支持 PDF 与 PPTX，最大 20MB
+                  支持 PDF / PPTX / Markdown（Markdown 免 MinerU 解析），最大 20MB
                 </p>
               </>
             )}

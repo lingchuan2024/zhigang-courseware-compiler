@@ -34,7 +34,7 @@ const PERSISTED_KEYS: (keyof ProjectState)[] = [
   'pipelineProgress',
   'staleMarker',
   'structureExtractionStatus', 'extractionErrors',
-  'sourceDocuments', 'knowledgeTopics', 'topicRelations',
+  'sourceDocuments', 'courseLearningStructure', 'courseExtractionSession', 'knowledgeTopics', 'topicRelations',
   'teachingBlocks', 'teachingRelations', 'courseLearningPath',
   'narrativePaths', 'knowledgeCards', 'topicNotes',
   'topicSyntheses', 'chapterPlan', 'chapterNotes', 'courseMasterNote',
@@ -59,6 +59,25 @@ export function writeWorkspacePointer(documentId: string, courseId: string): voi
     localStorage.setItem(POINTER_KEY, JSON.stringify(pointer));
   } catch (error) {
     console.warn('Failed to write workspace pointer:', error);
+  }
+}
+
+/** 读取工作区指针（刷新后恢复工作区用）；不存在或损坏时返回 null。 */
+export function readWorkspacePointer(): WorkspacePointer | null {
+  try {
+    const raw = localStorage.getItem(POINTER_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<WorkspacePointer>;
+    if (
+      parsed.schemaVersion === 10 &&
+      typeof parsed.documentId === 'string' && parsed.documentId &&
+      typeof parsed.courseId === 'string' && parsed.courseId
+    ) {
+      return { schemaVersion: 10, documentId: parsed.documentId, courseId: parsed.courseId };
+    }
+    return null;
+  } catch {
+    return null;
   }
 }
 

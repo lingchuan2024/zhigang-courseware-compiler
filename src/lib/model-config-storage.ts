@@ -11,7 +11,10 @@ function isModelConfig(value: unknown): value is ModelConfig {
     && typeof candidate.model === 'string'
     && candidate.model.length > 0
     && typeof candidate.apiKey === 'string'
-    && candidate.apiKey.length > 0;
+    && candidate.apiKey.length > 0
+    && (candidate.apiMode === undefined
+      || candidate.apiMode === 'chat-completions'
+      || candidate.apiMode === 'responses');
 }
 
 export function saveStoredModelConfig(config: ModelConfig): void {
@@ -23,7 +26,9 @@ export function loadStoredModelConfig(): ModelConfig | null {
     const raw = localStorage.getItem(MODEL_CONFIG_STORAGE_KEY);
     if (!raw) return null;
     const parsed: unknown = JSON.parse(raw);
-    return isModelConfig(parsed) ? parsed : null;
+    return isModelConfig(parsed)
+      ? { ...parsed, apiMode: parsed.apiMode ?? 'chat-completions' }
+      : null;
   } catch {
     return null;
   }
