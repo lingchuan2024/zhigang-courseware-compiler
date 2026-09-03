@@ -35,6 +35,18 @@ describe('evidence span resolution', () => {
     expect(result.span).toMatchObject({ startOffset: 24, endOffset: 28 });
   });
 
+  it('locates a unique quote after normalizing whitespace from model output', () => {
+    const formatted = { ...block, content: 'Representer\n\n  Theorem 给出有限维表示。' };
+    const result = resolveEvidenceSpan({
+      blockId: 'b1',
+      quote: 'Representer Theorem 给出有限维表示。',
+      role: 'statement',
+    }, formatted);
+
+    expect(result.issue).toBeUndefined();
+    expect(result.span?.quote).toBe('Representer\n\n  Theorem 给出有限维表示。');
+  });
+
   it('rejects an ambiguous quote', () => {
     const repeated = { ...block, content: '模型用于估计。模型也用于预测。' };
     expect(resolveEvidenceSpan({

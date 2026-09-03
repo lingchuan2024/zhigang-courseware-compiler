@@ -288,6 +288,10 @@ export function generateCards(
       confidence: block.confidence,
       reviewStatus: 'generated',
       narrativeIndex: cards.filter(existing => existing.topicId === topic.id).length,
+      // 这里只是可追溯的基础卡片，尚未经过 AI 深化与质量检查。
+      status: 'partial',
+      sourceVersion: 1,
+      cardVersion: 0,
     };
 
     cards.push(card);

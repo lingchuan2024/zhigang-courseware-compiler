@@ -44,6 +44,7 @@ describe('knowledge card narrative order', () => {
 
     expect(cards.map(card => card.teachingBlockId)).toEqual(['block-family', 'block-formula']);
     expect(cards.map(card => card.narrativeIndex)).toEqual([0, 1]);
+    expect(cards.every(card => card.status === 'partial')).toBe(true);
   });
 
   it('does not create an untraceable card for a teaching block without source evidence', () => {

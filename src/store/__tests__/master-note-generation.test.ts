@@ -147,6 +147,28 @@ describe('master note store generation', () => {
     expect(mocks.runMasterNoteGeneration).not.toHaveBeenCalled();
   });
 
+  it('builds notes directly from traceable base cards without waiting for optional AI enrichment', async () => {
+    seed(true);
+    const baseCard = {
+      ...card,
+      status: 'partial' as const,
+      detailedNote: card.title,
+      sourceExcerpt: '课件原文说明 GLM 使用连接函数把响应变量分布的均值与输入的线性预测子联系起来。',
+      sourceRanges: [{ documentId: 'doc-1', startBlockId: 'source-1', endBlockId: 'source-1' }],
+    };
+    useStore.setState({ knowledgeCards: [baseCard] });
+    mocks.runMasterNoteGeneration.mockImplementation(async (_config, input) => {
+      expect(input.knowledgeCards[0].detailedNote).toContain('课件原文');
+      expect(input.knowledgeCards[0].detailedNote).toContain('GLM 使用连接函数');
+      return { topicSyntheses: [synthesis], chapterPlan: [plan], chapterNotes: [chapter], masterNote };
+    });
+
+    await act(async () => useStore.getState().startMasterNoteGeneration());
+
+    expect(mocks.runMasterNoteGeneration).toHaveBeenCalledOnce();
+    expect(useStore.getState().jobStatus).toBe('completed');
+  });
+
   it('persists topic, plan, and chapter progress before publishing the master note', async () => {
     seed(true);
     useStore.setState({ knowledgeCards: [substantiveCard()] });

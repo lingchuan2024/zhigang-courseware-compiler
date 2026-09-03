@@ -45,7 +45,10 @@ export function isStageCompleted(stage: ProductStage, state: ProductStateSnapsho
     case 'structure':
       return Boolean(state.knowledgeTopics?.length);
     case 'cards':
-      return Boolean(state.knowledgeCards?.length);
+      return Boolean(
+        state.knowledgeCards?.length
+        && state.knowledgeCards.every(card => card.status === 'completed'),
+      );
     case 'notes': {
       const note = state.courseMasterNote;
       const structureVersion = state.knowledgeBaseVersions?.topicStructure ?? 0;
@@ -251,7 +254,10 @@ export function deriveProductSteps(
       canClick = false;
     } else if (completed || hasData) {
       // 有 staleMarker 时，下游阶段标记为 stale
-      if (state.staleMarker && i > currentIndex) {
+      if (stage === 'cards' && hasData && !completed) {
+        status = 'stale';
+        statusLabel = '需要深化';
+      } else if (state.staleMarker && i > currentIndex) {
         status = 'stale';
         statusLabel = '需要更新';
       } else {

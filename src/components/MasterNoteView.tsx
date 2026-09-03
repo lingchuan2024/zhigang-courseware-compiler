@@ -68,6 +68,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
   const isRunning = jobStatus === 'running';
   const estimatedProgress = progress.estimatedProgress ?? 0;
   const isPartial = usableMaster && masterNote?.status === 'partial';
+  const isBlocked = !isRunning && (progress.status === 'blocked' || progress.status === 'failed');
   const activeCards = activeChapter
     ? cards.filter(card => activeChapter.sourceCardIds.includes(card.id))
     : [];
@@ -145,6 +146,13 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
             <span className="font-mono text-xs">{Math.round(estimatedProgress)}%</span>
           </div>
           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-space-750"><div className="h-full rounded-full bg-celadon transition-all" style={{ width: `${Math.max(3, estimatedProgress)}%` }} /></div>
+        </div>
+      )}
+
+      {isBlocked && progress.message && (
+        <div className="flex items-center justify-between gap-4 border-b border-rose-400/25 bg-rose-400/10 px-5 py-3 text-sm text-rose-200" role="alert">
+          <span>{progress.message}</span>
+          <button type="button" onClick={() => navigateToStage('cards')} className="flex-shrink-0 rounded-lg border border-rose-300/30 px-3 py-1.5 text-xs hover:bg-rose-300/10">返回深化知识卡片</button>
         </div>
       )}
 

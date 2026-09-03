@@ -73,6 +73,23 @@ describe('Responses API transport', () => {
     expect(body).not.toHaveProperty('thinking');
   });
 
+  it('repairs literal Markdown newlines and invalid LaTeX escapes inside a JSON string', async () => {
+    const malformed = `{"detailedNote":"第一行
+第二行 $\\alpha$",}`;
+    const fetchMock = vi.fn().mockResolvedValue(responsesResponse(malformed));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await callChatCompletion<{ detailedNote: string }>(
+      config,
+      { ...prompt, maxStructuredAttempts: 1 },
+      'note-generation',
+      1000,
+    );
+
+    expect(result.data.detailedNote).toBe('第一行\n第二行 $\\alpha$');
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
+
   it('uses a task-specific output limit when the prompt provides one', async () => {
     const fetchMock = vi.fn().mockResolvedValue(responsesResponse('{"units":[]}'));
     vi.stubGlobal('fetch', fetchMock);

@@ -44,6 +44,7 @@ export interface CourseCompilerDependencies {
 interface ResolvedUnitDraft {
   draft: TeachingUnitDraft;
   evidenceIds: string[];
+  batchId: string;
 }
 
 interface ResolvedClaimDraft {
@@ -386,6 +387,7 @@ export async function compileCourseStructure(
     compilation.teachingUnits.forEach(draft => resolvedUnits.push({
       draft,
       evidenceIds: resolveDrafts(draft.evidence, blockById),
+      batchId: batch.id,
     }));
     compilation.orderClaims.forEach(claim => resolvedClaims.push({
       beforeTopicLocalId: claim.beforeTopicLocalId,
@@ -441,12 +443,18 @@ export async function compileCourseStructure(
 
   const topics = reviewed.topics;
   const topicById = new Map(topics.map(topic => [topic.id, topic]));
-  const teachingUnits = dedupeTeachingUnits(resolvedUnits.flatMap(({ draft, evidenceIds }) => {
+  const unitBatchIds = new Map<string, Set<string>>();
+  const unitOrderByStableKey = new Map<string, number>();
+  const teachingUnits = dedupeTeachingUnits(resolvedUnits.flatMap(({ draft, evidenceIds, batchId }, unitOrder) => {
     const initialTopicId = normalized.localTopicToCanonicalId.get(draft.topicLocalId);
     const topicId = mapTopicId(initialTopicId);
     const topic = topicById.get(topicId);
     if (!topic) return [];
     const stableKey = teachingUnitStableKey(topic.stableKey, draft.role, evidenceIds[0] ?? `unit:${draft.localId}`);
+    const batchIds = unitBatchIds.get(stableKey) ?? new Set<string>();
+    batchIds.add(batchId);
+    unitBatchIds.set(stableKey, batchIds);
+    if (!unitOrderByStableKey.has(stableKey)) unitOrderByStableKey.set(stableKey, unitOrder);
     return [{
       id: stableKey,
       stableKey,
@@ -460,6 +468,180 @@ export async function compileCourseStructure(
       status: evidenceIds.length > 0 ? 'verified' as const : 'draft' as const,
     }];
   }));
+
+  // 模型只负责在每个有界批次内识别两层语义结构；它常常只为一个
+  // 教学单元返回一条代表性 anchor。如果直接把“没有 anchor”当成“没有内容”，
+  // 同一小节的公式、推导和例子就会在卡片/笔记中永久丢失。因此在语义结构
+  // 已确定后，把成功批次里每个尚未被覆盖的原文块确定性地归到最近的
+  // 二层教学单元。这一步不创造新知识，只保证已选中课件的原文不被丢弃。
+  const attachBlockEvidence = (unit: TeachingUnit, block: MarkdownBlock): void => {
+    const resolved = resolveEvidenceSpan({
+      blockId: block.id,
+      quote: block.content,
+      role: unit.role === 'formula' ? 'formula'
+        : unit.role === 'condition' ? 'condition'
+          : unit.role === 'derivation_step' ? 'derivation'
+            : unit.role === 'example' ? 'example'
+              : unit.role === 'comparison' ? 'comparison'
+                : unit.role === 'application' ? 'application'
+                  : unit.role === 'definition' ? 'definition'
+                    : 'statement',
+      startOffset: 0,
+      endOffset: block.content.length,
+    }, block);
+    if (!resolved.span) return;
+    evidenceById.set(resolved.span.id, resolved.span);
+    unit.evidenceIds = unionInOrder(unit.evidenceIds, [resolved.span.id]);
+    unit.status = 'verified';
+  };
+
+  checkpoints.forEach(checkpoint => {
+    const batch = batchById.get(checkpoint.batchId);
+    if (!batch) return;
+    const originalBlocks = originalBlocksByDocument.get(batch.documentId);
+    if (!originalBlocks) return;
+    const blocks = [...new Set(batch.blocks.map(block => block.id))]
+      .map(blockId => originalBlocks.get(blockId))
+      .filter((block): block is MarkdownBlock => Boolean(block && block.type !== 'heading' && block.content.trim()));
+    const batchUnits = teachingUnits
+      .filter(unit => unitBatchIds.get(unit.stableKey)?.has(batch.id))
+      .sort((left, right) => (unitOrderByStableKey.get(left.stableKey) ?? 0)
+        - (unitOrderByStableKey.get(right.stableKey) ?? 0));
+    if (blocks.length === 0 || batchUnits.length === 0) return;
+
+    const blockIndexById = new Map(blocks.map((block, index) => [block.id, index]));
+    const distinctiveTokens = (value: string): Set<string> => {
+      const normalizedValue = value.normalize('NFKC').toLocaleLowerCase();
+      const tokens = new Set(
+        normalizedValue.match(/[a-z][a-z0-9-]{2,}|\d+/gu) ?? [],
+      );
+      // 课程结构常由中文模型输出，而课件原文多为英文。这里只扩展少量
+      // 高辨识度教学术语，不做开放式翻译，仍要求至少两个标记唯一命中。
+      const bilingualTerms: Array<[string, string[]]> = [
+        ['高斯', ['gaussian']], ['概率', ['probability']], ['密度', ['density', 'pdf']],
+        ['核', ['kernel']], ['贝叶斯', ['bayesian']], ['非参数', ['nonparametric']],
+        ['线性', ['linear']], ['非线性', ['nonlinear']], ['回归', ['regression']],
+        ['梯度', ['gradient']], ['稀疏', ['sparse']], ['正则', ['regularizer', 'regularization']],
+        ['似然', ['likelihood']], ['矩阵', ['matrix']], ['特征', ['feature']],
+        ['样本', ['sample']], ['对称', ['symmetry']], ['归一化', ['normalization']],
+      ];
+      bilingualTerms.forEach(([term, translations]) => {
+        if (normalizedValue.includes(term)) translations.forEach(token => tokens.add(token));
+      });
+      return tokens;
+    };
+    const semanticBlockForUnit = (
+      unit: TeachingUnit,
+      candidateBlocks: MarkdownBlock[],
+    ): MarkdownBlock | undefined => {
+      const titleTokens = distinctiveTokens(unit.title);
+      const summaryTokens = distinctiveTokens(unit.summary);
+      const wanted = new Set([...titleTokens, ...summaryTokens]);
+      if (wanted.size === 0) return undefined;
+      const scored = candidateBlocks.map(block => {
+        const present = distinctiveTokens(block.content);
+        const matchedTokens = [...wanted].filter(token => present.has(token));
+        const score = matchedTokens.reduce((total, token) => (
+          total + (titleTokens.has(token) ? 2 : 0) + (summaryTokens.has(token) ? 1 : 0)
+        ), 0);
+        return { block, score, matchedTokenCount: matchedTokens.length };
+      }).sort((left, right) => right.score - left.score
+        || left.block.orderIndex - right.block.orderIndex);
+      // 只在至少有两个区分性标记（如 23/25/RBF）且最优块唯一时使用，
+      // 避免把普通的“model”、“kernel”等高频词当成可靠定位。
+      return scored[0]?.matchedTokenCount >= 2 && scored[0].score > (scored[1]?.score ?? -1)
+        ? scored[0].block
+        : undefined;
+    };
+
+    const anchorIndex = (unit: TeachingUnit, fallback: number): number => {
+      for (const evidenceId of unit.evidenceIds) {
+        const index = blockIndexById.get(evidenceById.get(evidenceId)?.blockId ?? '');
+        if (index !== undefined) return index;
+      }
+      return fallback;
+    };
+
+    // 先按第一层主题划定原文范围，再只在主题内部为第二层单元补证据。
+    // 不能直接在整个批次上按 teachingUnits 数组下标插值：模型可能交错返回
+    // 不同主题的单元，那会把相邻主题的原文挂到错误单元。
+    const topicGroups = [...new Set(batchUnits.map(unit => unit.topicId))].map((topicId, topicIndex) => ({
+      topicId,
+      topicIndex,
+      units: batchUnits.filter(unit => unit.topicId === topicId),
+    }));
+    const topicAnchorIndices = (topicId: string): number[] => {
+      const topicEvidenceIds = topicById.get(topicId)?.evidenceIds ?? [];
+      const unitEvidenceIds = batchUnits
+        .filter(unit => unit.topicId === topicId)
+        .flatMap(unit => unit.evidenceIds);
+      return [...new Set([...topicEvidenceIds, ...unitEvidenceIds].flatMap(evidenceId => {
+        const index = blockIndexById.get(evidenceById.get(evidenceId)?.blockId ?? '');
+        return index === undefined ? [] : [index];
+      }))].sort((left, right) => left - right);
+    };
+    const anchorsByTopicId = new Map(topicGroups.map(group => [
+      group.topicId,
+      topicAnchorIndices(group.topicId),
+    ]));
+    const fallbackTopicIndex = (topicIndex: number): number => topicGroups.length === 1
+      ? 0
+      : Math.round(topicIndex * (blocks.length - 1) / (topicGroups.length - 1));
+    const ownerTopicIdByBlockId = new Map(blocks.map((block, blockIndex) => {
+      const owner = topicGroups.reduce((best, group) => {
+        const anchors = anchorsByTopicId.get(group.topicId) ?? [];
+        const distance = anchors.length > 0
+          ? Math.min(...anchors.map(index => Math.abs(index - blockIndex)))
+          : Math.abs(fallbackTopicIndex(group.topicIndex) - blockIndex);
+        return distance < best.distance ? { topicId: group.topicId, distance } : best;
+      }, { topicId: topicGroups[0].topicId, distance: Number.POSITIVE_INFINITY });
+      return [block.id, owner.topicId] as const;
+    }));
+
+    topicGroups.forEach(group => {
+      const topicBlocks = blocks.filter(block => ownerTopicIdByBlockId.get(block.id) === group.topicId);
+      const candidateBlocks = topicBlocks.length > 0 ? topicBlocks : blocks;
+
+      // 每个无 anchor 的单元先在本主题的原文范围中寻找公式/编号标记，
+      // 找不到再按照该主题内部的教学单元顺序插值。
+      group.units.forEach((unit, unitIndex) => {
+        if (unit.evidenceIds.some(id => {
+          const blockId = evidenceById.get(id)?.blockId;
+          return blockId !== undefined && blockIndexById.has(blockId);
+        })) return;
+        const semanticBlock = semanticBlockForUnit(unit, candidateBlocks);
+        if (semanticBlock) {
+          attachBlockEvidence(unit, semanticBlock);
+          return;
+        }
+        const candidateIndex = group.units.length === 1
+          ? 0
+          : Math.round(unitIndex * (candidateBlocks.length - 1) / (group.units.length - 1));
+        attachBlockEvidence(unit, candidateBlocks[Math.max(0, candidateIndex)]);
+      });
+    });
+
+    const coveredBlockIds = new Set([...evidenceById.values()].map(item => item.blockId));
+    blocks.forEach((block, blockIndex) => {
+      if (coveredBlockIds.has(block.id)) return;
+      const topicId = ownerTopicIdByBlockId.get(block.id);
+      const candidateUnits = batchUnits.filter(unit => unit.topicId === topicId);
+      const nearest = candidateUnits.reduce((best, unit, unitIndex) => {
+        const distance = Math.abs(anchorIndex(unit, unitIndex) - blockIndex);
+        return distance < best.distance ? { unit, distance } : best;
+      }, { unit: candidateUnits[0] ?? batchUnits[0], distance: Number.POSITIVE_INFINITY });
+      attachBlockEvidence(nearest.unit, block);
+      coveredBlockIds.add(block.id);
+    });
+  });
+
+  topics.forEach(topic => {
+    const unitEvidenceIds = teachingUnits
+      .filter(unit => unit.topicId === topic.id)
+      .flatMap(unit => unit.evidenceIds);
+    topic.evidenceIds = unionInOrder(topic.evidenceIds, unitEvidenceIds);
+    if (topic.evidenceIds.length > 0 && topic.status === 'draft') topic.status = 'verified';
+  });
 
   const claimConstraints: OrderConstraint[] = resolvedClaims.flatMap(claim => {
     const beforeTopicId = mapTopicId(normalized.localTopicToCanonicalId.get(claim.beforeTopicLocalId));

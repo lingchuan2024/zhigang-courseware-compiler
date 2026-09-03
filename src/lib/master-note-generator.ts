@@ -224,6 +224,16 @@ export async function regenerateChapterNote(
   const sourceCardIds = input.plan.topicIds.flatMap(topicId =>
     input.syntheses.find(synthesis => synthesis.topicId === topicId)?.orderedCardIds ?? [],
   );
+  if (sourceCardIds.length === 0) {
+    return {
+      ...input.plan,
+      markdown: '',
+      sourceCardIds,
+      status: 'failed',
+      error: '该知识主题没有可追溯的知识卡片',
+      retryCount: input.previousRetryCount + 1,
+    };
+  }
   return {
     ...input.plan,
     markdown: localChapterMarkdown(input.plan, input.syntheses, input.knowledgeCards),
@@ -262,6 +272,19 @@ export async function runMasterNoteGeneration(
       return;
     }
     callbacks.onChapterStart?.(plan, index + 1, chapterPlan.length);
+    if (sourceCardIds.length === 0) {
+      const chapter: ChapterNote = {
+        ...plan,
+        markdown: '',
+        sourceCardIds,
+        status: 'failed',
+        error: '该知识主题没有可追溯的知识卡片',
+        retryCount: input.resumeChapterNotes?.find(item => item.id === plan.id)?.retryCount ?? 0,
+      };
+      chapterNotes.push(chapter);
+      callbacks.onChapter?.(chapter, index + 1, chapterPlan.length);
+      return;
+    }
     const syntheses = plan.topicIds
       .map(topicId => synthesisByTopic.get(topicId))
       .filter((value): value is TopicSynthesis => Boolean(value));

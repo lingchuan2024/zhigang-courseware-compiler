@@ -10,6 +10,7 @@ import {
   WorkflowStage,
 } from '../types';
 import type { SourceDocument } from '../types';
+import type { KnowledgeCard } from '../types';
 import { saveState, clearState } from '../lib/persistence';
 import { createExampleCourse } from '../lib/examples';
 import { runKnowledgePipeline, type PipelineResultV2 } from '../lib/knowledge-pipeline-v2';
@@ -49,6 +50,52 @@ const initialMemory: CourseGenerationMemory = {
   symbols: {},
   generatedTopicSummaries: {},
 };
+
+function normalizeCardText(value: string): string {
+  return value.replace(/[-#>*_`\s：:。！？!? ，,；;（）()]/g, '').toLocaleLowerCase();
+}
+
+function prepareKnowledgeCardsForNotes(cards: KnowledgeCard[]): {
+  cards: KnowledgeCard[];
+  invalidCardIds: string[];
+} {
+  const invalidCardIds: string[] = [];
+  const prepared = cards.map(card => {
+    const enrichedQuality = evaluateKnowledgeCardDraft({
+      teachingType: card.teachingType,
+      title: card.title,
+      detailedNote: card.detailedNote,
+      sourceRangeCount: card.sourceRanges.length,
+    });
+    if (card.status === 'completed' && enrichedQuality.accepted) return card;
+
+    const excerpt = card.sourceExcerpt?.trim() ?? '';
+    const current = card.detailedNote.trim();
+    const currentIsSubstantive = current.length >= 80
+      && normalizeCardText(current) !== normalizeCardText(card.title);
+    const hasTraceableSource = card.sourceRanges.length > 0 && excerpt.length >= 12;
+    if (
+      card.status === 'failed'
+      || card.status === 'stale'
+      || card.status === 'generating'
+      || (!currentIsSubstantive && !hasTraceableSource)
+    ) {
+      invalidCardIds.push(card.id);
+      return card;
+    }
+
+    if (currentIsSubstantive) return card;
+    return {
+      ...card,
+      detailedNote: [
+        card.conciseSummary,
+        '**课件原文：**',
+        excerpt,
+      ].filter(Boolean).join('\n\n'),
+    };
+  });
+  return { cards: prepared, invalidCardIds };
+}
 
 const initialState: ProjectState = {
   stage: 'upload',
@@ -678,22 +725,17 @@ export const useStore = create<AppState>((set, get) => ({
       return;
     }
 
-    const invalidCards = knowledgeCards.filter(card => (
-      card.status !== 'completed' || !evaluateKnowledgeCardDraft({
-        teachingType: card.teachingType,
-        title: card.title,
-        detailedNote: card.detailedNote,
-        sourceRangeCount: card.sourceRanges.length,
-      }).accepted
-    ));
-    if (invalidCards.length > 0) {
+    // AI 深化是可选增强，不应成为完整笔记的必经网络关卡。
+    // 基础卡片只要能追溯到 MinerU 原文，就可以直接参与确定性笔记组装。
+    const preparedCards = prepareKnowledgeCardsForNotes(knowledgeCards);
+    if (preparedCards.invalidCardIds.length > 0) {
       set({
         stage: 'notes',
         job: null,
         jobStatus: 'blocked',
         pipelineProgress: blockProgress(
           createNoteGenerationProgress(knowledgeTopics.length),
-          `知识卡片内容不完整：${invalidCards.length}/${knowledgeCards.length} 张未通过正文与原文证据检查。请先重新深化知识卡片。`,
+          `知识卡片内容不完整：${preparedCards.invalidCardIds.length}/${knowledgeCards.length} 张既没有可用正文，也无法定位到课件原文。请先重新编译知识结构。`,
         ),
       });
       saveState(get());
@@ -734,7 +776,7 @@ export const useStore = create<AppState>((set, get) => ({
         topics: knowledgeTopics,
         topicRelations,
         orderedTopicIds,
-        knowledgeCards,
+        knowledgeCards: preparedCards.cards,
         glossary,
         formulaIndex: formulaCards,
         terminology: generationMemory.terminology,

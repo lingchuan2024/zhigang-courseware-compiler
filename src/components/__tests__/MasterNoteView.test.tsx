@@ -101,6 +101,20 @@ describe('MasterNoteView complete-note stage', () => {
     expect(start).toHaveBeenCalledOnce();
   });
 
+  it('shows the concrete blocking reason when note generation rejects incomplete cards', () => {
+    useStore.setState({
+      jobStatus: 'blocked',
+      pipelineProgress: {
+        operation: 'generate-notes', status: 'blocked', steps: [], estimatedProgress: 0, isEstimated: false,
+        message: '知识卡片内容不完整：1/1 张未通过正文与原文证据检查。请先重新深化知识卡片。',
+      },
+    });
+
+    const container = render();
+    expect(container.textContent).toContain('知识卡片内容不完整：1/1');
+    expect(container.textContent).toContain('返回深化知识卡片');
+  });
+
   it('keeps successful chapters visible and retries only a failed chapter', () => {
     const failed: ChapterNote = {
       ...plan, id: 'chapter-2', title: '模型族比较', markdown: '', sourceCardIds: [], status: 'failed', error: '模型返回为空', retryCount: 0,

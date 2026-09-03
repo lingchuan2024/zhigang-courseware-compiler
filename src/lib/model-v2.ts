@@ -8,7 +8,41 @@ import {
 } from './model-usage';
 import { ExtractionError, ExtractionStage, inferErrorCode } from './extraction-errors';
 
-// 通用JSON解析（处理代码围栏）
+function repairJsonStringEncoding(value: string): string {
+  let result = '';
+  let inString = false;
+  for (let index = 0; index < value.length; index += 1) {
+    const character = value[index];
+    if (!inString) {
+      result += character;
+      if (character === '"') inString = true;
+      continue;
+    }
+    if (character === '"') {
+      result += character;
+      inString = false;
+      continue;
+    }
+    if (character === '\\') {
+      const next = value[index + 1];
+      if (next && /["\\/bfnrtu]/.test(next)) {
+        result += character + next;
+        index += 1;
+      } else {
+        // 模型常把 LaTeX 的单反斜杠直接放进 JSON 字符串。
+        result += '\\\\';
+      }
+      continue;
+    }
+    if (character === '\n') result += '\\n';
+    else if (character === '\r') result += '\\r';
+    else if (character === '\t') result += '\\t';
+    else result += character;
+  }
+  return result.replace(/,\s*([}\]])/g, '$1');
+}
+
+// 通用JSON解析（处理代码围栏和模型常见的 Markdown 字符串编码错误）
 function parseJsonFromResponse(text: string): unknown {
   let cleaned = text.trim();
   // 去除markdown代码围栏
@@ -32,7 +66,11 @@ function parseJsonFromResponse(text: string): unknown {
   try {
     return JSON.parse(cleaned);
   } catch {
-    return null;
+    try {
+      return JSON.parse(repairJsonStringEncoding(cleaned));
+    } catch {
+      return null;
+    }
   }
 }
 

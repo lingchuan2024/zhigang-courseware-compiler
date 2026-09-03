@@ -200,6 +200,133 @@ describe('course structure compiler integration', () => {
     expect(result.teachingUnits[0].evidenceIds).toHaveLength(2);
   });
 
+  it('deterministically preserves every meaningful source block inside a compiled batch', async () => {
+    const documents = [multiBlockDocument('coverage', 4)];
+    const result = await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => {
+        const first = { blockId: batch.blocks[0].id, quote: batch.blocks[0].content, role: 'definition' as const };
+        return {
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          topicMentions: [{
+            localId: `${batch.id}:topic`, name: '连续知识段', aliases: [], learningObjective: '理解四个连续片段',
+            scope: '测试', genre: 'concept', difficulty: 2, importance: 'core', evidence: [first], confidence: 0.9,
+          }],
+          teachingUnits: [{
+            localId: `${batch.id}:unit`, topicLocalId: `${batch.id}:topic`, role: 'definition',
+            title: '连续讲解', summary: '四个原文片段属于同一个教学单元', evidence: [first], required: true, confidence: 0.9,
+          }],
+          orderClaims: [], unresolvedReferences: [], confidence: 0.9,
+        };
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    expect(result.validation.coverageRate).toBe(1);
+    expect(new Set(result.evidenceSpans.map(item => item.blockId))).toEqual(new Set([
+      'coverage-b1', 'coverage-b2', 'coverage-b3', 'coverage-b4',
+    ]));
+    expect(result.teachingUnits[0].evidenceIds).toHaveLength(4);
+  });
+
+  it('uses distinctive formula markers before positional fallback when recovering unit evidence', async () => {
+    const documents = [multiBlockDocument('semantic', 3)];
+    documents[0].blocks[0].content = 'AIC compares model fit and simplicity.';
+    documents[0].blocks[1].content = 'Question 2 asks for a sparse regularizer for kernel regression.';
+    documents[0].blocks[2].content = 'Question 1: derive equations (23) to (25) and the RBF kernel gradient.';
+    const result = await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => {
+        const evidence = (index: number) => ({
+          blockId: batch.blocks[index].id, quote: batch.blocks[index].content, role: 'statement' as const,
+        });
+        return {
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          topicMentions: [{
+            localId: `${batch.id}:topic`, name: '技术报告', aliases: [], learningObjective: '完成核方法技术报告',
+            scope: '测试', genre: 'case', difficulty: 3, importance: 'core', evidence: [evidence(0)], confidence: 0.9,
+          }],
+          teachingUnits: [
+            { localId: `${batch.id}:u1`, topicLocalId: `${batch.id}:topic`, role: 'comparison', title: 'AIC', summary: '模型比较', evidence: [evidence(0)], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:u2`, topicLocalId: `${batch.id}:topic`, role: 'problem', title: '推导 (23) 到 (25) 及 RBF 梯度', summary: '技术报告问题 1', evidence: [], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:u3`, topicLocalId: `${batch.id}:topic`, role: 'problem', title: '稀疏正则', summary: '技术报告问题 2', evidence: [evidence(1)], required: true, confidence: 0.9 },
+          ],
+          orderClaims: [], unresolvedReferences: [], confidence: 0.9,
+        };
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    const recovered = result.teachingUnits.find(unit => unit.title.includes('RBF'))!;
+    expect(recovered.evidenceIds.map(id => result.evidenceSpans.find(span => span.id === id)?.blockId))
+      .toContain('semantic-b3');
+  });
+
+  it('keeps positional evidence recovery inside its first-layer topic', async () => {
+    const documents = [multiBlockDocument('topic-boundary', 4)];
+    documents[0].blocks.forEach((block, index) => {
+      block.content = `主题边界原文 ${index + 1}`;
+    });
+    const result = await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => {
+        const evidence = (index: number) => ({
+          blockId: batch.blocks[index].id, quote: batch.blocks[index].content, role: 'statement' as const,
+        });
+        return {
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          topicMentions: [
+            { localId: `${batch.id}:a`, name: '主题甲', aliases: [], learningObjective: '学习主题甲', scope: '测试', genre: 'concept', difficulty: 1, importance: 'core', evidence: [evidence(0)], confidence: 0.9 },
+            { localId: `${batch.id}:b`, name: '主题乙', aliases: [], learningObjective: '学习主题乙', scope: '测试', genre: 'concept', difficulty: 1, importance: 'core', evidence: [evidence(2)], confidence: 0.9 },
+          ],
+          // 特意交错返回两个主题的单元，模拟模型数组顺序不稳定。
+          teachingUnits: [
+            { localId: `${batch.id}:a1`, topicLocalId: `${batch.id}:a`, role: 'definition', title: '甲的起点', summary: '甲', evidence: [evidence(0)], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:b1`, topicLocalId: `${batch.id}:b`, role: 'definition', title: '乙的起点', summary: '乙', evidence: [evidence(2)], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:a2`, topicLocalId: `${batch.id}:a`, role: 'example', title: '甲的后续', summary: '甲', evidence: [], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:b2`, topicLocalId: `${batch.id}:b`, role: 'example', title: '乙的后续', summary: '乙', evidence: [], required: true, confidence: 0.9 },
+          ],
+          orderClaims: [], unresolvedReferences: [], confidence: 0.9,
+        };
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    const blockIdsForUnit = (title: string) => result.teachingUnits
+      .find(unit => unit.title === title)!.evidenceIds
+      .map(id => result.evidenceSpans.find(span => span.id === id)?.blockId);
+    expect(blockIdsForUnit('甲的后续')).toContain('topic-boundary-b2');
+    expect(blockIdsForUnit('甲的后续')).not.toContain('topic-boundary-b3');
+    expect(blockIdsForUnit('乙的后续')).toContain('topic-boundary-b4');
+  });
+
+  it('uses bilingual teaching terms to recover evidence inside one topic', async () => {
+    const documents = [multiBlockDocument('bilingual', 3)];
+    documents[0].blocks[0].content = 'A kernel is associated with a probability density function.';
+    documents[0].blocks[1].content = 'A Gaussian density gives a Gaussian kernel.';
+    documents[0].blocks[2].content = 'The Lp norm is defined in an RKHS.';
+    const result = await compileCourseStructure(config, documents, 'course-1', {
+      compileBatch: async batch => {
+        const first = { blockId: batch.blocks[0].id, quote: batch.blocks[0].content, role: 'definition' as const };
+        return {
+          batchId: batch.id,
+          sectionIds: batch.sectionIds,
+          topicMentions: [{ localId: `${batch.id}:bayes`, name: '贝叶斯视角的核函数', aliases: [], learningObjective: '理解高斯核', scope: '测试', genre: 'concept', difficulty: 2, importance: 'core', evidence: [first], confidence: 0.9 }],
+          teachingUnits: [
+            { localId: `${batch.id}:u1`, topicLocalId: `${batch.id}:bayes`, role: 'definition', title: '核与概率密度函数', summary: '核和概率密度的关系', evidence: [first], required: true, confidence: 0.9 },
+            { localId: `${batch.id}:u2`, topicLocalId: `${batch.id}:bayes`, role: 'derivation_step', title: '高斯密度导出高斯核', summary: '从高斯概率密度得到核函数', evidence: [], required: true, confidence: 0.9 },
+          ],
+          orderClaims: [], unresolvedReferences: [], confidence: 0.9,
+        };
+      },
+      review: async () => ({ operations: [], constraints: [], warnings: [] }),
+    });
+
+    const recovered = result.teachingUnits.find(unit => unit.title === '高斯密度导出高斯核')!;
+    expect(recovered.evidenceIds.map(id => result.evidenceSpans.find(span => span.id === id)?.blockId))
+      .toContain('bilingual-b2');
+  });
+
   it('reports zero completed batches before the first long model request finishes', async () => {
     const progress: Array<[number, number]> = [];
     await compileCourseStructure(config, [document('d1', '似然函数用于参数估计。')], 'course-1', {

@@ -249,4 +249,55 @@ describe('unified section compiler', () => {
       blockId: 'b1', quote: '重复句', startOffset: 10, endOffset: 13,
     });
   });
+
+  it('keeps evidence when the copied atom anchor only normalizes whitespace', async () => {
+    const formattedBatch: SectionBatch = {
+      ...batch,
+      blocks: [{ ...batch.blocks[0], content: 'Representer\n  Theorem 给出表示式。', sourceEndOffset: 28 }],
+    };
+    mocks.callChatCompletion.mockResolvedValue({
+      data: {
+        topics: [{
+          localId: 't1', name: 'Representer Theorem', aliases: [], learningObjective: '理解表示定理',
+          genre: 'concept', difficulty: 3, importance: 'core',
+        }],
+        units: [{
+          localId: 'u1', topicLocalId: 't1', role: 'definition', title: 'Representer Theorem', required: true,
+          evidence: [{ atomId: 'b1:atom:0', blockId: 'b1', anchor: 'Representer Theorem 给出表示式。' }],
+        }],
+        explicitOrders: [], confidence: 0.9,
+      },
+      usage: {},
+    });
+
+    const result = await compileSectionBatch(config, formattedBatch);
+    expect(result.teachingUnits[0].evidence[0]).toMatchObject({
+      blockId: 'b1',
+      startOffset: 0,
+      endOffset: formattedBatch.blocks[0].content.length,
+    });
+  });
+
+  it('uses an exact unique unit title as a traceable fallback when model evidence is omitted', async () => {
+    mocks.callChatCompletion.mockResolvedValue({
+      data: {
+        topics: [{
+          localId: 't1', name: '最大似然估计', aliases: ['MLE'], learningObjective: '理解 MLE',
+          genre: 'concept', difficulty: 2, importance: 'core',
+        }],
+        units: [{
+          localId: 'u1', topicLocalId: 't1', role: 'definition', title: 'MLE 最大化似然函数',
+          summary: '定义 MLE', evidence: [], required: true,
+        }],
+        explicitOrders: [], confidence: 0.9,
+      },
+      usage: {},
+    });
+
+    const result = await compileSectionBatch(config, batch);
+    expect(result.teachingUnits[0].evidence).toEqual([
+      expect.objectContaining({ blockId: 'b1', quote: 'MLE 最大化似然函数' }),
+    ]);
+    expect(result.topicMentions[0].evidence).toHaveLength(1);
+  });
 });

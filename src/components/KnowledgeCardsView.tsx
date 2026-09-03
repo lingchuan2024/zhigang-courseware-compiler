@@ -84,6 +84,7 @@ function MarkdownKnowledgeCardsView() {
   const learningPath = useStore(state => state.courseLearningPath);
   const job = useStore(state => state.job);
   const regenerateKnowledgeCards = useStore(state => state.regenerateKnowledgeCards);
+  const startMasterNoteGeneration = useStore(state => state.startMasterNoteGeneration);
   const navigateToStage = useStore(state => state.navigateToStage);
   const [activeCardId, setActiveCardId] = useState<string | null>(cards[0]?.id ?? null);
 
@@ -110,6 +111,8 @@ function MarkdownKnowledgeCardsView() {
   const hasCompleteNoteData = Boolean(
     courseMasterNote?.markdown.trim() || chapterNotes.length > 0 || topicSyntheses.length > 0,
   );
+  const completedCardCount = cards.filter(card => card.status === 'completed').length;
+  const allCardsCompleted = cards.length > 0 && completedCardCount === cards.length;
 
   if (cards.length === 0) {
     return (
@@ -135,7 +138,12 @@ function MarkdownKnowledgeCardsView() {
           <button type="button" onClick={() => navigateToStage('structure')} className="grid h-9 w-9 place-items-center rounded-lg text-space-muted hover:bg-space-750 hover:text-space-text" aria-label="返回知识结构">←</button>
           <div>
             <h1 className="font-song text-xl font-bold text-space-text">知识卡片</h1>
-            <p className="mt-0.5 text-xs text-space-muted">{cards.length} 张 AI 深化卡片 · 按二级知识网顺序组织 · 每张卡片关联课件原文</p>
+            <p className="mt-0.5 text-xs text-space-muted">
+              {allCardsCompleted
+                ? `${cards.length} 张 AI 深化卡片`
+                : `${cards.length} 张基础卡片 · ${cards.length - completedCardCount} 张待深化`}
+              {' · 按二级知识网顺序组织 · 每张卡片关联课件原文'}
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -145,9 +153,9 @@ function MarkdownKnowledgeCardsView() {
             disabled={job === 'enriching-knowledge-cards'}
             className="btn-outline disabled:cursor-wait disabled:opacity-50"
           >
-            {job === 'enriching-knowledge-cards' ? '正在深化…' : '重新深化卡片'}
+            {job === 'enriching-knowledge-cards' ? '正在深化…' : allCardsCompleted ? '重新深化卡片' : '深化知识卡片'}
           </button>
-          <button type="button" onClick={() => navigateToStage('notes')} disabled={job === 'enriching-knowledge-cards'} className="btn-primary disabled:opacity-50">
+          <button type="button" onClick={() => void startMasterNoteGeneration()} disabled={job === 'enriching-knowledge-cards'} className="btn-primary disabled:opacity-50">
             生成完整笔记 →
           </button>
         </div>
@@ -200,7 +208,7 @@ function MarkdownKnowledgeCardsView() {
                 <div>
                   <div className="mb-2 flex flex-wrap gap-2 text-[11px]">
                     <span className="rounded-full bg-celadon/10 px-2.5 py-1 text-celadon ring-1 ring-celadon/20">{activeCard.teachingType}</span>
-                    <span className="rounded-full bg-space-750 px-2.5 py-1 text-space-muted ring-1 ring-space-border">{CARD_STATUS_LABELS[activeCard.status ?? 'completed']}</span>
+                    <span className="rounded-full bg-space-750 px-2.5 py-1 text-space-muted ring-1 ring-space-border">{CARD_STATUS_LABELS[activeCard.status ?? 'partial']}</span>
                     <span className="rounded-full bg-space-750 px-2.5 py-1 text-space-muted ring-1 ring-space-border">置信度 {Math.round(activeCard.confidence * 100)}%</span>
                   </div>
                   <h2 className="font-song text-3xl font-bold leading-tight text-space-text">{activeCard.title}</h2>

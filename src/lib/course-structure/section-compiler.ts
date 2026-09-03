@@ -3,6 +3,7 @@ import { callChatCompletion } from '../model-v2';
 import type { CompiledPrompt } from '../prompt-builder';
 import type { SectionBatch, SectionBatchBlock } from './section-batching';
 import { SECTION_COMPILER_PROMPT_VERSION } from './section-batching';
+import { locateUniqueNormalizedQuote } from './evidence-span';
 import type {
   EvidenceRole,
   EvidenceSpanDraft,
@@ -90,12 +91,47 @@ function parseEvidence(
     if (atom) {
       const first = atom.content.indexOf(quote);
       const second = first < 0 ? -1 : atom.content.indexOf(quote, first + Math.max(1, quote.length));
-      if (first < 0 || second >= 0) return [];
-      startOffset = atom.sourceStartOffset + first;
-      endOffset = startOffset + quote.length;
+      if (first >= 0 && second < 0) {
+        startOffset = atom.sourceStartOffset + first;
+        endOffset = startOffset + quote.length;
+      } else if (first < 0) {
+        const normalized = locateUniqueNormalizedQuote(atom.content, quote);
+        if (normalized) {
+          startOffset = atom.sourceStartOffset + normalized.startOffset;
+          endOffset = atom.sourceStartOffset + normalized.endOffset;
+        } else {
+          startOffset = undefined;
+          endOffset = undefined;
+        }
+      } else {
+        return [];
+      }
     }
     return [{ blockId, quote, role, startOffset, endOffset }];
   });
+}
+
+function evidenceFromUniqueText(
+  candidates: string[],
+  blocks: readonly SectionBatchBlock[],
+  role: EvidenceRole,
+): EvidenceSpanDraft[] {
+  for (const candidate of candidates.map(value => value.trim()).filter(Boolean)) {
+    const matches = blocks.flatMap(block => {
+      const range = locateUniqueNormalizedQuote(block.content, candidate);
+      return range ? [{ block, range }] : [];
+    });
+    if (matches.length !== 1) continue;
+    const { block, range } = matches[0];
+    return [{
+      blockId: block.id,
+      quote: block.content.slice(range.startOffset, range.endOffset),
+      role,
+      startOffset: block.sourceStartOffset + range.startOffset,
+      endOffset: block.sourceStartOffset + range.endOffset,
+    }];
+  }
+  return [];
 }
 
 export function buildSectionCompilerPrompt(batch: SectionBatch): CompiledPrompt {
@@ -234,14 +270,18 @@ export async function compileSectionBatch(
     const role = text(item.role) as TeachingRole;
     if (!localId || !topicLocalId || !TEACHING_ROLES.has(role)) return;
     const title = text(item.title);
-    const evidence = parseEvidence(item.evidence, batch.blocks, evidenceRoleForTeachingRole(role));
+    const evidenceRole = evidenceRoleForTeachingRole(role);
+    const evidence = parseEvidence(item.evidence, batch.blocks, evidenceRole);
+    const traceableEvidence = evidence.length > 0
+      ? evidence
+      : evidenceFromUniqueText([title, text(item.summary)], batch.blocks, evidenceRole);
     teachingUnits.push({
       localId: `${batch.id}:${localId}`,
       topicLocalId,
       role,
       title,
       summary: text(item.summary) || title,
-      evidence,
+      evidence: traceableEvidence,
       required: item.required === true,
       confidence: typeof item.confidence === 'number'
         ? clamp(item.confidence, 0, 1)

@@ -168,4 +168,20 @@ describe('master note generator', () => {
     expect(result.chapterNotes[0].markdown).not.toContain('本章先建立直觉');
     expect(result.chapterNotes[0].markdown).toContain('原始细节-1');
   });
+
+  it('does not report an empty topic chapter as completed', async () => {
+    const data = input(2);
+    const result = await runMasterNoteGeneration(config, {
+      ...data,
+      knowledgeCards: data.knowledgeCards.filter(item => item.topicId === 'topic-1'),
+    });
+
+    expect(result.chapterNotes[0].status).toBe('completed');
+    expect(result.chapterNotes[1]).toMatchObject({
+      status: 'failed',
+      sourceCardIds: [],
+      error: '该知识主题没有可追溯的知识卡片',
+    });
+    expect(result.masterNote.status).toBe('partial');
+  });
 });
