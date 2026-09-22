@@ -6,6 +6,7 @@ import { mineruProxyPlugin } from './vite/mineru-proxy'
 export default defineConfig({
   plugins: [react(), mineruProxyPlugin()],
   test: {
+    include: ['src/**/*.test.{ts,tsx}', 'vite/**/*.test.ts'],
     globals: true,
     environment: 'jsdom',
   },

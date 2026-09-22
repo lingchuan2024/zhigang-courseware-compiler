@@ -131,11 +131,11 @@ export async function callChatCompletion<T>(
     ? endpoint
     : `${endpoint}/chat/completions`;
 
-  const startedAt = Date.now();
   const maxStructuredAttempts = 2;
   let lastStructuredError: ExtractionError | null = null;
 
   for (let attempt = 0; attempt < maxStructuredAttempts; attempt++) {
+    const startedAt = Date.now();
     const response = await fetchWithTransientRetry(url, config, compiled, timeout, stage, sleep);
 
     const rawData = await response.json();
@@ -144,16 +144,17 @@ export async function callChatCompletion<T>(
     const wasTruncated = choice?.finish_reason === 'length';
     const parsed = rawContent ? parseJsonFromResponse(rawContent) : null;
 
+    // Every completed response is billable, including rejected/truncated JSON.
+    const usage = extractUsage(
+      rawData,
+      config.model,
+      taskType,
+      compiled.promptVersion,
+      Date.now() - startedAt,
+      topicId,
+    );
+    recordUsage(usage);
     if (!wasTruncated && parsed !== null) {
-      const usage = extractUsage(
-        rawData,
-        config.model,
-        taskType,
-        compiled.promptVersion,
-        Date.now() - startedAt,
-        topicId,
-      );
-      recordUsage(usage);
       return { data: parsed as T, usage };
     }
 
