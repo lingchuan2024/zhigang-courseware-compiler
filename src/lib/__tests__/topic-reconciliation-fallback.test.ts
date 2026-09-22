@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { CandidateTopic, MarkdownBlock, ModelConfig, KnowledgeTopic } from '../../types';
-import { reconcileTopics, topicsToCandidates, buildSourceRanges } from '../topic-reconciliation';
+import { reconcileTopics, topicsToCandidates, buildSourceRanges, parseMergeResponse } from '../topic-reconciliation';
 
 const config: ModelConfig = {
   endpoint: 'https://api.example.com/v1',
@@ -74,5 +74,21 @@ describe('merge evidence preservation', () => {
     expect(first[0].sourceBlockIds).toEqual(['block-0', 'block-1', 'block-2']);
     const second = topicsToCandidates([{ ...topic, sourceRanges: buildSourceRanges(first[0].sourceBlockIds, blocks) }], 'second', blocks);
     expect(second[0].sourceBlockIds).toEqual(first[0].sourceBlockIds);
+  });
+});
+
+
+describe('merge candidate provenance', () => {
+  it('retains all blocks of referenced candidates even when the model abbreviates the block list', () => {
+    const source = { ...candidate(0), sourceBlockIds: ['block-0', 'block-1', 'block-2'] };
+    const result = parseMergeResponse({ topics: [{ name: 'Gas example', sourceCandidateIds: ['candidate-0', 'invented'], sourceBlockIds: ['block-0', 'invented'] }] }, [source], [block(0), block(1), block(2)]);
+    expect(topicsToCandidates(result.topics, 'test', [block(0), block(1), block(2)])[0].sourceBlockIds).toEqual(source.sourceBlockIds);
+    expect(result.topics).toHaveLength(1);
+  });
+
+  it('keeps omitted candidate evidence separately and accepts valid candidate-only references', () => {
+    const result = parseMergeResponse({ topics: [{ name: 'Merged', sourceCandidateIds: ['candidate-0'] }] }, [candidate(0), candidate(1)], [block(0), block(1)]);
+    expect(result.topics.map(topic => topic.name)).toEqual(['Merged', 'AI candidate 1']);
+    expect(topicsToCandidates(result.topics, 'test', [block(0), block(1)]).flatMap(c => c.sourceBlockIds)).toEqual(['block-0', 'block-1']);
   });
 });

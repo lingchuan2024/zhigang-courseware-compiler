@@ -215,10 +215,13 @@ function buildTeachingPrompt(
 3. 节点可以是子概念、公式体系、对象家族、成立条件、推导链、方法步骤、反例、应用边界等任何有学习价值的内容。
 4. 例如 GLM 的第二层可以包含“GLM 的三部分公式”“哪些分布属于广义线性族”“链接函数如何选择”。
 5. 节点粒度应该能形成一个清晰问题或学习目标，不要把整段原文塞进一个节点。
+6. 同一学习目标的动机、定义、性质、成立条件及例子应在一个节点中连贯讲清，不要分别拆成多张重复卡片；同一示例的逐步展开页也应合并。
+7. 通常每个主题形成 2 至 5 个有区别的子主题；内容很少时可以只有 1 个，确有不同学习目标时可更多。不能为满足数量删掉关键事实、反例、步骤或来源块。
+8. 作业、评分、截止日期等事务性内容保留为简明要求，不扩写成概念教学。全部相关来源块仍须保留在合并后的 blockIds 中。
 
 ## 可参考的常见类型（不是限定集）
 
-将每个内容片段分类为以下 19 种类型之一：
+以下仅为教学作用的示例标签，不能按这些标签逐项拆节点，也不要求穷举：
 
 | 类型 | 说明 |
 |------|------|
@@ -584,7 +587,7 @@ export async function extractTeachingStructure(
     system: prompt.system,
     stablePrefix: '',
     dynamicInput: prompt.user,
-    promptVersion: 'teaching-v1.0',
+    promptVersion: 'teaching-v1.1',
     messages: [
       { role: 'system' as const, content: prompt.system },
       { role: 'user' as const, content: prompt.user },

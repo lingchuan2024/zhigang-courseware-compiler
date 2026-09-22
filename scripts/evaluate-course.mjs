@@ -29,7 +29,15 @@ let phase = 'parse';
 const courseId = `evaluation-${sourceHash.slice(0, 12)}`;
 globalThis.fetch = async (url, options) => {
   const time = Date.now();
-  const response = await nativeFetch(url, options);
+  let response;
+  try { response = await nativeFetch(url, options); }
+  catch (error) {
+    if (String(url).includes('api.deepseek.com')) {
+      requests.push({ phase, status: 0, durationMs: Date.now() - time, error: error instanceof Error ? error.message : 'Network failure' });
+      await save('requests.json', requests);
+    }
+    throw error;
+  }
   if (String(url).includes('api.deepseek.com')) {
     const body = await response.clone().json().catch(() => ({}));
     requests.push({ phase, status: response.status, durationMs: Date.now() - time, usage: body.usage, finishReason: body.choices?.[0]?.finish_reason });
@@ -60,12 +68,44 @@ try {
   const result = knowledgeRun ? JSON.parse(await readFile(resolve(root, knowledgeRun, 'knowledge.json'), 'utf8')) : await runKnowledgePipeline(config, [{ markdown, title: basename(pdf) }], courseId, {
     onStatusChange: mark, onTopicProgress: (n,total) => mark(`topic ${n}/${total}`), onNoteProgress: (n,total) => mark(`card ${n}/${total}`),
   });
+  if (process.env.EVAL_RECHECK_CARDS === '1') {
+    const { findPythonCodeIssues } = await load('python-code-quality');
+    const damaged = result.knowledgeCards.filter(card => findPythonCodeIssues(card.detailedNote).length);
+    if (damaged.length) {
+      mark(`repair-cards ${damaged.length}`);
+      const { enrichKnowledgeCards } = await load('card-enrichment');
+      const repaired = await enrichKnowledgeCards(config, damaged, result.topics, result.teachingBlocks, result.teachingRelations, result.allBlocks);
+      if (repaired.failedCardIds.length) throw new Error('Card repair failed; original run remains unchanged');
+      const replacements = new Map(repaired.cards.map(card => [card.id, card]));
+      result.knowledgeCards = result.knowledgeCards.map(card => replacements.get(card.id) ?? card);
+      result.versions.cards++;
+    }
+  }
   await save('knowledge.json', result);
   if (!result.knowledgeCards.length) throw new Error(result.errors.join('; ') || 'No knowledge cards generated');
   const { runMasterNoteGeneration } = await load('master-note-generator');
   phase = 'notes';
   mark('master-note-start');
-  const notes = await runMasterNoteGeneration(config, {
+  let notes;
+  if (process.env.EVAL_RETRY_CHAPTERS === '1') {
+    if (!knowledgeRun) throw new Error('Chapter retry requires a previous run');
+    notes = JSON.parse(await readFile(resolve(root, knowledgeRun, 'notes.json'), 'utf8'));
+    const { regenerateChapterNote } = await load('master-note-generator');
+    for (let i = 0; i < notes.chapterNotes.length; i++) {
+      const chapter = notes.chapterNotes[i];
+      if (chapter.status === 'completed') continue;
+      mark(`retry-chapter ${i + 1}/${notes.chapterNotes.length}`);
+      notes.chapterNotes[i] = await regenerateChapterNote(config, {
+        plan: notes.chapterPlan.find(plan => plan.id === chapter.id),
+        syntheses: notes.topicSyntheses.filter(synthesis => chapter.topicIds.includes(synthesis.topicId)),
+        knowledgeCards: result.knowledgeCards,
+        previousChapterSummary: notes.chapterNotes[i - 1]?.markdown.slice(0, 800) || '',
+        terminology: {}, symbols: {}, previousRetryCount: chapter.retryCount || 0,
+      });
+    }
+    const { assembleCourseMasterNote } = await load('course-master-note');
+    notes.masterNote = assembleCourseMasterNote({ courseId, title: basename(pdf), outline: notes.chapterPlan, chapterNotes: notes.chapterNotes, knowledgeCards: result.knowledgeCards, glossary: result.glossary, formulaIndex: result.formulaCards, structureVersion: result.versions.topicStructure });
+  } else notes = await runMasterNoteGeneration(config, {
     courseId: courseId, title: basename(pdf), topics: result.topics, topicRelations: result.topicRelations,
     orderedTopicIds: result.courseLearningPath.orderedTopicIds, knowledgeCards: result.knowledgeCards,
     glossary: result.glossary, formulaIndex: result.formulaCards, terminology: {}, symbols: {},
@@ -78,6 +118,6 @@ try {
   await save('error.txt', String(error));
   console.error(String(error)); process.exitCode = 1;
 } finally {
-  await save('metrics.json', { sourceHash, sourceName: basename(pdf), knowledgeRun, language: process.env.EVAL_LANGUAGE || 'ch', elapsedMs: Date.now() - started, stages, requests, totals: requests.reduce((sum, r) => ({ promptTokens: sum.promptTokens + (r.usage?.prompt_tokens ?? 0), completionTokens: sum.completionTokens + (r.usage?.completion_tokens ?? 0), totalTokens: sum.totalTokens + (r.usage?.total_tokens ?? 0) }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 }), usage: usage.getUsageRecords() });
+  await save('metrics.json', { sourceHash, sourceName: basename(pdf), knowledgeRun, retryChapters: process.env.EVAL_RETRY_CHAPTERS === '1', recheckCards: process.env.EVAL_RECHECK_CARDS === '1', language: process.env.EVAL_LANGUAGE || 'ch', elapsedMs: Date.now() - started, stages, requests, totals: requests.reduce((sum, r) => ({ promptTokens: sum.promptTokens + (r.usage?.prompt_tokens ?? 0), completionTokens: sum.completionTokens + (r.usage?.completion_tokens ?? 0), totalTokens: sum.totalTokens + (r.usage?.total_tokens ?? 0) }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 }), usage: usage.getUsageRecords() });
   await server.close();
 }

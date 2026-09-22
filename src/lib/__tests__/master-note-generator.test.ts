@@ -229,4 +229,26 @@ describe('master note generator', () => {
     expect(result.masterNote.status).toBe('completed');
   });
 
+  it('repairs damaged Python once and fails honestly when the repair is still invalid', async () => {
+    const input = { courseId: 'course-1', title: 'Python', topics: [topic('a', 'Classes')], topicRelations: [],
+      orderedTopicIds: ['a'], knowledgeCards: [card('c', 'a', 'Class source')], glossary: [], formulaIndex: [],
+      terminology: {}, symbols: {}, structureVersion: 1 };
+    for (const repairs of [true, false]) {
+      let writes = 0;
+      const complete: MasterNoteCompleter = async request => {
+        if (request.kind === 'topic-synthesis') return { markdown: 'Class source' };
+        if (request.kind === 'chapter-plan') return { chapters: [{ id: 'one', title: 'Classes', topicIds: ['a'] }] };
+        writes++;
+        if (writes === 2) expect(request.user).toContain('没有增加缩进');
+        return { markdown: repairs && writes === 2
+          ? '```python\nclass Student:\n    def run(self):\n        return 1\n```'
+          : '```python\nclass Student:\n    def run(self):\n    return 1\n```' };
+      };
+      const result = await runMasterNoteGeneration(config, input, {}, complete);
+      expect(writes).toBe(2);
+      expect(result.chapterNotes[0].status).toBe(repairs ? 'completed' : 'failed');
+      if (!repairs) expect(result.chapterNotes[0].error).toContain('代码检查未通过');
+    }
+  });
+
 });

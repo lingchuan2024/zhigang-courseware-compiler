@@ -72,7 +72,7 @@ function splitCodeSegments(content: string): Segment[] {
 
   for (const line of lines) {
     // Check for code fence start/end
-    const fenceMatch = line.match(/^(\s*)(```+|~~~+)/);
+    const fenceMatch = line.match(/^((?:[ \t]*>[ \t]*)*[ \t]*)(```+|~~~+)/);
 
     if (inCodeFence) {
       // Inside code fence — accumulate all lines as code
@@ -135,12 +135,13 @@ function normalizeTextSegment(text: string, warnings: string[]): string {
 
   // 2. Convert \(...\) to $...$
   result = convertInlineMath(result, warnings);
+  result = repairQuotedDisplayMath(result);
 
   // remark-math treats same-line $$...$$ as inline math; equation tags then fail.
   // Only promote standalone lines, after code spans/fences have been protected.
   let inDisplayMath = false;
   result = result.split('\n').map(line => {
-    const standalone = !inDisplayMath && line.match(/^( {0,3})\$\$([^\n]+?)\$\$[ \t]*$/);
+    const standalone = !inDisplayMath && line.match(/^((?: {0,3}> ?)* {0,3})\$\$([^\n]+?)\$\$[ \t]*$/);
     const delimiterCount = (line.match(/\$\$/g) ?? []).length;
     if (delimiterCount % 2 !== 0) inDisplayMath = !inDisplayMath;
     if (!standalone || delimiterCount !== 2) return line;
@@ -155,6 +156,27 @@ function normalizeTextSegment(text: string, warnings: string[]): string {
   });
 
   return result;
+}
+
+/** Recover quote prefixes lost by OCR/model delimiter conversion, without changing formula text. */
+function repairQuotedDisplayMath(text: string): string {
+  const lines = text.split('\n');
+  for (let start = 0; start < lines.length; start++) {
+    const prefix = lines[start].match(/^((?: {0,3}> ?)+)\$\$[ \t]*$/)?.[1];
+    if (!prefix) continue;
+    let end = start + 1;
+    while (end < lines.length && end - start <= 100) {
+      if (/^(?: {0,3}> ?)*[ \t]*\$\$[ \t]*$/.test(lines[end])) break;
+      if (/^(?: {0,3}> ?)*#{1,6}\s/.test(lines[end])) break;
+      end++;
+    }
+    if (end >= lines.length || end - start > 100 || !/^(?: {0,3}> ?)*[ \t]*\$\$[ \t]*$/.test(lines[end])) continue;
+    for (let index = start + 1; index <= end; index++) {
+      if (!lines[index].startsWith(prefix)) lines[index] = prefix + lines[index].replace(/^(?: {0,3}> ?)+/, '');
+    }
+    start = end;
+  }
+  return lines.join('\n');
 }
 
 /**

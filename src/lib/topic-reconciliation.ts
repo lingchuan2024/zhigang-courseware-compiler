@@ -571,7 +571,7 @@ export function parseMergeResponse(
   }
 
   const validBlockIds = new Set(allBlocks.map(b => b.id));
-  const validCandidateIds = new Set(candidates.map(c => c.temporaryId));
+  const candidateById = new Map(candidates.map(c => [c.temporaryId, c]));
 
   // 第一遍：生成稳定 ID，构建知识点（暂不设父子关系）
   const topics: KnowledgeTopic[] = [];
@@ -583,18 +583,14 @@ export function parseMergeResponse(
     // name 必须非空
     if (!t.name || !t.name.trim()) continue;
 
-    // sourceBlockIds 必须全部有效；过滤后为空则跳过
+    // A merge may abbreviate the explicit block list. Keep the full provenance
+    // of every explicitly referenced candidate; never infer ownership by proximity.
     const rawBlockIds = Array.isArray(t.sourceBlockIds) ? t.sourceBlockIds : [];
-    const sourceBlockIds = rawBlockIds.filter(id => validBlockIds.has(id));
+    const candidateBlockIds = (Array.isArray(t.sourceCandidateIds) ? t.sourceCandidateIds : [])
+      .flatMap(id => candidateById.get(id)?.sourceBlockIds ?? []);
+    const sourceBlockIds = [...new Set([...rawBlockIds, ...candidateBlockIds])]
+      .filter(id => validBlockIds.has(id));
     if (sourceBlockIds.length === 0) continue;
-
-    // sourceCandidateIds 校验（仅保留真实存在的候选 ID）
-    const sourceCandidateIds = Array.isArray(t.sourceCandidateIds)
-      ? t.sourceCandidateIds.filter(id => validCandidateIds.has(id))
-      : [];
-
-    // 若该知识点引用了候选 ID，确认覆盖（日志用途，不阻断）
-    void sourceCandidateIds;
 
     const topicId = generateId('topic');
     indexToId.set(i, topicId);
@@ -681,84 +677,15 @@ export function parseMergeResponse(
     });
   }
 
+  // Retain omitted evidence as a separate, source-backed topic rather than
+  // silently dropping it or attaching it to an unrelated model-generated topic.
+  const covered = new Set(topics.flatMap(topic =>
+    topicsToCandidates([topic], 'coverage', allBlocks).flatMap(candidate => candidate.sourceBlockIds)));
+  const omitted = candidates.filter(candidate =>
+    candidate.sourceBlockIds.some(id => validBlockIds.has(id) && !covered.has(id)));
+  topics.push(...candidatesToReviewableTopics(omitted, allBlocks));
+
   return { topics, relations };
-}
-
-// ====================================================================
-// parseLocalMergeResponse（内部）
-// ====================================================================
-
-/**
- * 解析局部合并响应，返回合并后的知识点列表（不含关系）。
- *
- * 与 parseMergeResponse 类似但更简单：不解析 relations / decisions，
- * 不设置父子关系。阶段为 'local-merge'。
- */
-function parseLocalMergeResponse(
-  response: unknown,
-  allBlocks: MarkdownBlock[],
-): KnowledgeTopic[] {
-  if (!response || typeof response !== 'object') {
-    throw new ExtractionError(
-      'json-schema-mismatch',
-      'local-merge',
-      '局部合并响应不是有效对象',
-    );
-  }
-
-  const data = response as { topics?: RawMergeTopic[] };
-  if (!Array.isArray(data.topics) || data.topics.length === 0) {
-    throw new ExtractionError(
-      'model-returned-empty',
-      'local-merge',
-      '局部合并返回了空的 topics 数组',
-    );
-  }
-
-  const validBlockIds = new Set(allBlocks.map(b => b.id));
-  const topics: KnowledgeTopic[] = [];
-
-  for (const t of data.topics) {
-    if (!t.name || !t.name.trim()) continue;
-
-    const rawBlockIds = Array.isArray(t.sourceBlockIds) ? t.sourceBlockIds : [];
-    const sourceBlockIds = rawBlockIds.filter(id => validBlockIds.has(id));
-    if (sourceBlockIds.length === 0) continue;
-
-    const genre = VALID_GENRES.has(t.knowledgeGenre as string)
-      ? (t.knowledgeGenre as KnowledgeTopic['knowledgeGenre'])
-      : 'mixed';
-
-    const importance = VALID_IMPORTANCE.has(t.importance as string)
-      ? (t.importance as 'core' | 'important' | 'supplementary')
-      : 'important';
-
-    topics.push({
-      id: generateId('topic'),
-      courseId: '',
-      name: t.name.trim(),
-      aliases: Array.isArray(t.aliases) ? t.aliases.map(a => String(a).trim()).filter(Boolean) : [],
-      summary: t.summary?.trim() || '',
-      learningObjective: t.learningObjective?.trim() || '',
-      sourceRanges: buildSourceRanges(sourceBlockIds, allBlocks),
-      childTopicIds: [],
-      importance,
-      difficulty: clampDifficulty(t.difficulty),
-      knowledgeGenre: genre,
-      confidence: clamp01(t.confidence),
-      status: 'generated',
-    });
-  }
-
-  if (topics.length === 0) {
-    throw new ExtractionError(
-      'model-returned-empty',
-      'local-merge',
-      '过滤无效块 ID 后没有有效知识点',
-    );
-  }
-
-  return topics;
 }
 
 // ====================================================================
@@ -920,7 +847,7 @@ export async function localMerge(
     'local-merge',
   );
 
-  return parseLocalMergeResponse(data, allBlocks);
+  return parseMergeResponse(data, candidates, allBlocks).topics;
 }
 
 // ====================================================================

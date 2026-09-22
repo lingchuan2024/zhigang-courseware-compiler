@@ -346,3 +346,24 @@ describe('standalone display equation fences', () => {
     expect(normalizeGeneratedMarkdown(normalized).content).toBe(normalized);
   });
 });
+
+describe('quoted display math', () => {
+  it('keeps all display math lines in the teaching supplement quote', () => {
+    const raw = '> AI 教学补充\n> \\[\nx^2 + y^2\n\\]\n\n后续正文';
+    const normalized = normalizeGeneratedMarkdown(raw).content;
+    expect(normalized).toContain('> $$\n> x^2 + y^2\n> $$');
+    expect(normalized).toContain('\n\n后续正文');
+    expect(normalizeGeneratedMarkdown(normalized).content).toBe(normalized);
+  });
+  it('repairs legacy missing quote prefixes and promotes standalone quoted equations', () => {
+    const raw = '> $$\nx^2\n$$\n\n正文 $x$';
+    expect(normalizeGeneratedMarkdown(raw).content).toBe('> $$\n> x^2\n> $$\n\n正文 $x$');
+    expect(normalizeGeneratedMarkdown('> $$x^2\\tag{1}$$').content).toBe('> $$\n> x^2\\tag{1}\n> $$');
+  });
+  it('leaves quoted code examples literal and does not absorb later headings', () => {
+    const code = '> ```python\n> formula = "\\[x\\]"\n> ```';
+    expect(normalizeGeneratedMarkdown(code).content).toBe(code);
+    const unclosed = '> $$\nx\n## Next\n$$\ny\n$$';
+    expect(normalizeGeneratedMarkdown(unclosed).content).toContain('\n## Next\n');
+  });
+});

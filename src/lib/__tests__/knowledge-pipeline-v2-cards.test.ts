@@ -80,6 +80,7 @@ vi.mock('../teaching-structure', () => ({
 }));
 
 import { runKnowledgePipeline } from '../knowledge-pipeline-v2';
+import { enrichKnowledgeCards } from '../card-enrichment';
 
 const config: ModelConfig = {
   endpoint: 'https://api.example.com/v1',
@@ -222,4 +223,13 @@ describe('knowledge pipeline V2 card boundary', () => {
     expect(result.knowledgeCards[0]).toMatchObject({ status: 'completed', cardVersion: 1 });
     expect(result.knowledgeCards[0].detailedNote).toContain('步骤 2');
   });
+  it('does not retain a known broken code card as completed when regeneration fails', async () => {
+    const result = await runKnowledgePipeline(config, [{ markdown: '# GLM\n\nSource', title: '测试' }], 'course-1');
+    const broken = { ...result.knowledgeCards[0], detailedNote: '```python\nprint(1))\n```' };
+    mocks.callChatCompletion.mockRejectedValue(new Error('provider unavailable'));
+    const repaired = await enrichKnowledgeCards(config, [broken], result.topics, result.teachingBlocks, [], result.allBlocks);
+    expect(repaired.failedCardIds).toEqual([broken.id]);
+    expect(repaired.cards[0].status).toBe('partial');
+  });
+
 });

@@ -1,3 +1,4 @@
+import { findPythonCodeIssues } from './python-code-quality';
 export interface KnowledgeCardDraftQualityInput {
   teachingType: string;
   detailedNote: string;
@@ -29,7 +30,7 @@ export function evaluateKnowledgeCardDraft(
   input: KnowledgeCardDraftQualityInput,
 ): KnowledgeCardQualityResult {
   const text = input.detailedNote.trim();
-  const reasons: string[] = [];
+  const reasons: string[] = findPythonCodeIssues(text).map(issue => `代码第 ${issue.line} 行：${issue.reason}`);
 
   if (text.length < 120) reasons.push('正文过短，尚未形成可独立学习的讲解');
   if (PLACEHOLDER_PATTERNS.some(pattern => pattern.test(text))) {

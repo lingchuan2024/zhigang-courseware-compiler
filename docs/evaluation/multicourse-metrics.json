@@ -274,5 +274,327 @@
       "codeChapterBodiesPreserved": true,
       "pythonSyntaxErrors": []
     }
+  },
+  {
+    "label": "multi-physics-r2",
+    "elapsedSeconds": 1065.889,
+    "noteSeconds": 551.858,
+    "requests": 217,
+    "tokens": 854372,
+    "unknownUsageResponses": 8,
+    "noteTokens": 279925,
+    "truncatedResponses": 2,
+    "topics": 27,
+    "cards": {
+      "completed": 105,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.926829268292683,
+    "syntheses": {
+      "completed": 21,
+      "partial": 6
+    },
+    "chapters": {
+      "completed": 3,
+      "failed": 2
+    },
+    "noteCharacters": 22974,
+    "chaptersTitles": [
+      "热学导论：从热本质之争到热物理学",
+      "热力学系统与平衡态描述",
+      "理想气体状态方程及其应用",
+      "统计规律性与概率基础",
+      "统计平均值与涨落"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "reusedKnowledge": null,
+    "measurementScope": "full pipeline with MinerU cache",
+    "renderAudit": {
+      "label": "multi-physics-r2",
+      "katexErrors": 0,
+      "displayEquations": 25,
+      "tables": 2,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-physics-r2-repair",
+    "elapsedSeconds": 68.255,
+    "noteSeconds": 68.156,
+    "requests": 3,
+    "tokens": 71530,
+    "unknownUsageResponses": 0,
+    "noteTokens": 71530,
+    "truncatedResponses": 2,
+    "topics": 27,
+    "cards": {
+      "completed": 105,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.926829268292683,
+    "syntheses": {
+      "completed": 21,
+      "partial": 6
+    },
+    "chapters": {
+      "completed": 4,
+      "failed": 1
+    },
+    "noteCharacters": 30674,
+    "chaptersTitles": [
+      "热学导论：从热本质之争到热物理学",
+      "热力学系统与平衡态描述",
+      "理想气体状态方程及其应用",
+      "统计规律性与概率基础",
+      "统计平均值与涨落"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "reusedKnowledge": "multi-physics-r2",
+    "measurementScope": "incremental repair",
+    "renderAudit": {
+      "label": "multi-physics-r2-repair",
+      "katexErrors": 0,
+      "displayEquations": 34,
+      "tables": 3,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-physics-r2-final",
+    "elapsedSeconds": 19.455,
+    "noteSeconds": 19.361,
+    "requests": 1,
+    "tokens": 23091,
+    "unknownUsageResponses": 0,
+    "noteTokens": 23091,
+    "truncatedResponses": 0,
+    "topics": 27,
+    "cards": {
+      "completed": 105,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.926829268292683,
+    "syntheses": {
+      "completed": 21,
+      "partial": 6
+    },
+    "chapters": {
+      "completed": 5
+    },
+    "noteCharacters": 39929,
+    "chaptersTitles": [
+      "热学导论：从热本质之争到热物理学",
+      "热力学系统与平衡态描述",
+      "理想气体状态方程及其应用",
+      "统计规律性与概率基础",
+      "统计平均值与涨落"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "reusedKnowledge": "multi-physics-r2-repair",
+    "measurementScope": "incremental repair",
+    "renderAudit": {
+      "label": "multi-physics-r2-final",
+      "katexErrors": 0,
+      "displayEquations": 65,
+      "tables": 4,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-python-r2",
+    "elapsedSeconds": 270.099,
+    "noteSeconds": 81.32,
+    "requests": 88,
+    "tokens": 320650,
+    "unknownUsageResponses": 0,
+    "noteTokens": 118964,
+    "truncatedResponses": 0,
+    "topics": 11,
+    "cards": {
+      "completed": 41,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.8861788617886179,
+    "syntheses": {
+      "completed": 11
+    },
+    "chapters": {
+      "completed": 3
+    },
+    "noteCharacters": 29936,
+    "chaptersTitles": [
+      "面向对象编程思想与Python类实例基础",
+      "类的方法与数据封装",
+      "Python命名约定与名称改写机制"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "reusedKnowledge": null,
+    "measurementScope": "full pipeline with MinerU cache",
+    "renderAudit": {
+      "label": "multi-python-r2",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 2,
+      "codeBlocks": 43,
+      "pythonSnippets": 27,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-python-r2-repair",
+    "elapsedSeconds": 93.442,
+    "noteSeconds": 87.132,
+    "requests": 17,
+    "tokens": 126120,
+    "unknownUsageResponses": 0,
+    "noteTokens": 123628,
+    "truncatedResponses": 0,
+    "topics": 11,
+    "cards": {
+      "completed": 41,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.8861788617886179,
+    "syntheses": {
+      "completed": 11
+    },
+    "chapters": {
+      "completed": 4
+    },
+    "noteCharacters": 32127,
+    "chaptersTitles": [
+      "面向对象编程基础与类实例概念",
+      "类的方法与构造函数",
+      "数据封装与私有变量",
+      "Python命名约定与名称改写机制"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "reusedKnowledge": "multi-python-r2",
+    "measurementScope": "incremental repair",
+    "renderAudit": {
+      "label": "multi-python-r2-repair",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 3,
+      "codeBlocks": 41,
+      "pythonSnippets": 27,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-writing-r2",
+    "elapsedSeconds": 798.944,
+    "noteSeconds": 374.804,
+    "requests": 205,
+    "tokens": 693932,
+    "unknownUsageResponses": 2,
+    "noteTokens": 254888,
+    "truncatedResponses": 0,
+    "topics": 30,
+    "cards": {
+      "completed": 89
+    },
+    "sourceBlockCoverage": 0.9770642201834863,
+    "syntheses": {
+      "completed": 30
+    },
+    "chapters": {
+      "completed": 8,
+      "failed": 2
+    },
+    "noteCharacters": 53739,
+    "chaptersTitles": [
+      "引用来源与学术诚信基础",
+      "直接引用的使用时机与APA格式",
+      "总结的写作标准与结构",
+      "改写的步骤与技巧",
+      "整合来源与信号短语",
+      "写作作业要求与提交规范",
+      "大纲写作规范",
+      "引用规范与扣分规则",
+      "避免抄袭与AI生成内容",
+      "课程通知与辅导安排"
+    ],
+    "warnings": [],
+    "reusedKnowledge": null,
+    "measurementScope": "full pipeline with MinerU cache",
+    "renderAudit": {
+      "label": "multi-writing-r2",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 5,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-writing-r2-repair",
+    "elapsedSeconds": 34.494,
+    "noteSeconds": 34.405,
+    "requests": 2,
+    "tokens": 26489,
+    "unknownUsageResponses": 0,
+    "noteTokens": 26489,
+    "truncatedResponses": 0,
+    "topics": 30,
+    "cards": {
+      "completed": 89
+    },
+    "sourceBlockCoverage": 0.9770642201834863,
+    "syntheses": {
+      "completed": 30
+    },
+    "chapters": {
+      "completed": 10
+    },
+    "noteCharacters": 72454,
+    "chaptersTitles": [
+      "引用来源与学术诚信基础",
+      "直接引用的使用时机与APA格式",
+      "总结的写作标准与结构",
+      "改写的步骤与技巧",
+      "整合来源与信号短语",
+      "写作作业要求与提交规范",
+      "大纲写作规范",
+      "引用规范与扣分规则",
+      "避免抄袭与AI生成内容",
+      "课程通知与辅导安排"
+    ],
+    "warnings": [],
+    "reusedKnowledge": "multi-writing-r2",
+    "measurementScope": "incremental repair",
+    "renderAudit": {
+      "label": "multi-writing-r2-repair",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 6,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
   }
 ]

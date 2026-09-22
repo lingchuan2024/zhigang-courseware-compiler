@@ -1,3 +1,5 @@
+import { findPythonCodeIssues } from './python-code-quality';
+import { SOURCE_FIDELITY_RULES } from './source-fidelity';
 import type {
   KnowledgeCard,
   KnowledgeTopic,
@@ -74,6 +76,8 @@ function buildPrompt(
 ): CompiledPrompt {
   const system = `你是一位严谨的课程知识卡片作者。知识卡片必须是可独立学习、可用于问答检索的知识原料包，而不是笔记片段或写作建议。
 
+${SOURCE_FIDELITY_RULES}
+
 要求：
 1. 所有课程事实必须来自给定课件原文，不得补造课件没有表达的结论。
 2. 课件之外的通用教材解释、基础代数步骤或典型例子，必须放在统一引用块中：
@@ -125,7 +129,7 @@ function buildPrompt(
     system,
     stablePrefix: system,
     dynamicInput: user,
-    promptVersion: 'knowledge-card-enrichment-v2',
+    promptVersion: 'knowledge-card-enrichment-v3',
     messages: [
       { role: 'system', content: system },
       { role: 'user', content: user },
@@ -231,7 +235,7 @@ async function enrichOne(
     };
   } catch (error) {
     console.warn(`知识卡片深化失败（${card.title}）:`, error);
-    if (card.status === 'completed' && card.detailedNote.trim()) {
+    if (card.status === 'completed' && card.detailedNote.trim() && findPythonCodeIssues(card.detailedNote).length === 0) {
       return {
         card: { ...card, sourceExcerpt: excerpt },
         failed: true,

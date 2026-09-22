@@ -56,6 +56,16 @@ describe('MarkdownRenderer', () => {
     expect(container.textContent).toContain('(7)');
   });
 
+  it('keeps quoted display math contained and renders the following section normally', () => {
+    const content = '> AI 教学补充\n> \\[\nx^2\n\\]\n\n## 后续正文\n\n均值 $x$。\n\n$$\ny^2\n$$';
+    const container = render(createElement(MarkdownRenderer, { content }));
+    expect(container.querySelectorAll('.katex-error')).toHaveLength(0);
+    expect(container.querySelectorAll('.katex-display')).toHaveLength(2);
+    expect(container.querySelector('blockquote .katex-display')).not.toBeNull();
+    expect(container.querySelector('h2')?.textContent).toBe('后续正文');
+    expect(container.querySelector('blockquote h2')).toBeNull();
+  });
+
   it('renders inline math $x^2$ as KaTeX', () => {
     const container = render(
       createElement(MarkdownRenderer, { content: 'Inline math $x^2$ here.' })
