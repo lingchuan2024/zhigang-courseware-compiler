@@ -24,11 +24,13 @@ function unique<T>(items: T[]): T[] {
 }
 
 function dedupeAdjacentMarkdown(markdown: string): string {
-  const paragraphs = markdown
-    .split(/\n\s*\n/)
-    .map(paragraph => paragraph.trim())
-    .filter(Boolean);
-  return paragraphs.filter((paragraph, index) => index === 0 || paragraph !== paragraphs[index - 1]).join('\n\n');
+  // Paragraph trimming used to move methods out of Python classes after blank lines.
+  // Fenced chapters are already synthesized; never rewrite their whitespace or code.
+  if (/^[\t >]*(?:`{3,}|~{3,})/m.test(markdown)) return markdown;
+  const paragraphs = markdown.split(/\n[ \t]*\n/);
+  return paragraphs.filter((paragraph, index) =>
+    index === 0 || /^[ \t]/m.test(paragraph) || paragraph !== paragraphs[index - 1]
+  ).join('\n\n');
 }
 
 export function planFallbackChapters(

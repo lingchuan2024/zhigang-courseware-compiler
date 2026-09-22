@@ -18,7 +18,7 @@ for (const label of process.argv.slice(2)) {
   console.log(JSON.stringify({
     label, elapsedSeconds: metrics.elapsedMs / 1000, noteSeconds: (metrics.elapsedMs - start) / 1000,
     requests: requests.length, tokens: tokens(requests), unknownUsageResponses: requests.filter(r => !r.usage).length,
-    noteTokens: noteStartIndex >= 0 ? tokens(requests.slice(noteStartIndex)) : null,
+    noteTokens: requests.some(r => r.phase) ? tokens(requests.filter(r => r.phase === 'notes')) : noteStartIndex >= 0 ? tokens(requests.slice(noteStartIndex)) : null,
     truncatedResponses: requests.filter(r => r.finishReason === 'length').length,
     topics: knowledge.topics.length, cards: count(knowledge.knowledgeCards),
     sourceBlockCoverage: knowledge.validation.coverage.coverageRate,

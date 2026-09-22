@@ -120,6 +120,19 @@ describe('course master note', () => {
     expect(result.coverage.missingCardIds).toEqual(['card-uncovered']);
   });
 
+  it('preserves blank lines, indentation and repeated statements inside code fences', () => {
+    const plan = chapterPlan('chapter-1', '程序', ['a']);
+    for (const fence of ['```', '~~~']) {
+      const code = `${fence}python\nclass Student:\n    def first(self):\n        print(1)\n\n    def second(self):\n        print(2)\n\n        print(2)\n${fence}`;
+      const result = assembleCourseMasterNote({
+        courseId: 'course-1', title: '程序', outline: [plan],
+        chapterNotes: [chapter(plan, code, ['card-a'])],
+        knowledgeCards: [card('card-a', 'a')], glossary: [], formulaIndex: [], structureVersion: 1,
+      });
+      expect(result.markdown).toContain(code);
+    }
+  });
+
   it('keeps the outline and completed content when one chapter fails', () => {
     const first = chapterPlan('chapter-1', '基础', ['a']);
     const second = chapterPlan('chapter-2', '扩展', ['b']);

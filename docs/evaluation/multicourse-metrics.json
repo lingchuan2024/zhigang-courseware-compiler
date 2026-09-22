@@ -1,0 +1,278 @@
+[
+  {
+    "label": "multi-physics-base",
+    "elapsedSeconds": 854.92,
+    "noteSeconds": 243.635,
+    "requests": 263,
+    "tokens": 1050078,
+    "unknownUsageResponses": 0,
+    "noteTokens": 437672,
+    "truncatedResponses": 3,
+    "topics": 28,
+    "cards": {
+      "completed": 152,
+      "partial": 2
+    },
+    "sourceBlockCoverage": 0.9512195121951219,
+    "syntheses": {
+      "completed": 27,
+      "partial": 1
+    },
+    "chapters": {
+      "completed": 5
+    },
+    "noteCharacters": 33268,
+    "chaptersTitles": [
+      "热学的研究对象与热物理学",
+      "热力学系统与平衡态",
+      "状态参量、状态方程与理想气体",
+      "统计规律性与概率基础",
+      "统计平均值与涨落"
+    ],
+    "warnings": [
+      "2 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "renderAudit": {
+      "label": "multi-physics-base",
+      "katexErrors": 6,
+      "displayEquations": 63,
+      "tables": 4,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-physics-r1",
+    "elapsedSeconds": 222.68,
+    "noteSeconds": 222.589,
+    "requests": 36,
+    "tokens": 420853,
+    "unknownUsageResponses": 0,
+    "noteTokens": 420853,
+    "truncatedResponses": 0,
+    "topics": 28,
+    "cards": {
+      "completed": 152,
+      "partial": 2
+    },
+    "sourceBlockCoverage": 0.9512195121951219,
+    "syntheses": {
+      "completed": 28
+    },
+    "chapters": {
+      "completed": 6
+    },
+    "noteCharacters": 37381,
+    "chaptersTitles": [
+      "热学起源与热物理学基础",
+      "热力学系统与平衡态",
+      "状态参量、状态方程与理想气体",
+      "统计规律性与概率基础",
+      "统计平均值与涨落",
+      "热力学第零定律与温度"
+    ],
+    "warnings": [
+      "2 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "renderAudit": {
+      "label": "multi-physics-r1",
+      "katexErrors": 0,
+      "displayEquations": 53,
+      "tables": 7,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-python-base",
+    "elapsedSeconds": 344.221,
+    "noteSeconds": 119.563,
+    "requests": 87,
+    "tokens": 346871,
+    "unknownUsageResponses": 0,
+    "noteTokens": 148113,
+    "truncatedResponses": 0,
+    "topics": 8,
+    "cards": {
+      "completed": 53
+    },
+    "sourceBlockCoverage": 0.8861788617886179,
+    "syntheses": {
+      "completed": 8
+    },
+    "chapters": {
+      "completed": 4
+    },
+    "noteCharacters": 42015,
+    "chaptersTitles": [
+      "从面向过程到面向对象：OOP思想与类实例基础",
+      "构造函数与属性访问：初始化实例与处理AttributeError",
+      "类的方法与数据封装：从函数到方法，实现数据与操作捆绑",
+      "私有变量与访问控制：命名约定与名称修饰"
+    ],
+    "warnings": [],
+    "renderAudit": {
+      "label": "multi-python-base",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 2,
+      "codeBlocks": 40,
+      "pythonSnippets": 28,
+      "codeChapterBodiesPreserved": false,
+      "pythonSyntaxErrors": [
+        {
+          "snippet": 19,
+          "line": 4,
+          "reason": "expected an indented block after function definition on line 2"
+        },
+        {
+          "snippet": 28,
+          "line": 6,
+          "reason": "invalid syntax"
+        }
+      ]
+    }
+  },
+  {
+    "label": "multi-python-r1",
+    "elapsedSeconds": 108.865,
+    "noteSeconds": 108.778,
+    "requests": 13,
+    "tokens": 146284,
+    "unknownUsageResponses": 0,
+    "noteTokens": 146284,
+    "truncatedResponses": 0,
+    "topics": 8,
+    "cards": {
+      "completed": 53
+    },
+    "sourceBlockCoverage": 0.8861788617886179,
+    "syntheses": {
+      "completed": 8
+    },
+    "chapters": {
+      "completed": 4
+    },
+    "noteCharacters": 40992,
+    "chaptersTitles": [
+      "面向对象编程思想与类的基础",
+      "类的方法与构造函数",
+      "属性访问与数据封装",
+      "私有变量与访问控制"
+    ],
+    "warnings": [],
+    "renderAudit": {
+      "label": "multi-python-r1",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 1,
+      "codeBlocks": 38,
+      "pythonSnippets": 26,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": [
+        {
+          "snippet": 9,
+          "line": 4,
+          "reason": "expected an indented block after function definition on line 2"
+        },
+        {
+          "snippet": 26,
+          "line": 6,
+          "reason": "invalid syntax"
+        }
+      ]
+    }
+  },
+  {
+    "label": "multi-writing-base",
+    "elapsedSeconds": 719.33,
+    "noteSeconds": 209.584,
+    "requests": 217,
+    "tokens": 797987,
+    "unknownUsageResponses": 0,
+    "noteTokens": 311528,
+    "truncatedResponses": 0,
+    "topics": 24,
+    "cards": {
+      "completed": 121,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.981651376146789,
+    "syntheses": {
+      "completed": 24
+    },
+    "chapters": {
+      "completed": 6
+    },
+    "noteCharacters": 55263,
+    "chaptersTitles": [
+      "Citing Sources and Plagiarism Avoidance与Paraphrasing",
+      "When to Quote or Cite与Steps of Writing a Successful Paraphrase",
+      "Paraphrasing Skills与Integrating Sources: Goals and Methods",
+      "Signal Phrases in Source Integration与主题大纲",
+      "段落中有子要点的大纲与反馈与修改策略",
+      "扣分规则详解与引用规范与学术诚信"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "renderAudit": {
+      "label": "multi-writing-base",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 3,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  },
+  {
+    "label": "multi-writing-r1",
+    "elapsedSeconds": 185.861,
+    "noteSeconds": 185.776,
+    "requests": 31,
+    "tokens": 303661,
+    "unknownUsageResponses": 0,
+    "noteTokens": 303661,
+    "truncatedResponses": 0,
+    "topics": 24,
+    "cards": {
+      "completed": 121,
+      "partial": 1
+    },
+    "sourceBlockCoverage": 0.981651376146789,
+    "syntheses": {
+      "completed": 24
+    },
+    "chapters": {
+      "completed": 6
+    },
+    "noteCharacters": 49024,
+    "chaptersTitles": [
+      "学术诚信与引用来源基础",
+      "直接引用：定义、判断与APA格式",
+      "总结与改述：定义、步骤与技巧",
+      "整合来源：信号短语与流畅融入",
+      "大纲写作：主题大纲与含子要点段落",
+      "终稿提交：要求、自查与扣分规则"
+    ],
+    "warnings": [
+      "1 张知识卡片深化失败，已保留基础卡片"
+    ],
+    "renderAudit": {
+      "label": "multi-writing-r1",
+      "katexErrors": 0,
+      "displayEquations": 0,
+      "tables": 5,
+      "codeBlocks": 0,
+      "pythonSnippets": 0,
+      "codeChapterBodiesPreserved": true,
+      "pythonSyntaxErrors": []
+    }
+  }
+]

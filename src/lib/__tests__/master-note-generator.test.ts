@@ -87,7 +87,7 @@ describe('master note generator', () => {
       topicRelations: [{ id: 'rel-1', sourceTopicId: 'topic-a', targetTopicId: 'topic-b', type: 'hard_prerequisite', reason: 'A 是 B 的基础', confidence: 0.9 } satisfies TopicRelation],
       orderedTopicIds: ['topic-a', 'topic-b'],
       knowledgeCards: [
-        card('card-a', 'topic-a', '只属于A的原始细节-A-UNIQUE'),
+        { ...card('card-a', 'topic-a', '只属于A的原始细节-A-UNIQUE'), sourceExcerpt: '原始证据：仅在独立事件下成立' },
         card('card-b', 'topic-b', '只属于B的原始细节-B-UNIQUE'),
       ],
       glossary: [],
@@ -102,8 +102,10 @@ describe('master note generator', () => {
     expect(synthesisA.system).toContain('连续推导链');
     expect(synthesisA.user).toContain('card-a');
     expect(synthesisA.user).toContain('A-UNIQUE');
+    expect(synthesisA.user).toContain('原始证据：仅在独立事件下成立');
     expect(synthesisA.user).not.toContain('card-b');
     expect(synthesisA.user).not.toContain('B-UNIQUE');
+    expect(requests.find(r => r.kind === 'topic-synthesis' && r.subjectId === 'topic-b')!.user).not.toContain('原始证据：仅在独立事件下成立');
 
     const planning = requests.find(request => request.kind === 'chapter-plan')!;
     expect(planning.user).toContain('topic-a综合摘要');

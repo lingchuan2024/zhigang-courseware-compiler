@@ -25,12 +25,14 @@ const mark = stage => { stages.push({ stage, elapsedMs: Date.now() - started });
 const usage = await load('model-usage');
 const nativeFetch = globalThis.fetch;
 const requests = [];
+let phase = 'parse';
+const courseId = `evaluation-${sourceHash.slice(0, 12)}`;
 globalThis.fetch = async (url, options) => {
   const time = Date.now();
   const response = await nativeFetch(url, options);
   if (String(url).includes('api.deepseek.com')) {
     const body = await response.clone().json().catch(() => ({}));
-    requests.push({ status: response.status, durationMs: Date.now() - time, usage: body.usage, finishReason: body.choices?.[0]?.finish_reason });
+    requests.push({ phase, status: response.status, durationMs: Date.now() - time, usage: body.usage, finishReason: body.choices?.[0]?.finish_reason });
     await save('requests.json', requests);
   }
   return response;
@@ -41,24 +43,30 @@ try {
   catch {
     const { runMinerUParse } = await load('mineru-client');
     const result = await runMinerUParse(new File([await readFile(pdf)], basename(pdf), { type: 'application/pdf' }), {
-      endpoint: 'https://mineru.net/api/v4', apiKey: credentials.mineru, modelVersion: 'vlm', language: 'en', enableFormula: true, enableTable: true,
+      endpoint: 'https://mineru.net/api/v4', apiKey: credentials.mineru, modelVersion: 'vlm', language: process.env.EVAL_LANGUAGE || 'ch', enableFormula: true, enableTable: true,
     }, { onStatus: mark, fetcher: (url, options) => {
       return nativeFetch(new URL(String(url), `http://127.0.0.1:${port}`), { ...options, signal: AbortSignal.timeout(120000) });
     }});
     markdown = result.markdown;
     await writeFile(sourceCache, markdown);
   }
+  phase = 'knowledge';
   mark('knowledge-start');
+  if (knowledgeRun) {
+    const previous = JSON.parse(await readFile(resolve(root, knowledgeRun, 'metrics.json'), 'utf8'));
+    if (previous.sourceHash !== sourceHash) throw new Error('Cannot reuse knowledge from a different source PDF');
+  }
   const { runKnowledgePipeline } = await load('knowledge-pipeline-v2');
-  const result = knowledgeRun ? JSON.parse(await readFile(resolve(root, knowledgeRun, 'knowledge.json'), 'utf8')) : await runKnowledgePipeline(config, [{ markdown, title: basename(pdf) }], 'evaluation-lecture2', {
+  const result = knowledgeRun ? JSON.parse(await readFile(resolve(root, knowledgeRun, 'knowledge.json'), 'utf8')) : await runKnowledgePipeline(config, [{ markdown, title: basename(pdf) }], courseId, {
     onStatusChange: mark, onTopicProgress: (n,total) => mark(`topic ${n}/${total}`), onNoteProgress: (n,total) => mark(`card ${n}/${total}`),
   });
   await save('knowledge.json', result);
   if (!result.knowledgeCards.length) throw new Error(result.errors.join('; ') || 'No knowledge cards generated');
   const { runMasterNoteGeneration } = await load('master-note-generator');
+  phase = 'notes';
   mark('master-note-start');
   const notes = await runMasterNoteGeneration(config, {
-    courseId: 'evaluation-lecture2', title: basename(pdf), topics: result.topics, topicRelations: result.topicRelations,
+    courseId: courseId, title: basename(pdf), topics: result.topics, topicRelations: result.topicRelations,
     orderedTopicIds: result.courseLearningPath.orderedTopicIds, knowledgeCards: result.knowledgeCards,
     glossary: result.glossary, formulaIndex: result.formulaCards, terminology: {}, symbols: {},
     structureVersion: result.versions.topicStructure, narrativePaths: result.narrativePaths, teachingRelations: result.teachingRelations,
@@ -70,6 +78,6 @@ try {
   await save('error.txt', String(error));
   console.error(String(error)); process.exitCode = 1;
 } finally {
-  await save('metrics.json', { sourceHash, knowledgeRun, elapsedMs: Date.now() - started, stages, requests, totals: requests.reduce((sum, r) => ({ promptTokens: sum.promptTokens + (r.usage?.prompt_tokens ?? 0), completionTokens: sum.completionTokens + (r.usage?.completion_tokens ?? 0), totalTokens: sum.totalTokens + (r.usage?.total_tokens ?? 0) }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 }), usage: usage.getUsageRecords() });
+  await save('metrics.json', { sourceHash, sourceName: basename(pdf), knowledgeRun, language: process.env.EVAL_LANGUAGE || 'ch', elapsedMs: Date.now() - started, stages, requests, totals: requests.reduce((sum, r) => ({ promptTokens: sum.promptTokens + (r.usage?.prompt_tokens ?? 0), completionTokens: sum.completionTokens + (r.usage?.completion_tokens ?? 0), totalTokens: sum.totalTokens + (r.usage?.total_tokens ?? 0) }), { promptTokens: 0, completionTokens: 0, totalTokens: 0 }), usage: usage.getUsageRecords() });
   await server.close();
 }
