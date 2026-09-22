@@ -64,7 +64,7 @@ try {
     structureVersion: result.versions.topicStructure, narrativePaths: result.narrativePaths, teachingRelations: result.teachingRelations,
   }, { onTopicSynthesis: (_,n,total) => mark(`synthesis ${n}/${total}`), onChapter: (_,n,total) => mark(`chapter ${n}/${total}`) });
   await save('notes.json', notes);
-  await save('notes.md', notes.chapterNotes.map(c => `# ${c.title}\n\n${c.markdown}`).join('\n\n'));
+  await save('notes.md', notes.masterNote.markdown);
   mark('completed');
 } catch (error) {
   await save('error.txt', String(error));

@@ -11,10 +11,15 @@ for (const label of process.argv.slice(2)) {
   const tokens = items => items.reduce((sum, item) => sum + (item.usage?.total_tokens ?? 0), 0);
   // usage.taskType describes application calls; requests is the provider billing source.
   const noteUsage = metrics.usage.filter(item => item.promptVersion.startsWith('master-note-'));
+  const firstNote = noteUsage[0];
+  const noteStartIndex = firstNote ? requests.findIndex(r =>
+    r.usage?.prompt_tokens === firstNote.promptTokens && r.usage?.completion_tokens === firstNote.completionTokens
+  ) : -1;
   console.log(JSON.stringify({
     label, elapsedSeconds: metrics.elapsedMs / 1000, noteSeconds: (metrics.elapsedMs - start) / 1000,
     requests: requests.length, tokens: tokens(requests), unknownUsageResponses: requests.filter(r => !r.usage).length,
-    noteTokens: noteUsage.reduce((sum, item) => sum + (item.totalTokens ?? 0), 0),
+    noteTokens: noteStartIndex >= 0 ? tokens(requests.slice(noteStartIndex)) : null,
+    truncatedResponses: requests.filter(r => r.finishReason === 'length').length,
     topics: knowledge.topics.length, cards: count(knowledge.knowledgeCards),
     sourceBlockCoverage: knowledge.validation.coverage.coverageRate,
     syntheses: count(notes.topicSyntheses), chapters: count(notes.chapterNotes),

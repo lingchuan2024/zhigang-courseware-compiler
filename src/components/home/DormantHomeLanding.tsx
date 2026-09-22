@@ -37,8 +37,6 @@ export function DormantHomeLanding({ onOpenLibrary, onOpenQa, onOpenSettings }: 
           知纲
         </a>
         <nav aria-label="首页导航" className="flex items-center gap-3 md:gap-5">
-          <button type="button" onClick={onOpenLibrary} className="hidden text-sm text-[#9db2bf] transition hover:text-white sm:block">课件库</button>
-          <button type="button" onClick={onOpenQa} className="hidden text-sm text-[#9db2bf] transition hover:text-white md:block">全库知识问答</button>
           <button type="button" onClick={onOpenSettings} className="rounded-full border border-white/10 bg-[#040914]/55 px-4 py-2 font-mono text-[10px] tracking-[0.18em] text-[#8ca3b3] backdrop-blur-xl transition hover:border-[#6fd7e8]/35 hover:text-white">服务配置</button>
         </nav>
       </header>
@@ -97,10 +95,7 @@ export function DormantHomeLanding({ onOpenLibrary, onOpenQa, onOpenSettings }: 
         <RevealSection className="py-24 text-center md:py-40">
           <p className="font-mono text-[10px] tracking-[0.28em] text-[#68c9d8]">BEGIN THE FIRST OBSERVATION</p>
           <h2 className="mx-auto mt-6 max-w-4xl font-song text-4xl font-bold text-white md:text-7xl">你的知识宇宙，等待第一次观测。</h2>
-          <div className="mt-10 flex flex-wrap justify-center gap-3">
-            <button type="button" onClick={onOpenLibrary} className={primaryButton}>添加第一份课件</button>
-            <button type="button" onClick={onOpenQa} className={secondaryButton}>全库知识问答</button>
-          </div>
+
         </RevealSection>
       </div>
 

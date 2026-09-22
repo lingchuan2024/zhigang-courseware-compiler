@@ -49,6 +49,13 @@ describe('MarkdownRenderer', () => {
     expect(h3?.textContent).toBe('Heading 3');
   });
 
+  it('renders numbered same-line display equations without KaTeX errors', () => {
+    const container = render(createElement(MarkdownRenderer, { content: '$$y = Ax \\tag{7}$$' }));
+    expect(container.querySelector('.katex-display')).not.toBeNull();
+    expect(container.querySelector('.katex-error')).toBeNull();
+    expect(container.textContent).toContain('(7)');
+  });
+
   it('renders inline math $x^2$ as KaTeX', () => {
     const container = render(
       createElement(MarkdownRenderer, { content: 'Inline math $x^2$ here.' })

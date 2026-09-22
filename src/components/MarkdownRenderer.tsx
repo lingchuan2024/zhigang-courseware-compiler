@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkMath from 'remark-math';
 import rehypeKatex from 'rehype-katex';
+import { normalizeGeneratedMarkdown } from '../lib/markdown-normalization';
 import { remarkCitation } from '../lib/markdown-citation-plugin';
 import { createMarkdownComponents, isSafeUrl } from './markdown-components';
 import 'katex/dist/katex.min.css';
@@ -57,6 +58,7 @@ export function MarkdownRenderer({
   validMarkers,
   className = '',
 }: MarkdownRendererProps) {
+  const normalizedContent = useMemo(() => normalizeGeneratedMarkdown(content).content, [content]);
   const components = useMemo(
     () => createMarkdownComponents(onCitationClick, validMarkers),
     [onCitationClick, validMarkers]
@@ -75,7 +77,7 @@ export function MarkdownRenderer({
         urlTransform={urlTransform}
         skipHtml
       >
-        {content}
+        {normalizedContent}
       </ReactMarkdown>
     </div>
   );

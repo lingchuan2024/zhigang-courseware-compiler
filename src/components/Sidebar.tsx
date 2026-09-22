@@ -32,7 +32,6 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
   const jobStatus = useStore(s => s.jobStatus);
   const reset = useStore(s => s.reset);
   const document = useStore(s => s.document);
-  const loadExample = useStore(s => s.loadExampleCourse);
   const modelConfig = useStore(s => s.modelConfig);
   const mineruConfig = useStore(s => s.mineruConfig);
   const mineruParseResult = useStore(s => s.mineruParseResult);
@@ -251,15 +250,6 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
             <span className={`w-2 h-2 rounded-full ${mineruConfig?.apiKey ? 'bg-celadon' : 'bg-amber-400'}`} />
             <span className={`w-2 h-2 rounded-full ${hasModel ? 'bg-celadon' : 'bg-amber-400'}`} />
           </span>
-        </button>
-        <button
-          onClick={() => loadExample(activeCourseId ?? undefined)}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-ui text-sm text-ink-light transition-colors hover:bg-space-750 hover:text-white"
-        >
-          <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-          </svg>
-          <span>加载示例</span>
         </button>
         <button
           onClick={() => {

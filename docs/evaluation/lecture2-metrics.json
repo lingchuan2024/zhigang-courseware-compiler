@@ -1,0 +1,111 @@
+[
+  {
+    "label": "baseline",
+    "elapsedSeconds": 826.576,
+    "noteSeconds": 497.085,
+    "requests": 150,
+    "tokens": 613064,
+    "unknownUsageResponses": 0,
+    "noteTokens": 334399,
+    "truncatedResponses": 6,
+    "topics": 23,
+    "cards": {
+      "completed": 57
+    },
+    "sourceBlockCoverage": 0.1978798586572438,
+    "syntheses": {
+      "completed": 21,
+      "partial": 2
+    },
+    "chapters": {
+      "completed": 8,
+      "failed": 1
+    },
+    "noteCharacters": 47102,
+    "chaptersTitles": [
+      "线性模型与线性系统基础",
+      "线性空间与线性无关",
+      "矩阵的秩与满列秩",
+      "向量分解与正交投影",
+      "线性回归模型与最小二乘",
+      "多项式回归与最小二乘学习",
+      "矩阵微分与梯度",
+      "一阶优化与随机梯度下降",
+      "课程总结与资源"
+    ],
+    "warnings": []
+  },
+  {
+    "label": "round2",
+    "elapsedSeconds": 882.534,
+    "noteSeconds": 417.072,
+    "requests": 202,
+    "tokens": 961091,
+    "unknownUsageResponses": 0,
+    "noteTokens": 461653,
+    "truncatedResponses": 10,
+    "topics": 22,
+    "cards": {
+      "completed": 102
+    },
+    "sourceBlockCoverage": 0.872791519434629,
+    "syntheses": {
+      "completed": 21,
+      "partial": 1
+    },
+    "chapters": {
+      "completed": 6,
+      "failed": 4
+    },
+    "noteCharacters": 47826,
+    "chaptersTitles": [
+      "线性系统与线性模型基础",
+      "线性代数基础：空间、秩与正交性",
+      "正交投影与向量分解",
+      "概率线性模型与均方误差损失",
+      "多项式回归与最小二乘学习策略",
+      "线性回归的线性代数视角",
+      "微积分基础：导数与偏导数",
+      "梯度与海森矩阵",
+      "一阶优化方法：随机梯度下降",
+      "矩阵分析进阶与课程总结"
+    ],
+    "warnings": []
+  },
+  {
+    "label": "round3",
+    "elapsedSeconds": 290.36,
+    "noteSeconds": 290.264,
+    "requests": 35,
+    "tokens": 377158,
+    "unknownUsageResponses": 0,
+    "noteTokens": 377158,
+    "truncatedResponses": 3,
+    "topics": 22,
+    "cards": {
+      "completed": 102
+    },
+    "sourceBlockCoverage": 0.872791519434629,
+    "syntheses": {
+      "completed": 21,
+      "partial": 1
+    },
+    "chapters": {
+      "completed": 10
+    },
+    "noteCharacters": 58637,
+    "chaptersTitles": [
+      "线性系统与线性模型基础",
+      "线性空间、正交性与子空间",
+      "正交投影与向量分解",
+      "概率线性模型与均方误差损失",
+      "多项式回归与最小二乘学习策略",
+      "线性回归的线性代数视角",
+      "微积分基础：导数与偏导数",
+      "梯度与海森矩阵",
+      "一阶优化方法：随机梯度下降",
+      "矩阵分析进阶与课程总结"
+    ],
+    "warnings": []
+  }
+]

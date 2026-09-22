@@ -122,7 +122,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!modelConfig?.apiKey && <button type="button" onClick={onOpenSettings} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">配置 AI 模型</button>}
+          {!modelConfig?.apiKey && (!usableMaster || generatedCount < plan.length) && <button type="button" onClick={onOpenSettings} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">配置 AI 模型</button>}
           {!usableMaster && !isRunning && (
             <button type="button" onClick={() => void startGeneration()} className="btn-primary">生成完整笔记</button>
           )}

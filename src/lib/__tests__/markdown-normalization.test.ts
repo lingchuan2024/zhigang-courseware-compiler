@@ -334,3 +334,15 @@ $$`;
     });
   });
 });
+
+
+describe('standalone display equation fences', () => {
+  it('normalizes once while preserving actual code and inline formulas', () => {
+    const input = '$$x = y \\tag{1}$$\n\nInline $x$ and `$$literal$$`\n\n```text\n$$code$$\n```';
+    const normalized = normalizeGeneratedMarkdown(input).content;
+    expect(normalized).toContain('$$\nx = y \\tag{1}\n$$');
+    expect(normalized).toContain('`$$literal$$`');
+    expect(normalized).toContain('```text\n$$code$$\n```');
+    expect(normalizeGeneratedMarkdown(normalized).content).toBe(normalized);
+  });
+});

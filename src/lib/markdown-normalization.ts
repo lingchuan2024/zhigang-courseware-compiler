@@ -136,6 +136,18 @@ function normalizeTextSegment(text: string, warnings: string[]): string {
   // 2. Convert \(...\) to $...$
   result = convertInlineMath(result, warnings);
 
+  // remark-math treats same-line $$...$$ as inline math; equation tags then fail.
+  // Only promote standalone lines, after code spans/fences have been protected.
+  let inDisplayMath = false;
+  result = result.split('\n').map(line => {
+    const standalone = !inDisplayMath && line.match(/^( {0,3})\$\$([^\n]+?)\$\$[ \t]*$/);
+    const delimiterCount = (line.match(/\$\$/g) ?? []).length;
+    if (delimiterCount % 2 !== 0) inDisplayMath = !inDisplayMath;
+    if (!standalone || delimiterCount !== 2) return line;
+    const [, indent, formula] = standalone;
+    return `${indent}$$\n${indent}${formula.trim()}\n${indent}$$`;
+  }).join('\n');
+
   // Restore inline code
   result = result.replace(/\uE000IC(\d+)\uE001/g, (_match, idx) => {
     const index = parseInt(idx, 10);

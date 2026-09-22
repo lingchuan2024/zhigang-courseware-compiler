@@ -94,7 +94,11 @@ const CHAPTER_NOTE_SYSTEM = [
   '知识较多时先给出本章知识框架，再按二级知识网顺序展开，不能把知识卡片按标题机械拼接。',
   '并列知识先总结共同目标和分类依据，再分别讲解、比较差异并给出选择条件。',
   '复杂概念先直觉后形式化；公式写出假设、符号、起点、连续步骤、结论和适用条件。',
-  '允许补充通用教材解释、典型例子或课件省略的基础推导，但必须使用引用块：',
+  '覆盖本章全部主题，但合并重复定义、重复公式和同义卡片；不要反复解释节点类型、课程位置或编写过程。',
+  '正文以约 2500 至 3500 个中文字为宜，必要公式和推导另计；整个 JSON 控制在 6000 token 以内。优先保留定义、假设、关键推导、结论和适用条件。',
+  '数学表达式使用 $...$ 或独立行的 $$...$$，不得放入 latex/tex/math 代码围栏，也不要把整篇 Markdown 放入代码围栏。',
+  '同一符号必须含义一致；求导前核对变量维度、转置和损失函数的常数因子；不得从孤立标题推断未给出的公式。',
+  '允许补充通用教材解释、典型例子或课件省略的基础推导，但补充内容必须整段放入引用块，不得先当作课件事实陈述：',
   '> AI 教学补充：以下内容用于补足课件省略的解释或推导，不属于课件原文。',
   '不得改变知识事实，不得伪造原文；返回 JSON：{ markdown, glossary, formulas }。',
 ].join('\n');
@@ -293,7 +297,7 @@ function buildModelCompleter(config: ModelConfig): MasterNoteCompleter {
       system: request.system,
       stablePrefix: request.system,
       dynamicInput: request.user,
-      promptVersion: `master-note-${request.kind}-v2`,
+      promptVersion: `master-note-${request.kind}-v3`,
       messages: [
         { role: 'system' as const, content: request.system },
         { role: 'user' as const, content: request.user },
