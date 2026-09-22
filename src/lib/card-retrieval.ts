@@ -22,21 +22,23 @@ function queryTerms(query: string): string[] {
   if (!normalized) return [];
   const terms = new Set<string>([normalized]);
   normalized.match(/[a-z0-9][a-z0-9+_.-]*/g)?.forEach(term => terms.add(term));
-  normalized.match(/[\u4e00-\u9fff]+/g)?.forEach(segment => {
+  // Remove conversational phrases before splitting, so their boundaries cannot create false matches.
+  const searchable = normalized.replace(/有没有|为什么|课件|什么|为何|怎么|请问|请你|没有|讲解|问题|这个|这些|哪些|是否/g, ' ');
+  searchable.match(/[\u4e00-\u9fff]+/g)?.forEach(segment => {
     terms.add(segment);
     for (let index = 0; index < segment.length - 1; index++) terms.add(segment.slice(index, index + 2));
   });
-  return [...terms].filter(term => term.length > 1);
+  const stopTerms = new Set(['课件', '什么', '为什么', '为何', '怎么', '请问', '请你', '有没有', '有没', '没有', '讲解', '问题', '这个', '这些', '哪些', '是否']);
+  return [...terms].filter(term => term.length > 1 && !stopTerms.has(term));
 }
 
 export function buildRetrievalRecords(
   cards: KnowledgeCard[],
-  fallbackDocumentId: string,
+  documentId: string,
   courseIdOverride?: string,
 ): RetrievalRecord[] {
   return cards.flatMap(card => {
-    const documentIds = [...new Set(card.sourceRanges.map(range => range.documentId).filter(Boolean))];
-    const targets = documentIds.length > 0 ? documentIds : [fallbackDocumentId];
+    // The library document owns this index; sourceRanges refer to parsed source documents.
     const content = [
       card.conciseSummary,
       card.detailedNote,
@@ -47,7 +49,7 @@ export function buildRetrievalRecords(
       card.selfCheckQuestions?.length ? `自检问题：${card.selfCheckQuestions.join('；')}` : '',
       card.formulas?.length ? `公式：${card.formulas.map(formula => formula.formula).join('；')}` : '',
     ].filter(Boolean).filter((item, index, values) => values.indexOf(item) === index).join('\n\n');
-    return targets.map(documentId => ({
+    return [{
       id: `retrieval-${documentId}-${card.id}`,
       cardId: card.id,
       courseId: courseIdOverride ?? card.courseId,
@@ -61,9 +63,9 @@ export function buildRetrievalRecords(
       sourceExcerpt: card.sourceExcerpt,
       prerequisiteTopicIds: card.prerequisiteTopicIds,
       relatedTopicIds: card.relatedTopicIds,
-      sourceRanges: card.sourceRanges.filter(range => range.documentId === documentId),
+      sourceRanges: card.sourceRanges,
       version: card.cardVersion ?? 1,
-    }));
+    }];
   });
 }
 

@@ -208,3 +208,14 @@ describe('knowledge card RAG', () => {
     expect(requests[0].user).toContain('graph');
   });
 });
+
+it('does not manufacture citations when all model references are invalid', async () => {
+  await expect(answerWithKnowledgeCards(config, '问题', [{ record, score: 8, matchedTerms: [] }], async () => ({ cardAnswer: '没有依据的断言', citations: ['invented'] }))).rejects.toThrow('有效的课件引用');
+});
+it('does not substitute retrieved card dumps for an empty answer', async () => {
+  await expect(answerWithKnowledgeCards(config, '问题', [{ record, score: 8, matchedTerms: [] }], async () => ({}))).rejects.toThrow('空回答');
+});
+it('labels evidence-insufficient responses as general without automatic citations', async () => {
+  const answer = await answerWithKnowledgeCards(config, '问题', [{ record, score: 8, matchedTerms: [] }], async () => ({ cardAnswer: '', citations: [], generalSupplement: '课件没有足够依据。' }));
+  expect(answer.sections).toEqual([{ source: 'general', content: '课件没有足够依据。', cardIds: [] }]);
+});

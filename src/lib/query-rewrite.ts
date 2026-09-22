@@ -8,14 +8,23 @@ import { callChatCompletion } from './model-v2';
 
 /** 从检索记录提取术语词表（主题名 + 关键词 + 别名，去重限长）。 */
 export function buildVocabulary(records: RetrievalRecord[], limit = 80): string[] {
+  if (limit <= 0) return [];
+  const groups = new Map<string, string[]>();
+  for (const record of records) {
+    const key = `${record.courseId}:${record.documentId}`;
+    const terms = groups.get(key) ?? [];
+    terms.push(record.title, ...(record.keywords ?? []), ...(record.aliases ?? []));
+    groups.set(key, terms);
+  }
+  const queues = [...groups.values()].map(terms => [...new Set(terms.map(t => t.trim()).filter(Boolean))]);
   const seen = new Set<string>();
   const vocabulary: string[] = [];
-  for (const record of records) {
-    const candidates = [record.title, ...(record.keywords ?? []), ...(record.aliases ?? [])];
-    for (const candidate of candidates) {
-      const term = candidate.trim();
-      if (!term || seen.has(term)) continue;
-      seen.add(term);
+  // Round-robin across documents so a large first course cannot hide later courses.
+  for (let index = 0; queues.some(queue => index < queue.length); index++) {
+    for (const queue of queues) {
+      const term = queue[index];
+      if (!term || seen.has(term.toLocaleLowerCase())) continue;
+      seen.add(term.toLocaleLowerCase());
       vocabulary.push(term);
       if (vocabulary.length >= limit) return vocabulary;
     }
@@ -62,6 +71,8 @@ function buildRewritePrompt(question: string, vocabulary: string[]): CompiledPro
     '- 优先使用术语词表中出现的词（检索是词面匹配，词表里的词命中率最高）',
     '- 每个查询是简短的名词短语或关键词组合，不要完整句子',
     '- 覆盖问题的不同问法与相关术语，不要同义重复',
+    '- 保留用户问题中的核心概念，即使词表中没有也必须保留；不得将改写（paraphrase）替换为直接引用（quote）等相邻但不同的概念',
+    '- 问题包含多个学科或子问题时，为每个子问题分别生成查询，不要遗漏其中一部分',
     '- 只输出 JSON：{"queries": ["查询1", "查询2", "查询3"]}',
   ].join('\n');
   const user = [

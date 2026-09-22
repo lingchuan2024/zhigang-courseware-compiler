@@ -98,7 +98,6 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     : '__library__';
   useEffect(() => {
     if (!selectedCitation && recordsLoadedOnMountRef.current) return;
-    recordsLoadedOnMountRef.current = true;
     let active = true;
     setRecordsStatus('loading');
     setRecordsError(null);
@@ -106,6 +105,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
     void listRetrievalRecords()
       .then(nextRecords => {
         if (!active) return;
+        recordsLoadedOnMountRef.current = true;
         setRecords(nextRecords);
         setRecordsStatus('ready');
         setRecordsValidatedFor(selectedCitationKey);
@@ -361,7 +361,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
               {activeConversation?.title ?? '全库知识问答'}
             </h1>
           </div>
-          <span className="rounded-full border border-celadon/20 bg-celadon/5 px-3 py-1.5 text-xs text-celadon">全部课件</span>
+          <span className="rounded-full border border-celadon/20 bg-celadon/5 px-3 py-1.5 text-xs text-celadon">全部课件 · {new Set(records.map(record => record.documentId)).size} 份 · {new Set(records.map(record => record.cardId)).size} 张卡片</span>
         </header>
 
         <div

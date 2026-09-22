@@ -1,5 +1,5 @@
 import { IDBFactory } from 'fake-indexeddb';
-import { act, createElement } from 'react';
+import { act, createElement, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as repository from '../../lib/library-repository';
@@ -167,6 +167,12 @@ afterEach(() => {
 });
 
 describe('KnowledgeQaView chat interface', () => {
+  it('loads library coverage after StrictMode effect replay', async () => {
+    await act(async () => root!.render(createElement(StrictMode, null,
+      createElement(KnowledgeQaView, { onOpenSettings: vi.fn(), answerer: vi.fn() }))));
+    await waitFor(() => expect(container!.textContent).toContain('全部课件 · 2 份 · 1 张卡片'));
+  });
+
   it('creates a chat, preserves two turns, renders Markdown, and opens the exact citation drawer', async () => {
     const answerer = vi.fn<QaAnswerer>(async (_config, question, hits) => (
       answer(question.startsWith('GLM') ? '**GLM** 包含三个组成部分。' : '逻辑回归使用连接函数。', [hits[0].record.cardId])

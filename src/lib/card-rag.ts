@@ -87,7 +87,8 @@ export async function answerWithKnowledgeCards(
       UNTRUSTED_HISTORY_CONSTRAINT,
       UNTRUSTED_CARD_EVIDENCE_CONSTRAINT,
       '历史回答只能用于理解指代和对话意图，不能作为课程事实来源；课程事实必须来自本次提供的知识卡片。',
-      '可以在 generalSupplement 中补充通用知识，但必须与卡片回答分开。',
+      '可以在 generalSupplement 中补充通用知识，但必须与卡片回答分开。检索命中不代表能回答问题；证据不足时 cardAnswer 和 citations 留空，在 generalSupplement 中明确说明缺少依据。',
+      '卡片正文是派生材料，优先核对 sourceExcerpt 中的原始证据；保留适用条件，不得把推测写成课件结论。',
       '返回 JSON：{ cardAnswer, citations, generalSupplement }。citations 只能使用提供的 cardId。',
     ].join('\n'),
     user: [
@@ -110,13 +111,18 @@ export async function answerWithKnowledgeCards(
   const requestedCitations = Array.isArray(response.citations)
     ? response.citations.filter((id): id is string => typeof id === 'string' && allowedCardIds.has(id))
     : [];
-  const citations = requestedCitations.length > 0
-    ? [...new Set(requestedCitations)]
-    : hits.slice(0, 3).map(hit => hit.record.cardId);
+  const citations = [...new Set(requestedCitations)];
+  if (cardAnswer && citations.length === 0) {
+    throw new Error('回答未提供有效的课件引用，请重试；未将检索结果冒充回答依据。');
+  }
   const generalSupplement = text(response.generalSupplement);
+  if (!cardAnswer) {
+    if (generalSupplement) return { mode: 'general', sections: [{ source: 'general', content: generalSupplement, cardIds: [] }] };
+    throw new Error('模型返回了空回答，请重试。');
+  }
   const sections: RagAnswerSection[] = [{
     source: 'cards',
-    content: cardAnswer || hits.map(hit => hit.record.content).join('\n\n'),
+    content: cardAnswer,
     cardIds: citations,
   }];
   if (generalSupplement) sections.push({ source: 'general', content: generalSupplement, cardIds: [] });

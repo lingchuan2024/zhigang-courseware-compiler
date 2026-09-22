@@ -428,7 +428,7 @@ describe('library repository', () => {
     expect((await listLibraryCourses()).map(course => course.id)).toEqual(['legacy-course']);
 
     const db = await openDatabase();
-    expect(db.version).toBe(3);
+    expect(db.version).toBe(4);
     expect(Array.from(db.objectStoreNames)).toEqual(expect.arrayContaining([
       'courses',
       'documents',
@@ -491,7 +491,7 @@ describe('library repository', () => {
   });
 
   it('rejects a write when the IndexedDB open request errors', async () => {
-    const futureDb = await openDatabase(4);
+    const futureDb = await openDatabase(5);
     futureDb.close();
     vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
@@ -502,7 +502,7 @@ describe('library repository', () => {
 
   it('closes an open repository connection when another version is requested', async () => {
     await listLibraryCourses();
-    const upgradeRequest = indexedDB.open(DB_NAME, 4);
+    const upgradeRequest = indexedDB.open(DB_NAME, 5);
     const upgrade = idbRequest(upgradeRequest);
     const outcome = await Promise.race([
       upgrade.then(() => 'opened' as const),
@@ -516,4 +516,19 @@ describe('library repository', () => {
     upgradedDb.close();
     expect(outcome).toBe('opened');
   });
+});
+
+it('migrates parsed-source index IDs to their owning library document and deletes them with it', async () => {
+  const db = await createVersionOneDatabase();
+  const card = { id: 'card-owned', courseId: 'legacy-course', topicId: 'topic', teachingBlockId: 'block', topicName: '气体', title: '理想气体', conciseSummary: '气体状态', detailedNote: '气体状态', keywords: [], aliases: [], sourceRanges: [{ documentId: 'parsed-id', startBlockId: 'b', endBlockId: 'b' }] };
+  const tx = db.transaction(['snapshots', 'retrieval-records'], 'readwrite');
+  tx.objectStore('snapshots').put({ documentId: 'library-id', courseId: 'legacy-course', snapshot: { knowledgeCards: [card] } });
+  tx.objectStore('retrieval-records').put({ id: 'old-index', cardId: card.id, courseId: 'legacy-course', documentId: 'parsed-id' });
+  await new Promise<void>((resolve, reject) => { tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); });
+  db.close();
+  const records = await listRetrievalRecords();
+  expect(records.filter(r => r.cardId === card.id).map(r => r.documentId)).toEqual(['library-id']);
+  expect(records.find(r => r.cardId === card.id)?.sourceRanges[0].documentId).toBe('parsed-id');
+  await deleteLibraryDocumentCascade('library-id');
+  expect((await listRetrievalRecords()).some(r => r.cardId === card.id)).toBe(false);
 });

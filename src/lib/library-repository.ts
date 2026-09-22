@@ -8,11 +8,12 @@ import type {
   ProjectState,
   RetrievalRecord,
 } from '../types';
+import { buildRetrievalRecords } from './card-retrieval';
 import { deleteDocumentSource } from './document-source';
 import { buildCourseNebulaSummary, type NebulaSnapshotInput } from './nebula/nebula-summary';
 
 const DB_NAME = 'zhigang-library';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const COURSES = 'courses';
 const DOCUMENTS = 'documents';
 const SNAPSHOTS = 'snapshots';
@@ -102,6 +103,26 @@ async function openLibraryDb(): Promise<IDBDatabase | null> {
       if (!db.objectStoreNames.contains(NEBULA_SUMMARIES)) {
         db.createObjectStore(NEBULA_SUMMARIES, { keyPath: 'courseId' });
       }
+      // v4: rebuild owned indexes from snapshots. Old indexes used parsed-source
+      // IDs, which broke citation navigation, replacement, and document deletion.
+      const transaction = request.transaction!;
+      const snapshots = transaction.objectStore(SNAPSHOTS).getAll();
+      snapshots.onsuccess = () => {
+        const rows = snapshots.result as SnapshotRecord[];
+        const store = transaction.objectStore(RETRIEVAL);
+        const ownedCards = new Set(rows.flatMap(row => (row.snapshot.knowledgeCards ?? [])
+          .map(card => `${row.courseId}:${card.id}`)));
+        const previous = store.getAll();
+        previous.onsuccess = () => {
+          for (const record of previous.result as RetrievalRecord[]) {
+            if (ownedCards.has(`${record.courseId}:${record.cardId}`)) store.delete(record.id);
+          }
+          for (const row of rows) {
+            buildRetrievalRecords(row.snapshot.knowledgeCards ?? [], row.documentId, row.courseId)
+              .forEach(record => store.put(record));
+          }
+        };
+      };
     };
     request.onsuccess = () => {
       const db = request.result;

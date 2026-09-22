@@ -124,3 +124,10 @@ describe('多查询检索合并（改写验收）', () => {
     expect(ids).toContain('reg');
   });
 });
+
+it('includes later documents in a bounded whole-library vocabulary', () => {
+  const first = Array.from({ length: 100 }, (_, i) => record({ cardId: `a${i}`, title: `physics${i}` }));
+  const last = record({ cardId: 'last', documentId: 'writing', title: 'paraphrase' });
+  expect(buildVocabulary([...first, last], 4)).toContain('paraphrase');
+  expect(buildVocabulary(first, 0)).toEqual([]);
+});

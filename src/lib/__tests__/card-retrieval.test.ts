@@ -140,3 +140,18 @@ describe('knowledge card retrieval', () => {
     expect(new Set(hits.map(hit => hit.record.cardId)).size).toBe(4);
   });
 });
+
+it('keeps library ownership separate from parsed source range IDs', () => {
+  const item = card('owned', 'course', '气体', '理想气体');
+  item.sourceRanges = [{ documentId: 'parsed-source', startBlockId: 'b1', endBlockId: 'b2' }];
+  const records = buildRetrievalRecords([item], 'library-pdf');
+  expect(records).toHaveLength(1);
+  expect(records[0].documentId).toBe('library-pdf');
+  expect(records[0].sourceRanges).toEqual(item.sourceRanges);
+  expect(searchKnowledgeCards('气体', records, { documentIds: ['library-pdf'] })).toHaveLength(1);
+});
+
+it('does not treat generic courseware wording as evidence for an unrelated topic', () => {
+  const records = buildRetrievalRecords([card('physics', 'course', '平衡态', '课件没有讲解稳恒态反例')], 'doc');
+  expect(searchKnowledgeCards('这三份课件有没有讲解 Kubernetes 集群部署？', records)).toEqual([]);
+});
