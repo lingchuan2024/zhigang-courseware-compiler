@@ -168,3 +168,13 @@
  .atlas-section-heading h2 { font-size:24px; }
 }
 @media (prefers-reduced-motion:reduce) { .atlas-course:hover { transform:none; } }
+
+/* Engraved artwork is decorative; graph text and hit targets remain native SVG. */
+.atlas-network { background: #f2eee5; }
+.atlas-network::before { content:''; position:absolute; inset:0; pointer-events:none; background:linear-gradient(90deg,#f2eee5b8,#f2eee5dd),url('/atlas/antique-map.jpg') center/cover; opacity:.58; }
+.atlas-network::after { content:''; position:absolute; inset:14px; border:1px solid #b6a17a40; outline:1px solid #b6a17a28; outline-offset:5px; pointer-events:none; }
+.atlas-network-node:focus-visible > rect:first-child { stroke:#8b3d43; stroke-width:3; }
+.atlas-network-node:hover > rect:first-child { stroke:#8b3d43; }
+.atlas-processing { background-image:linear-gradient(105deg,rgba(247,244,237,.87),rgba(247,244,237,.64)),url('/atlas/antique-map.jpg'); background-size:cover; background-position:center; }
+.atlas-processing > header { background-color:#f7f4edf5; }
+.atlas-processing .card { background-color:#fffdf8f5; box-shadow:0 12px 36px #5a472014; }

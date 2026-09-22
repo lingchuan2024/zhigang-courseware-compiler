@@ -161,18 +161,14 @@ export function KnowledgeNetworkCanvas({
 
   return (
     <div
-      className="relative h-full min-h-0 overflow-hidden bg-space-950"
+      className="atlas-network relative h-full min-h-0 overflow-hidden bg-space-950"
       data-testid="knowledge-network-canvas"
-      style={{
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(120,205,227,.09) 1px, transparent 0)',
-        backgroundSize: '22px 22px',
-      }}
     >
       {model.nodes.length === 0 ? (
         <div className="absolute inset-0 grid place-items-center text-sm text-space-muted">当前层没有可展示的知识节点</div>
       ) : (
         <svg
-          className="w-full h-full select-none"
+          className="relative z-10 w-full h-full select-none"
           viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
           aria-label="知识网络画布"
           onWheel={event => {
@@ -302,7 +298,7 @@ export function KnowledgeNetworkCanvas({
                 aria-selected={selected}
                 transform={`translate(${position.x} ${position.y})`}
                 opacity={opacity}
-                className="outline-none cursor-pointer"
+                className="atlas-network-node outline-none cursor-pointer"
                 style={{ transition: 'opacity 160ms ease' }}
                 filter={selected ? 'url(#selected-node-glow)' : undefined}
                 onClick={event => { event.stopPropagation(); onSelect(node.id); }}
@@ -317,11 +313,17 @@ export function KnowledgeNetworkCanvas({
                   y={node.kind === 'teaching' ? 5 : 0}
                   width={position.width - (node.kind === 'teaching' ? 14 : 0)}
                   height={position.height - (node.kind === 'teaching' ? 10 : 0)}
-                  rx={node.kind === 'topic' ? 15 : 12}
+                  rx={node.kind === 'topic' ? 3 : 6}
                   fill={palette.fill}
                   stroke={palette.stroke}
                   strokeWidth={selected ? 3 : node.kind === 'topic' ? 2 : 1.5}
                 />
+                {node.kind === 'topic' && <image
+                  href="/atlas/node-cartouche.png" x="-14" y="-10"
+                  width={position.width + 28} height={position.height + 20}
+                  preserveAspectRatio="none" pointerEvents="none" aria-hidden="true"
+                  opacity={selected ? 1 : 0.65}
+                />}
                 <rect x={node.kind === 'teaching' ? 7 : 0} y={node.kind === 'teaching' ? 5 : 0} width="6" height={position.height - (node.kind === 'teaching' ? 10 : 0)} rx="3" fill={palette.accent} opacity={selected ? 1 : 0.78} />
                 {node.sequence !== undefined && (
                   <g aria-label={`遍历顺序 ${node.sequenceLabel ?? node.sequence}`}>
