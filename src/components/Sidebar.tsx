@@ -70,7 +70,9 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
     mineruParseResult,
   };
 
-  const steps = deriveProductSteps(stage, navigationSnapshot);
+  const hasCompleteNotes = courseMasterNote?.status === 'completed' && Boolean(courseMasterNote.markdown.trim());
+  const steps = deriveProductSteps(stage, navigationSnapshot)
+    .filter(step => step.stage !== 'upload' || !hasCompleteNotes);
 
   // 检测是否在查看较早步骤
   const latestStage = getLatestStage(navigationSnapshot);
@@ -94,7 +96,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
 
       {/* 流程导航 */}
       <nav className="flex-1 px-4 py-4 overflow-y-auto">
-        <p className="mb-4 font-mono text-xs uppercase tracking-widest text-space-muted/65">编译流程</p>
+        <p className="mb-4 font-mono text-xs uppercase tracking-widest text-space-muted/65">{hasCompleteNotes ? '学习资料' : '编译流程'}</p>
         <div className="relative">
           {/* 竖向连接线 */}
           <div className="absolute bottom-2 left-[11px] top-2 w-px bg-space-border" aria-hidden="true" />
