@@ -193,14 +193,14 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
               {courseNetwork.nodes.length} 个核心知识 · {courseNetwork.edges.length} 个课程关系
               {structureQuality && (
                 <span
-                  className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${structureQuality.coverageRate >= 0.9 ? 'bg-celadon/12 text-celadon-light' : 'bg-amber-400/12 text-amber-300'}`}
+                  className={`ml-2 rounded px-1.5 py-0.5 text-[11px] ${structureQuality.coverageRate >= 0.9 ? 'bg-celadon/12 text-celadon-light' : 'bg-amber-400/12 text-amber-800'}`}
                   title={`内容块分配到知识结构的比例（${structureQuality.assignedBlocks}/${structureQuality.totalBlocks} 块）`}
                 >
                   内容覆盖率 {Math.round(structureQuality.coverageRate * 100)}%
                 </span>
               )}
               {staleMarker?.reason === 'source-reparsed' && staleNodeIds.size > 0 && (
-                <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[11px] text-amber-300">
+                <span className="ml-2 rounded bg-amber-400/15 px-1.5 py-0.5 text-[11px] text-amber-800">
                   重解析：{staleNodeIds.size} 个知识点需更新
                 </span>
               )}
@@ -233,7 +233,7 @@ export function KnowledgeStructureView({ onOpenSettings }: KnowledgeStructureVie
 
         <div className="flex flex-shrink-0 items-center gap-2">
           {currentNetwork.warnings.length > 0 && (
-            <span className="rounded-full bg-amber-400/10 px-2.5 py-1 text-xs text-amber-300" title={currentNetwork.warnings.join('\n')}>{currentNetwork.warnings.length} 条数据警告</span>
+            <span className="rounded-full bg-amber-400/10 px-2.5 py-1 text-xs text-amber-800" title={currentNetwork.warnings.join('\n')}>{currentNetwork.warnings.length} 条数据警告</span>
           )}
           {!sourcePanelOpen && (
             <button type="button" onClick={() => setSourcePanelOpen(true)} className="rounded-lg border border-space-border px-3 py-2 text-xs text-ink-light hover:bg-space-750">显示原文</button>

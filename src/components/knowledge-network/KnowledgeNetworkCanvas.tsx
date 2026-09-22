@@ -48,15 +48,15 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 function nodePalette(node: KnowledgeNetworkNode, selected: boolean): { fill: string; stroke: string; accent: string } {
-  if (selected) return { fill: '#102238', stroke: '#78cde3', accent: '#ed8880' };
-  if (node.kind === 'topic' && node.importance === 'core') return { fill: '#0d2132', stroke: '#4fa7bd', accent: '#ffbd72' };
-  if (node.kind === 'topic') return { fill: '#0a1a2a', stroke: '#31536d', accent: '#78cde3' };
+  if (selected) return { fill: '#ece2d1', stroke: '#294f61', accent: '#8b3d43' };
+  if (node.kind === 'topic' && node.importance === 'core') return { fill: '#f7f0e2', stroke: '#9c8356', accent: '#8b3d43' };
+  if (node.kind === 'topic') return { fill: '#fffdf8', stroke: '#b9ab92', accent: '#294f61' };
   if (node.kind === 'teaching') {
-    if (['formula', 'derivation', 'proof'].includes(node.category)) return { fill: '#0b1727', stroke: '#587ba1', accent: '#8fb9e8' };
-    if (['example', 'application', 'visualization'].includes(node.category)) return { fill: '#18160f', stroke: '#8f7542', accent: '#e2ba65' };
-    if (['limitation', 'misconception', 'condition'].includes(node.category)) return { fill: '#1d1117', stroke: '#8f5559', accent: '#ed8880' };
+    if (['formula', 'derivation', 'proof'].includes(node.category)) return { fill: '#f2f5f5', stroke: '#658493', accent: '#294f61' };
+    if (['example', 'application', 'visualization'].includes(node.category)) return { fill: '#f8f1df', stroke: '#99824f', accent: '#786330' };
+    if (['limitation', 'misconception', 'condition'].includes(node.category)) return { fill: '#f9edeb', stroke: '#a77275', accent: '#8b3d43' };
   }
-  return { fill: '#0a1625', stroke: '#31536d', accent: '#78cde3' };
+  return { fill: '#f7f4ed', stroke: '#b9ab92', accent: '#294f61' };
 }
 
 function titleLines(label: string): string[] {
@@ -199,7 +199,7 @@ export function KnowledgeNetworkCanvas({
               <path d="M 0 0 L 10 5 L 0 10 z" fill="context-stroke" />
             </marker>
             <filter id="selected-node-glow" x="-30%" y="-40%" width="160%" height="180%">
-              <feDropShadow dx="0" dy="3" stdDeviation="7" floodColor="#78cde3" floodOpacity="0.24" />
+              <feDropShadow dx="0" dy="3" stdDeviation="7" floodColor="#294f61" floodOpacity="0.24" />
             </filter>
           </defs>
 
@@ -211,9 +211,9 @@ export function KnowledgeNetworkCanvas({
                 width={expandedGroupBounds.width}
                 height={expandedGroupBounds.height}
                 rx="28"
-                fill="#07101d"
+                fill="#fffdf8"
                 fillOpacity="0.94"
-                stroke="#31536d"
+                stroke="#b9ab92"
                 strokeWidth="1.8"
                 strokeDasharray="7 5"
               />
@@ -238,8 +238,8 @@ export function KnowledgeNetworkCanvas({
                   cx={expandedGroupBounds.x + 23}
                   cy={expandedGroupBounds.y + 24}
                   r="14"
-                  fill="#102238"
-                  stroke="#78cde3"
+                  fill="#ece2d1"
+                  stroke="#294f61"
                   strokeWidth="1.5"
                 />
                 <text
@@ -248,7 +248,7 @@ export function KnowledgeNetworkCanvas({
                   textAnchor="middle"
                   fontSize="17"
                   fontWeight="700"
-                  fill="#edf7fc"
+                  fill="#fffdf8"
                 >×</text>
               </g>
               <text
@@ -256,7 +256,7 @@ export function KnowledgeNetworkCanvas({
                 y={expandedGroupBounds.y + 29}
                 fontSize="12"
                 fontWeight="700"
-                fill="#b1c3d1"
+                fill="#53616a"
               >{model.expandedGroup.label}</text>
             </g>
           )}
@@ -274,7 +274,7 @@ export function KnowledgeNetworkCanvas({
               <g key={edge.id} opacity={selectedId ? (connected ? 0.9 : 0.08) : 0.34} data-edge={edge.id}>
                 <path d={path} fill="none" stroke={color} strokeWidth={connected && selectedId ? 2.4 : 1.6} markerEnd="url(#network-arrow)" />
                 {connected && selectedId && (
-                  <text x={labelX} y={labelY} textAnchor="middle" fontSize="10" fill={color} paintOrder="stroke" stroke="#010207" strokeWidth="4">
+                  <text x={labelX} y={labelY} textAnchor="middle" fontSize="10" fill={color} paintOrder="stroke" stroke="#f2eee5" strokeWidth="4">
                     {edge.label}
                   </text>
                 )}
@@ -325,19 +325,19 @@ export function KnowledgeNetworkCanvas({
                 <rect x={node.kind === 'teaching' ? 7 : 0} y={node.kind === 'teaching' ? 5 : 0} width="6" height={position.height - (node.kind === 'teaching' ? 10 : 0)} rx="3" fill={palette.accent} opacity={selected ? 1 : 0.78} />
                 {node.sequence !== undefined && (
                   <g aria-label={`遍历顺序 ${node.sequenceLabel ?? node.sequence}`}>
-                    <circle cx="22" cy="21" r={node.sequenceLabel ? 13 : 11} fill={node.kind === 'topic' || selected ? '#f4d8a8' : palette.accent} opacity={selected ? 1 : 0.92} />
-                    <text x="22" y="25" textAnchor="middle" fontSize={node.sequenceLabel ? 9 : 10} fontWeight="800" fill="#07101d">{node.sequenceLabel ?? node.sequence}</text>
+                    <circle cx="22" cy="21" r={node.sequenceLabel ? 13 : 11} fill={node.kind === 'topic' || selected ? '#ac8750' : palette.accent} opacity={selected ? 1 : 0.92} />
+                    <text x="22" y="25" textAnchor="middle" fontSize={node.sequenceLabel ? 9 : 10} fontWeight="800" fill="#253a46">{node.sequenceLabel ?? node.sequence}</text>
                   </g>
                 )}
-                <text x={node.sequence !== undefined ? 43 : 17} y="25" fontSize="13" fontWeight="700" fill="#edf7fc">
+                <text x={node.sequence !== undefined ? 43 : 17} y="25" fontSize="13" fontWeight="700" fill="#253a46">
                   {lines[0]}
                 </text>
-                {lines[1] && <text x="17" y="43" fontSize="12" fontWeight="600" fill="#b1c3d1">{lines[1]}</text>}
-                <text x="17" y={position.height - 13} fontSize="10" fill={selected || node.kind === 'topic' ? '#8ea6b7' : palette.accent}>
+                {lines[1] && <text x="17" y="43" fontSize="12" fontWeight="600" fill="#53616a">{lines[1]}</text>}
+                <text x="17" y={position.height - 13} fontSize="10" fill={selected || node.kind === 'topic' ? '#756d60' : palette.accent}>
                   {CATEGORY_LABELS[node.category] ?? node.category} · {node.sourceRanges.length} 处原文
                 </text>
                 {node.kind === 'topic' && node.importance === 'core' && (
-                  <text x={position.width - 12} y="18" textAnchor="end" fontSize="10" fontWeight="700" fill="#f4d8a8">核心</text>
+                  <text x={position.width - 12} y="18" textAnchor="end" fontSize="10" fontWeight="700" fill="#ac8750">核心</text>
                 )}
                 {staleNodeIds?.has(node.id) && (
                   <text
@@ -365,7 +365,7 @@ export function KnowledgeNetworkCanvas({
       </div>
 
       {filteredEdges.length === 0 && model.nodes.length > 0 && (
-        <div className="absolute left-3 top-3 rounded-lg border border-amber-400/30 bg-space-850/95 px-3 py-2 text-xs text-amber-300 shadow-sm">
+        <div className="absolute left-3 top-3 rounded-lg border border-amber-400/30 bg-space-850/95 px-3 py-2 text-xs text-amber-800 shadow-sm">
           当前仅提取到内容节点，尚无可显示的关系
         </div>
       )}

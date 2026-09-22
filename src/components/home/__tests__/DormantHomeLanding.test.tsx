@@ -24,7 +24,7 @@ function render(element: ReactElement) {
 }
 
 function button(container: HTMLElement, name: string) {
-  return Array.from(container.querySelectorAll('button')).find(item => item.textContent?.trim() === name)!;
+  return Array.from(container.querySelectorAll('button')).find(item => item.textContent?.trim().startsWith(name))!;
 }
 
 describe('RevealSection', () => {
@@ -64,15 +64,14 @@ describe('DormantHomeLanding', () => {
       onOpenLibrary: vi.fn(), onOpenQa: vi.fn(), onOpenSettings: vi.fn(),
     }));
 
-    expect(container.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
-    expect(container.querySelector('[data-home-nebula-veil]')?.className).toContain('rgba(1,2,7,.52)_86%');
-    expect(container.textContent).toContain('让每一份课件，成为可探索的知识宇宙。');
+    expect(container.querySelector('.atlas-home')).not.toBeNull();
+    expect(container.textContent).toContain('循着知识，看见更大的世界。');
     expect(container.textContent).toContain('知识结构');
     expect(container.textContent).toContain('知识卡片');
     expect(container.textContent).toContain('完整笔记');
     expect(container.textContent).toContain('全库知识问答');
-    expect(container.textContent).toContain('导入课程材料');
-    expect(container.textContent).toContain('你的知识宇宙，等待第一次观测。');
+    expect(container.textContent).toContain('收录课件');
+    expect(container.textContent).toContain('你的第一卷知识图集，从这里开始。');
     expect(container.textContent).not.toContain('还没有被点亮的知识星');
   });
 

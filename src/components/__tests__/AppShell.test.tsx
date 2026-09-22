@@ -36,7 +36,7 @@ describe('AppShell', () => {
     const content = container.querySelector<HTMLElement>('[data-app-shell-content]');
     const overlay = container.querySelector<HTMLElement>('[data-test-overlay]');
 
-    expect(container.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
+    expect(container.querySelector('[data-atlas-backdrop="library"]')).not.toBeNull();
     expect(content?.textContent).toContain('课程空间');
     expect(foreground?.classList.contains('relative')).toBe(true);
     expect(foreground?.classList.contains('z-10')).toBe(true);

@@ -9,7 +9,7 @@
  */
 
 .prose-content {
-  color: #b9c7d7;
+  color: #35434b;
   font-size: 15px;
   line-height: 1.75;
   overflow-wrap: anywhere;
@@ -36,7 +36,7 @@
 /* Inline emphasis */
 .prose-content strong {
   font-weight: 600;
-  color: #f2f6fb;
+  color: #203643;
 }
 
 .prose-content em {
@@ -63,7 +63,7 @@
 }
 
 .prose-content li::marker {
-  color: #6f879f;
+  color: #8d744e;
 }
 
 /* Nested list indentation */

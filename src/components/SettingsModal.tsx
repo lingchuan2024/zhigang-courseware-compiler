@@ -124,7 +124,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                 <h3 className="font-song text-lg font-bold text-ink mt-1">MinerU 精准解析 API</h3>
                 <p className="mt-1 text-xs text-space-muted">上传 PDF/PPTX，异步生成 Markdown、公式和表格。</p>
               </div>
-              <span className={`rounded-full border px-2 py-1 text-xs ${mineruValid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-300'}`}>
+              <span className={`rounded-full border px-2 py-1 text-xs ${mineruValid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-800'}`}>
                 {mineruValid ? '已配置' : '未配置'}
               </span>
             </div>
@@ -179,7 +179,7 @@ export function SettingsModal({ isOpen, onClose, mode = 'default', onSaved }: Se
                 <h3 className="font-song text-lg font-bold text-ink mt-1">OpenAI-compatible 模型</h3>
                 <p className="mt-1 text-xs text-space-muted">用于主题提取、结构合并、学习顺序与笔记生成。</p>
               </div>
-              <span className={`rounded-full border px-2 py-1 text-xs ${model.apiKey && modelValidation.valid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-300'}`}>
+              <span className={`rounded-full border px-2 py-1 text-xs ${model.apiKey && modelValidation.valid ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-800'}`}>
                 {model.apiKey && modelValidation.valid ? '已配置' : '未配置'}
               </span>
             </div>

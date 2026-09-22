@@ -253,7 +253,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
               clearDraftForNavigation();
               startNewChat();
             }}
-            className="w-full rounded-xl border border-space-border bg-space-850 px-4 py-3 text-left font-song text-sm font-bold text-space-text transition hover:-translate-y-px hover:border-celadon/60 hover:bg-space-750"
+            className="w-full rounded-md border border-space-border bg-space-850 px-4 py-3 text-left font-song text-sm font-bold text-space-text transition hover:-translate-y-px hover:border-celadon/60 hover:bg-space-750"
           >
             <span className="mr-2 text-cinnabar">＋</span>新建聊天
           </button>
@@ -274,7 +274,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                       return (
                         <div
                           key={conversation.id}
-                          className={`group relative rounded-xl border transition ${active ? 'border-celadon/25 bg-celadon/10' : 'border-transparent hover:border-space-border hover:bg-space-750'}`}
+                          className={`group relative rounded-md border transition ${active ? 'border-celadon/25 bg-celadon/10' : 'border-transparent hover:border-space-border hover:bg-space-750'}`}
                         >
                           {renaming ? (
                             <input
@@ -404,7 +404,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
 
                       {message.status === 'completed' && messageSections(message).map((section, index) => (
                         <section key={`${message.id}-${index}`} className={index > 0 ? 'mt-6 border-t border-space-border pt-6' : ''}>
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide ${section.source === 'cards' ? 'bg-celadon/10 text-celadon' : 'bg-amber-400/10 text-amber-300'}`}>
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold tracking-wide ${section.source === 'cards' ? 'bg-celadon/10 text-celadon' : 'bg-amber-400/10 text-amber-800'}`}>
                             {section.source === 'cards' ? '基于知识卡片' : 'AI 通用回答'}
                           </span>
                           <MarkdownRenderer content={section.content} className="mt-3 text-[15px] leading-8 text-space-muted" />
@@ -418,7 +418,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                       )}
 
                       {(message.status === 'failed' || message.status === 'interrupted') && (
-                        <div className="rounded-2xl border border-cinnabar/20 bg-cinnabar/5 p-4">
+                        <div className="rounded-md border border-cinnabar/20 bg-cinnabar/5 p-4">
                           <p className="font-song text-base font-bold text-cinnabar">回答未完成</p>
                           <p className="mt-1 text-sm leading-6 text-space-muted">{message.error ?? '本次生成已中断'}</p>
                           <button
@@ -459,7 +459,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
           )}
 
           {(actionError || error) && (
-            <div role="alert" className="mx-auto mt-6 max-w-3xl rounded-xl border border-cinnabar/20 bg-cinnabar/5 px-4 py-3 text-sm text-cinnabar">
+            <div role="alert" className="mx-auto mt-6 max-w-3xl rounded-md border border-cinnabar/20 bg-cinnabar/5 px-4 py-3 text-sm text-cinnabar">
               {actionError || error}
             </div>
           )}
@@ -467,7 +467,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
 
         <div className="border-t border-space-border bg-space-900/95 p-3 md:px-8 md:py-5">
           <div className="mx-auto max-w-3xl">
-            <div className="flex items-end gap-2 rounded-2xl border border-space-border bg-space-850 p-2 shadow-nebula-panel focus-within:border-celadon focus-within:ring-2 focus-within:ring-celadon/10">
+            <div className="flex items-end gap-2 rounded-md border border-space-border bg-space-850 p-2 shadow-nebula-panel focus-within:border-celadon focus-within:ring-2 focus-within:ring-celadon/10">
               <textarea
                 value={draft}
                 onChange={event => {
@@ -493,7 +493,7 @@ export function KnowledgeQaView({ onOpenSettings, answerer }: KnowledgeQaViewPro
                 onClick={() => { void submitQuestion(); }}
                 disabled={sendDisabled}
                 aria-label="发送消息"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-cinnabar text-lg text-white transition hover:bg-[#d7654d] disabled:cursor-not-allowed disabled:opacity-30"
+                className="grid h-10 w-10 shrink-0 place-items-center rounded-md bg-cinnabar text-lg text-white transition hover:bg-[#d7654d] disabled:cursor-not-allowed disabled:opacity-30"
               >
                 ↑
               </button>
@@ -604,24 +604,24 @@ function CitationDrawer({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-6 py-6">
           {recordsStatus === 'loading' && (
-            <div role="status" className="mb-5 rounded-xl border border-celadon/20 bg-celadon/5 px-3 py-2.5 text-xs leading-5 text-space-muted">
+            <div role="status" className="mb-5 rounded-md border border-celadon/20 bg-celadon/5 px-3 py-2.5 text-xs leading-5 text-space-muted">
               正在核对最新知识卡片…
             </div>
           )}
           {displayingSnapshot && (
-            <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-xs leading-5 text-amber-300">
+            <div className="mb-5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-xs leading-5 text-amber-800">
               卡片已更新或不可用，显示历史引用
             </div>
           )}
           {recordsStatus === 'error' && (
-            <div className="mb-5 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-xs leading-5 text-amber-300">
+            <div className="mb-5 rounded-md border border-amber-400/30 bg-amber-400/10 px-3 py-2.5 text-xs leading-5 text-amber-800">
               暂时无法核对最新卡片，显示历史引用
-              {recordsError ? <span className="mt-1 block text-amber-200">{recordsError}</span> : null}
+              {recordsError ? <span className="mt-1 block text-amber-800">{recordsError}</span> : null}
             </div>
           )}
           <p className="text-xs leading-5 text-space-faint">{citation.courseName} · {citation.documentTitle}</p>
           <h3 className="mt-3 font-song text-2xl font-bold leading-tight text-space-text">{record?.title ?? citation.title}</h3>
-          <div className="mt-5 rounded-2xl border border-space-border bg-space-850 p-5 shadow-nebula-panel">
+          <div className="mt-5 rounded-md border border-space-border bg-space-850 p-5 shadow-nebula-panel">
             <MarkdownRenderer content={content} className="text-sm leading-7 text-space-muted" />
           </div>
           {sourceExcerpt && (

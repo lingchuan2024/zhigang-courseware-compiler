@@ -13,7 +13,7 @@ import { LibraryView } from './components/LibraryView';
 import { AppShell } from './components/AppShell';
 import { useLibraryStore } from './store/useLibraryStore';
 import { KnowledgeQaView } from './components/KnowledgeQaView';
-import { AstronomyBackdrop } from './components/backgrounds/AstronomyBackdrop';
+import { AtlasBackdrop } from './components/backgrounds/AtlasBackdrop';
 import { loadStoredModelConfig, loadStoredMinerUConfig } from './lib/model-config-storage';
 
 function App() {
@@ -115,7 +115,7 @@ function App() {
 
   return (
     <div className="relative h-screen overflow-hidden bg-space-950">
-      <AstronomyBackdrop variant={stage === 'notes' ? 'reading' : 'workspace'} />
+      <AtlasBackdrop variant={stage === 'notes' ? 'reading' : 'workspace'} />
       <div className="relative z-10 flex h-full overflow-hidden">
         {/* 移动端菜单按钮 */}
         <div className="md:hidden fixed top-4 left-4 z-40">

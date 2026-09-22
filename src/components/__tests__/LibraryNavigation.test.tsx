@@ -119,32 +119,32 @@ describe('multi-course library navigation', () => {
     expect(useLibraryStore.getState().nebulaSummaries).toEqual([
       expect.objectContaining({ courseId: course.id, knowledgeCount: 1 }),
     ]);
-    expect(container!.textContent).not.toContain('让每一份课件，成为可探索的知识宇宙。');
-    expect(container!.textContent).toContain('知识被观测');
+    expect(container!.textContent).not.toContain('你的第一卷知识图集');
+    expect(container!.textContent).toContain('我的课程图集');
   });
 
   it('starts at home, creates a course, and opens its upload workspace', async () => {
     await act(async () => root!.render(createElement(App)));
     expect(container!.textContent).toContain('知纲');
-    expect(container!.querySelector('h1')?.textContent).toContain('让每一份课件');
+    expect(container!.querySelector('h1')?.textContent).toContain('循着知识');
     expect(container!.textContent).not.toContain('还没有被点亮的知识星');
     expect(container!.textContent).not.toContain('知识被观测，星云才会发光。');
     expect(container!.textContent).toContain('知识结构');
     expect(container!.textContent).toContain('完整笔记');
     expect(container!.textContent).toContain('全库知识问答');
-    expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container!.querySelector('.atlas-home')).not.toBeNull();
     expect(button('添加第一份课件')).not.toBeNull();
     expect(container!.textContent).not.toContain('OBSERVATORY ONLINE');
     expect(container!.textContent).not.toContain('CURRENT SURVEY');
 
     await act(async () => button('全库知识问答').click());
-    expect(container!.querySelector('[data-astronomy-backdrop="qa"]')).not.toBeNull();
+    expect(container!.querySelector('[data-atlas-backdrop="qa"]')).not.toBeNull();
     act(() => useLibraryStore.getState().navigate('home'));
     await act(async () => {});
 
     await act(async () => button('添加第一份课件').click());
     expect(container!.textContent).toContain('课程与课件');
-    expect(container!.querySelector('[data-astronomy-backdrop="library"]')).not.toBeNull();
+    expect(container!.querySelector('[data-atlas-backdrop="library"]')).not.toBeNull();
     expect(container!.querySelector('[data-app-shell-content] > main > aside')?.className).toContain('bg-space-900/[0.78]');
     expect(container!.querySelector('[data-app-shell-content] > main > section')?.className).toContain('bg-space-950/[0.5]');
 
@@ -166,7 +166,7 @@ describe('multi-course library navigation', () => {
 
     act(() => useLibraryStore.getState().navigate('qa'));
     await act(async () => {});
-    expect(container!.querySelector('[data-astronomy-backdrop="qa"]')).not.toBeNull();
+    expect(container!.querySelector('[data-atlas-backdrop="qa"]')).not.toBeNull();
 
     act(() => useLibraryStore.getState().navigate('home'));
     await act(async () => {});
@@ -181,14 +181,14 @@ describe('multi-course library navigation', () => {
     await act(async () => button('创建课程').click());
     await act(async () => button('添加课件').click());
 
-    expect(container!.querySelector('[data-astronomy-backdrop="workspace"]')).not.toBeNull();
-    expect(container!.querySelector('[data-astronomy-backdrop="workspace"] + div main > div')?.className)
+    expect(container!.querySelector('[data-atlas-backdrop="workspace"]')).not.toBeNull();
+    expect(container!.querySelector('[data-atlas-backdrop="workspace"] + div main > div')?.className)
       .toContain('bg-space-950/[0.5]');
 
     act(() => useStore.getState().setStage('notes'));
     await act(async () => {});
-    expect(container!.querySelector('[data-astronomy-backdrop="reading"]')).not.toBeNull();
-    expect(container!.querySelector('[data-astronomy-backdrop="reading"] + div main > div')?.className)
+    expect(container!.querySelector('[data-atlas-backdrop="reading"]')).not.toBeNull();
+    expect(container!.querySelector('[data-atlas-backdrop="reading"] + div main > div')?.className)
       .toContain('bg-space-950/[0.82]');
     act(() => useStore.setState({ stage: 'upload' }));
   });
@@ -197,10 +197,10 @@ describe('multi-course library navigation', () => {
     await act(async () => root!.render(createElement(App)));
     await act(async () => button('添加第一份课件').click());
     await act(async () => button('返回首页').click());
-    expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container!.querySelector('.atlas-home')).not.toBeNull();
     expect(container!.textContent).not.toContain('还没有被点亮的知识星');
     expect(container!.textContent).not.toContain('知识被观测，星云才会发光。');
-    expect(container!.textContent).toContain('让每一份课件，成为可探索的知识宇宙。');
+    expect(container!.textContent).toContain('你的第一卷知识图集');
   });
 
   it('opens a course from its nebula hotspot', async () => {
@@ -358,7 +358,7 @@ describe('multi-course library navigation', () => {
     await act(async () => {});
 
     expect(useLibraryStore.getState().screen).toBe('home');
-    expect(container!.querySelector('[data-astronomy-backdrop="dormant"]')).not.toBeNull();
+    expect(container!.querySelector('.atlas-home')).not.toBeNull();
     expect(useLibraryStore.getState().error).toBeNull();
   });
 });

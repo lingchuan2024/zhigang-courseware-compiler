@@ -122,7 +122,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
           </div>
         </div>
         <div className="flex items-center gap-2">
-          {!modelConfig?.apiKey && (!usableMaster || generatedCount < plan.length) && <button type="button" onClick={onOpenSettings} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-300">配置 AI 模型</button>}
+          {!modelConfig?.apiKey && (!usableMaster || generatedCount < plan.length) && <button type="button" onClick={onOpenSettings} className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-800">配置 AI 模型</button>}
           {!usableMaster && !isRunning && (
             <button type="button" onClick={() => void startGeneration()} className="btn-primary">生成完整笔记</button>
           )}
@@ -146,7 +146,7 @@ export function MasterNoteView({ onOpenSettings }: { onOpenSettings: () => void 
       )}
 
       {isPartial && (
-        <div className="border-b border-amber-400/20 bg-amber-400/10 px-5 py-2.5 text-xs text-amber-300">部分章节生成失败，已完成内容会保留；可在左侧选择失败章节单独重试。</div>
+        <div className="border-b border-amber-400/20 bg-amber-400/10 px-5 py-2.5 text-xs text-amber-800">部分章节生成失败，已完成内容会保留；可在左侧选择失败章节单独重试。</div>
       )}
 
       <div className="relative flex min-h-0 flex-1">

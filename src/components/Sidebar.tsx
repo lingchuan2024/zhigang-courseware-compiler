@@ -115,9 +115,9 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                       : step.status === 'completed'
                       ? 'text-ink-light hover:bg-space-750/70'
                       : step.status === 'stale'
-                      ? 'text-amber-300/90 hover:bg-space-750/70'
+                      ? 'text-amber-800 hover:bg-space-750/70'
                       : step.status === 'blocked'
-                      ? 'text-amber-300/80 hover:bg-space-750/70'
+                      ? 'text-amber-800 hover:bg-space-750/70'
                       : step.status === 'failed'
                       ? 'text-cinnabar-light hover:bg-space-750/70'
                       : 'text-space-muted/55'
@@ -134,12 +134,12 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                       <span className="w-2.5 h-2.5 bg-celadon-light rounded-full animate-pulse-soft motion-reduce:animate-none" />
                     )}
                     {step.status === 'stale' && (
-                      <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-amber-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                       </svg>
                     )}
                     {step.status === 'blocked' && (
-                      <svg className="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg className="w-4 h-4 text-amber-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                       </svg>
                     )}
@@ -156,9 +156,9 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                     <div className="text-sm font-ui">{step.label}</div>
                     {stepStatusText && (
                       <div className={`text-xs font-mono mt-0.5 truncate ${
-                        step.status === 'stale' ? 'text-amber-400/60'
+                        step.status === 'stale' ? 'text-amber-800'
                         : step.status === 'failed' ? 'text-cinnabar-light/70'
-                        : step.status === 'blocked' ? 'text-amber-400/60'
+                        : step.status === 'blocked' ? 'text-amber-800'
                         : step.status === 'active' ? 'text-celadon-light/60'
                         : 'text-space-muted/60'
                       }`}>
@@ -167,7 +167,7 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
                     )}
                   </div>
                   {step.status === 'stale' && (
-                    <span className="text-xs font-mono text-amber-400/60 flex-shrink-0">需更新</span>
+                    <span className="text-xs font-mono text-amber-800 flex-shrink-0">需更新</span>
                   )}
                 </button>
               );
@@ -193,10 +193,10 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         {/* Stale 提示 */}
         {staleMarker && (
           <div className="mt-4 bg-amber-400/10 border border-amber-400/30 rounded-lg p-3">
-            <p className="text-xs font-ui text-amber-400/90 mb-1">数据已修改</p>
-            <p className="text-xs text-amber-400/60">{staleLabel(staleMarker)}</p>
+            <p className="text-xs font-ui text-amber-800 mb-1">数据已修改</p>
+            <p className="text-xs text-amber-800">{staleLabel(staleMarker)}</p>
             {staleMarker.reason === 'source-reparsed' && staleMarker.affectedTopicIds.length > 0 && (
-              <p className="mt-1 text-[11px] text-amber-400/45">
+              <p className="mt-1 text-[11px] text-amber-800">
                 受影响知识点 {staleMarker.affectedTopicIds.length} 个 · 在知识结构中会以"需更新"标出
               </p>
             )}
@@ -233,13 +233,13 @@ export function Sidebar({ onOpenSettings }: SidebarProps) {
         <button
           type="button"
           onClick={() => { void refreshLibrary(); navigateLibrary('library'); }}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-ui text-sm text-ink-light transition-colors hover:bg-space-750 hover:text-white"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-ui text-sm text-ink-light transition-colors hover:bg-space-750 hover:text-ink"
         >
           <span aria-hidden="true">▦</span><span>返回课件库</span>
         </button>
         <button
           onClick={onOpenSettings}
-          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-ui text-sm text-ink-light transition-colors hover:bg-space-750 hover:text-white focus:outline-none focus-visible:ring-2 focus-visible:ring-celadon/30"
+          className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left font-ui text-sm text-ink-light transition-colors hover:bg-space-750 hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-celadon/30"
         >
           <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />

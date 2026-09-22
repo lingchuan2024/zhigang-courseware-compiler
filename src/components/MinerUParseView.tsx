@@ -70,7 +70,7 @@ export function MinerUParseView({ onOpenSettings }: MinerUParseViewProps) {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className={`rounded-full border px-2 py-1 text-xs ${mineruConfig?.apiKey ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-300'}`}>
+          <span className={`rounded-full border px-2 py-1 text-xs ${mineruConfig?.apiKey ? 'border-celadon/25 bg-celadon/10 text-celadon-light' : 'border-amber-400/25 bg-amber-400/10 text-amber-800'}`}>
             MinerU {mineruConfig?.apiKey ? '已配置' : '未配置'}
           </span>
           {isCompleted && (

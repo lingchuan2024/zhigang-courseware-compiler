@@ -60,9 +60,9 @@ export function LibraryView() {
               value={name}
               onChange={event => setName(event.target.value)}
               placeholder="例如：机器学习"
-              className="config-input rounded-xl"
+              className="config-input rounded-md"
             />
-            <button type="submit" className="btn-primary w-full rounded-xl">创建课程</button>
+            <button type="submit" className="btn-primary w-full rounded-md">创建课程</button>
           </form>
           <div className="mt-7 space-y-2">
             {courses.map(course => (
@@ -70,7 +70,7 @@ export function LibraryView() {
                 type="button"
                 key={course.id}
                 onClick={() => void openCourse(course.id)}
-                className={`w-full rounded-xl border px-4 py-3 text-left transition ${course.id === activeCourseId ? 'border-celadon/35 bg-celadon/10 text-space-text shadow-[0_12px_30px_rgba(0,0,0,.18)]' : 'border-transparent text-ink-light hover:border-space-border hover:bg-space-850'}`}
+                className={`w-full rounded-md border px-4 py-3 text-left transition ${course.id === activeCourseId ? 'border-celadon/35 bg-celadon/10 text-space-text shadow-[0_12px_30px_rgba(72,56,30,.05)]' : 'border-transparent text-ink-light hover:border-space-border hover:bg-space-850'}`}
               >
                 <div className="font-song font-bold">{course.name}</div>
                 <div className={`mt-1 text-xs ${course.id === activeCourseId ? 'text-celadon/65' : 'text-space-muted'}`}>{course.documentIds.length} 份课件</div>
@@ -91,7 +91,7 @@ export function LibraryView() {
                 <button
                   type="button"
                   onClick={() => setDeleteTarget({ kind: 'course', id: activeCourse.id, title: activeCourse.name, documentCount: courseDocuments.length })}
-                  className="btn-danger rounded-xl px-4 py-3"
+                  className="btn-danger rounded-md px-4 py-3"
                 >
                   删除课程
                 </button>
@@ -100,26 +100,26 @@ export function LibraryView() {
                 type="button"
                 disabled={!activeCourseId}
                 onClick={() => startNewDocument()}
-                className="btn-primary rounded-xl px-5 py-3 disabled:cursor-not-allowed disabled:opacity-40"
+                className="btn-primary rounded-md px-5 py-3 disabled:cursor-not-allowed disabled:opacity-40"
               >
                 ＋ 添加课件
               </button>
             </div>
           </div>
 
-          {error && <div className="mt-5 rounded-xl border border-cinnabar/20 bg-cinnabar/5 p-4 text-sm text-cinnabar">{error}</div>}
+          {error && <div className="mt-5 rounded-md border border-cinnabar/20 bg-cinnabar/5 p-4 text-sm text-cinnabar">{error}</div>}
 
           {!activeCourse ? (
             <div className="grid min-h-[420px] place-items-center text-center text-space-muted">创建课程空间后，可以连续添加多份 PDF 或 PPTX。</div>
           ) : courseDocuments.length === 0 ? (
-            <div className="mt-8 rounded-2xl border border-dashed border-space-border-strong bg-space-900/50 px-8 py-20 text-center">
+            <div className="mt-8 rounded-md border border-dashed border-space-border-strong bg-space-900/50 px-8 py-20 text-center">
               <p className="font-song text-xl font-bold text-ink">这个课程空间还没有课件</p>
               <p className="mt-2 text-sm text-space-muted">添加第一份 PDF 或 PPTX，处理结果会作为独立课件保存。</p>
             </div>
           ) : (
             <div className="mt-7 grid gap-4 lg:grid-cols-2">
               {courseDocuments.map(document => (
-                <article key={document.id} className="group relative rounded-2xl border border-space-border bg-space-850/[0.94] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-celadon/45 hover:shadow-[0_18px_38px_rgba(0,0,0,.28)]">
+                <article key={document.id} className="group relative rounded-md border border-space-border bg-space-850/[0.94] backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-celadon/45 hover:shadow-[0_18px_38px_rgba(72,56,30,.09)]">
                   <button type="button" onClick={() => void openDocument(document.id)} className="w-full p-5 text-left">
                     <div className="flex items-start justify-between gap-4 pr-16">
                       <div>
@@ -132,7 +132,7 @@ export function LibraryView() {
                     <div className="mt-6 flex items-center gap-4 border-t border-space-border pt-4 text-xs text-space-muted">
                       <span>{document.pageCount} 页</span>
                       <span>{document.cardCount ?? 0} 张卡片</span>
-                      <span className="ml-auto">{document.stage}</span>
+                      <span className="ml-auto">{{ upload: '待上传', document: '课件预览', mineru: '原文解析', structure: '知识结构', cards: '知识卡片', notes: '完整笔记' }[document.stage]}</span>
                     </div>
                   </button>
                   <button
@@ -151,7 +151,7 @@ export function LibraryView() {
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-5 backdrop-blur-sm" role="dialog" aria-modal="true">
-          <section className="w-full max-w-lg rounded-2xl border border-space-border-strong bg-space-850 p-6 shadow-2xl">
+          <section className="w-full max-w-lg rounded-md border border-space-border-strong bg-space-850 p-6 shadow-2xl">
             <p className="font-mono text-[11px] tracking-[0.18em] text-cinnabar">DESTRUCTIVE ACTION</p>
             <h2 className="mt-3 font-song text-2xl font-bold text-ink">
               {deleteTarget.kind === 'document' ? `删除课件“${deleteTarget.title}”？` : `删除整个课程空间“${deleteTarget.title}”？`}
@@ -162,8 +162,8 @@ export function LibraryView() {
               <p className="mt-4 text-sm leading-7 text-ink-light">该课程包含 {deleteTarget.documentCount} 份课件。删除后，全部课件及其 MinerU 解析、知识网络、卡片、笔记和索引都会被清理；聊天历史仍会保留。</p>
             )}
             <div className="mt-6 flex justify-end gap-3">
-              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-outline rounded-xl px-4 py-2.5 disabled:opacity-50">取消</button>
-              <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="rounded-xl border border-cinnabar/50 bg-cinnabar px-4 py-2.5 text-sm font-medium text-white hover:bg-cinnabar-light disabled:opacity-50">
+              <button type="button" disabled={deleting} onClick={() => setDeleteTarget(null)} className="btn-outline rounded-md px-4 py-2.5 disabled:opacity-50">取消</button>
+              <button type="button" disabled={deleting} onClick={() => void confirmDelete()} className="rounded-md border border-cinnabar/50 bg-cinnabar px-4 py-2.5 text-sm font-medium text-white hover:bg-cinnabar-light disabled:opacity-50">
                 {deleting ? '正在删除…' : deleteTarget.kind === 'document' ? '确认删除课件' : '确认删除课程'}
               </button>
             </div>

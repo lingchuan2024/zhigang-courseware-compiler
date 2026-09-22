@@ -76,7 +76,7 @@ export function SourceEvidencePanel({
 
           <div className="flex-1 overflow-y-auto p-4 space-y-3">
             {sources.length === 0 && (
-              <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-300">
+              <div className="rounded-xl border border-amber-400/30 bg-amber-400/10 px-4 py-3 text-sm leading-6 text-amber-800">
                 该节点缺少可定位原文。系统不会使用摘要或笔记替代课件原文。
               </div>
             )}
