@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { CandidateTopic, MarkdownBlock, ModelConfig } from '../../types';
-import { reconcileTopics } from '../topic-reconciliation';
+import type { CandidateTopic, MarkdownBlock, ModelConfig, KnowledgeTopic } from '../../types';
+import { reconcileTopics, topicsToCandidates, buildSourceRanges } from '../topic-reconciliation';
 
 const config: ModelConfig = {
   endpoint: 'https://api.example.com/v1',
@@ -58,5 +58,21 @@ describe('reconcileTopics degraded merge', () => {
     expect(result.topics.map(topic => topic.name)).toContain('AI candidate 0');
     expect(result.topics.every(topic => topic.sourceRanges.length === 1)).toBe(true);
     expect(result.relations).toEqual([]);
+  });
+});
+
+
+describe('merge evidence preservation', () => {
+  it('retains interior formula blocks across repeated compaction without crossing documents', () => {
+    const blocks = [block(0), { ...block(1), type: 'formula' as const }, block(2), { ...block(1), id: 'other-doc', documentId: 'doc-2' }];
+    const topic: KnowledgeTopic = {
+      id: 'topic', courseId: 'course', name: 'Least squares', aliases: [], summary: 'Derivation',
+      learningObjective: 'derive', sourceRanges: [{ documentId: 'doc-1', startBlockId: 'block-2', endBlockId: 'block-0' }],
+      childTopicIds: [], importance: 'core', difficulty: 2, knowledgeGenre: 'mathematical_derivation', confidence: 1, status: 'generated',
+    };
+    const first = topicsToCandidates([topic], 'first', blocks);
+    expect(first[0].sourceBlockIds).toEqual(['block-0', 'block-1', 'block-2']);
+    const second = topicsToCandidates([{ ...topic, sourceRanges: buildSourceRanges(first[0].sourceBlockIds, blocks) }], 'second', blocks);
+    expect(second[0].sourceBlockIds).toEqual(first[0].sourceBlockIds);
   });
 });

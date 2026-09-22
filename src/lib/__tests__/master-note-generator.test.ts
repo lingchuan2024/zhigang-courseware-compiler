@@ -193,4 +193,38 @@ describe('master note generator', () => {
     expect(synthesisRequest.user.indexOf('card-b')).toBeLessThan(synthesisRequest.user.indexOf('card-a'));
     expect(result.topicSyntheses[0].orderedCardIds).toEqual(['card-b', 'card-a']);
   });
+  it('bounds synthesis concurrency, preserves learning order and sends each section body once', async () => {
+    let active = 0;
+    let peak = 0;
+    const progress: number[] = [];
+    const requests: MasterNoteGenerationRequest[] = [];
+    const topics = Array.from({ length: 5 }, (_, i) => topic(`topic-${i}`, `Topic ${i}`));
+    const completer: MasterNoteCompleter = async request => {
+      requests.push(request);
+      if (request.kind === 'topic-synthesis') {
+        active++;
+        peak = Math.max(peak, active);
+        const index = Number(request.subjectId.split('-')[1]);
+        await new Promise(resolve => setTimeout(resolve, index === 0 ? 25 : 1));
+        active--;
+        if (index === 2) throw new Error('one topic unavailable');
+        return { sections: [{ title: 'Evidence', cardIds: [`card-${index}`], markdown: `UNIQUE-BODY-${index}` }] };
+      }
+      if (request.kind === 'chapter-plan') return { chapters: [{ id: 'chapter', title: 'All', topicIds: topics.map(t => t.id), framework: [] }] };
+      return { markdown: 'A complete chapter' };
+    };
+    const result = await runMasterNoteGeneration(config, {
+      courseId: 'course', title: 'Test', topics, topicRelations: [], orderedTopicIds: topics.map(t => t.id),
+      knowledgeCards: topics.map((t, i) => card(`card-${i}`, t.id, `fallback-${i}`)), glossary: [], formulaIndex: [], terminology: {}, symbols: {}, structureVersion: 1,
+    }, { onTopicSynthesis: (_, current) => progress.push(current) }, completer);
+    expect(peak).toBe(3);
+    expect(progress).toEqual([1, 2, 3, 4, 5]);
+    expect(result.topicSyntheses.map(t => t.topicId)).toEqual(topics.map(t => t.id));
+    expect(result.topicSyntheses[2].status).toBe('partial');
+    const chapter = requests.find(r => r.kind === 'chapter-note')!;
+    expect(chapter.user.match(/UNIQUE-BODY-0/g)).toHaveLength(1);
+    expect(chapter.user).toContain('fallback-2');
+    expect(result.masterNote.status).toBe('completed');
+  });
+
 });

@@ -134,7 +134,7 @@ export function getAssignedBlockIds(
  * @param blocks - 全部 Markdown 块（用于定位与展开）
  * @returns 范围内的块 ID 列表；若端点无效则返回空数组
  */
-function expandSourceRange(
+export function expandSourceRange(
   range: SourceRange,
   blocks: MarkdownBlock[]
 ): string[] {

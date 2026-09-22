@@ -22,6 +22,7 @@ import type {
   TopicMergeDecision,
   MarkdownBlock,
 } from '../types';
+import { expandSourceRange } from './knowledge-validation';
 import { callChatCompletion } from './model-v2';
 import type { CompiledPrompt } from './prompt-builder';
 import type { ModelTaskType } from './model-usage';
@@ -269,7 +270,7 @@ export function buildSourceRanges(
 /**
  * 将知识点列表转换回候选知识点列表，用于二级合并。
  *
- * 从每个知识点的 sourceRanges 重建 sourceBlockIds（取每个范围的起止块 ID），
+ * 从每个知识点的 sourceRanges 重建 sourceBlockIds（展开每个范围内全部块 ID），
  * 并以给定前缀生成新的 temporaryId。
  *
  * @param topics - 局部合并后的知识点列表
@@ -279,13 +280,14 @@ export function buildSourceRanges(
 export function topicsToCandidates(
   topics: KnowledgeTopic[],
   prefix: string,
+  allBlocks: MarkdownBlock[],
 ): CandidateTopic[] {
   return topics.map((topic, idx) => {
-    // 从 sourceRanges 重建 sourceBlockIds（取起止块 ID，去重）
+    // 保留完整证据区间，不能把推导中间的公式丢掉。
     const sourceBlockIds: string[] = [];
     const seen = new Set<string>();
     for (const range of topic.sourceRanges) {
-      for (const bid of [range.startBlockId, range.endBlockId]) {
+      for (const bid of expandSourceRange(range, allBlocks)) {
         if (!seen.has(bid)) {
           seen.add(bid);
           sourceBlockIds.push(bid);
@@ -963,7 +965,7 @@ export async function reconcileTopics(
       const batch = currentCandidates.slice(offset, offset + LOCAL_MERGE_BATCH_SIZE);
       try {
         const merged = await localMerge(config, batch, allBlocks);
-        compacted.push(...topicsToCandidates(merged, `lm${round}_${offset}`));
+        compacted.push(...topicsToCandidates(merged, `lm${round}_${offset}`, allBlocks));
       } catch (error) {
         if (!isRecoverableMergeError(error)) throw error;
         mergeWarnings.push(`第 ${round + 1} 轮局部合并输出异常，已保留该批 AI 候选`);

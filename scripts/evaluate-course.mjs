@@ -12,7 +12,8 @@ const credentials = JSON.parse(await readFile(resolve(root, 'credentials.json'),
 const config = { endpoint: 'https://api.deepseek.com', model: 'deepseek-chat', apiKey: credentials.deepseek };
 const memory = new Map();
 globalThis.localStorage = { getItem: k => memory.get(k) ?? null, setItem: (k,v) => memory.set(k,v), removeItem: k => memory.delete(k) };
-const server = await createServer({ server: { host: '127.0.0.1', port: 5199, strictPort: true, watch: null }, appType: 'custom' });
+const port = Number(process.env.EVAL_PORT || 5199);
+const server = await createServer({ server: { host: '127.0.0.1', port, strictPort: true, watch: null }, appType: 'custom' });
 await server.listen();
 const load = path => server.ssrLoadModule(`/src/lib/${path}.ts`);
 const save = (name, value) => writeFile(resolve(dir, name), typeof value === 'string' ? value : JSON.stringify(value, null, 2));
@@ -42,7 +43,7 @@ try {
     const result = await runMinerUParse(new File([await readFile(pdf)], basename(pdf), { type: 'application/pdf' }), {
       endpoint: 'https://mineru.net/api/v4', apiKey: credentials.mineru, modelVersion: 'vlm', language: 'en', enableFormula: true, enableTable: true,
     }, { onStatus: mark, fetcher: (url, options) => {
-      return nativeFetch(new URL(String(url), 'http://127.0.0.1:5199'), { ...options, signal: AbortSignal.timeout(120000) });
+      return nativeFetch(new URL(String(url), `http://127.0.0.1:${port}`), { ...options, signal: AbortSignal.timeout(120000) });
     }});
     markdown = result.markdown;
     await writeFile(sourceCache, markdown);
